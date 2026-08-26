@@ -5,6 +5,7 @@ import { Alert, Card, Skeleton, Tabs } from '@heroui/react';
 import {
   Activity,
   Astroid,
+  Bell,
   Calculator,
   CalendarDays,
   Clock,
@@ -114,6 +115,8 @@ export function fmtCostPerMinute(value: number | undefined | null): string {
 export function fmtUsageEstimateDuration(minutes: number | undefined): string {
   if (minutes == null || !Number.isFinite(minutes) || minutes < 0) return '';
   const totalMinutes = Math.round(minutes);
+  // 超过 1000h 时封顶显示 ">1000h"，避免超长文本撑破卡片布局。
+  if (totalMinutes > 1000 * 60) return '>1000h';
   const hours = Math.floor(totalMinutes / 60);
   const remainingMinutes = totalMinutes % 60;
   if (hours <= 0) return `${remainingMinutes}m`;
@@ -123,7 +126,22 @@ export function fmtUsageEstimateDuration(minutes: number | undefined): string {
 
 export function fmtUsageEstimateCost(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '$0';
-  return `$${Math.round(value)}`;
+  if (value < 1000) return `$${Math.round(value)}`;
+  // 千位以上按 K/M/B 归一化（保留一位小数，整数去尾零），控制卡片内容宽度。
+  const units: Array<{ divisor: number; suffix: string }> = [
+    { divisor: 1e9, suffix: 'B' },
+    { divisor: 1e6, suffix: 'M' },
+    { divisor: 1e3, suffix: 'K' },
+  ];
+  for (const unit of units) {
+    if (value < unit.divisor) continue;
+    const scaled = Math.round((value / unit.divisor) * 10) / 10;
+    // 四舍五入撞上下一档边界（如 999.95K → 1000.0K）时晋升到更大单位。
+    if (scaled < 1000) {
+      return `$${Number.isInteger(scaled) ? scaled : scaled.toFixed(1)}${unit.suffix}`;
+    }
+  }
+  return `$${Math.round(value / 1e9)}B`;
 }
 
 /** 将 $ 金额文本渲染为绿色 $ + 继承色金额，参考今日 Token 卡片标准成本（text-success）样式 */
@@ -263,9 +281,9 @@ function MetricCard({
   return (
     <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
       <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
-        <div className="ag-dashboard-metric-copy">
-          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
-          <div className="mt-1 flex min-w-0 items-baseline gap-2">
+        <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
+          <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
+          <div className="mt-auto flex min-w-0 items-baseline gap-2 pt-1">
             <div className="flex min-w-0 items-baseline font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">
               {value}
               {valueSuffix ? <span className="ml-1.5 text-[11px] font-medium leading-none text-text-tertiary">{valueSuffix}</span> : null}
@@ -284,21 +302,41 @@ function MetricCard({
   );
 }
 
+/** 指标徽章的高位告警色（红/黑），RPM 负载徽章与用量估算 Bell 徽章共用，保证语义一致。 */
+const METRIC_BADGE_DANGER_CLASS = 'bg-red-100 text-red-600 ring-red-200 dark:bg-red-400/15 dark:text-red-300 dark:ring-red-400/25';
+const METRIC_BADGE_CRITICAL_CLASS = 'bg-zinc-900 text-white ring-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:ring-zinc-700';
+
 /** RPM 负载等级对应的图标徽章配色：0 灰，≤50 同账号卡片(emerald)，≤200 同总Token卡片(stream)，≤500 同今日Token卡片(amber)，≤1000 红，>1000 黑 */
 const RPM_BADGE_LEVELS: Array<{ max: number; className: string; style?: CSSProperties }> = [
   { max: 0, className: METRIC_TONE_CLASSES.gray, style: METRIC_TONE_STYLES.gray },
   { max: 50, className: METRIC_TONE_CLASSES.emerald, style: METRIC_TONE_STYLES.emerald },
   { max: 200, className: METRIC_TONE_CLASSES.stream, style: METRIC_TONE_STYLES.stream },
-  { max: 500, className: METRIC_TONE_CLASSES.amber, style: METRIC_TONE_STYLES.amber },
-  { max: 1000, className: 'bg-red-100 text-red-600 ring-red-200 dark:bg-red-400/15 dark:text-red-300 dark:ring-red-400/25' },
+  { max: 500, className: METRIC_TONE_CLASSES.amber },
+  { max: 1000, className: METRIC_BADGE_DANGER_CLASS },
 ];
-const RPM_BADGE_MAX_CLASS = 'bg-zinc-900 text-white ring-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:ring-zinc-700';
+const RPM_BADGE_MAX_CLASS = METRIC_BADGE_CRITICAL_CLASS;
 
 function rpmBadge(rpm: number): { className: string; style?: CSSProperties } {
   for (const level of RPM_BADGE_LEVELS) {
     if (rpm <= level.max) return level;
   }
   return { className: RPM_BADGE_MAX_CLASS };
+}
+
+/** 用量估算 Bell 徽章配色：按 plus 套餐 5h 窗口剩余标准余额分档，<300 警告色(amber)，<200 危险色(红)，<100 黑；其余/无数据保持 cyan。 */
+const USAGE_ESTIMATE_BADGE_CYAN_CLASS = 'bg-cyan-100 text-cyan-600 ring-cyan-200 dark:bg-cyan-400/15 dark:text-cyan-300 dark:ring-cyan-400/25';
+const USAGE_ESTIMATE_BADGE_LEVELS: Array<{ maxExclusive: number; className: string }> = [
+  { maxExclusive: 100, className: METRIC_BADGE_CRITICAL_CLASS },
+  { maxExclusive: 200, className: METRIC_BADGE_DANGER_CLASS },
+  { maxExclusive: 300, className: METRIC_TONE_CLASSES.amber },
+];
+
+export function usageEstimateBadgeClass(remainingCost: number | undefined): string {
+  if (remainingCost == null || !Number.isFinite(remainingCost)) return USAGE_ESTIMATE_BADGE_CYAN_CLASS;
+  for (const level of USAGE_ESTIMATE_BADGE_LEVELS) {
+    if (remainingCost < level.maxExclusive) return level.className;
+  }
+  return USAGE_ESTIMATE_BADGE_CYAN_CLASS;
 }
 
 function PerformanceMetricCard({
@@ -326,8 +364,8 @@ function PerformanceMetricCard({
   return (
     <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
       <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
-        <div className="ag-dashboard-metric-copy">
-          <div className="flex items-center gap-1 text-sm font-semibold tracking-normal text-text-tertiary">
+        <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
+          <div className="flex h-5 min-w-0 items-center gap-1 text-sm font-semibold tracking-normal text-text-tertiary">
             <span className="truncate">{title}</span>
             {rpmTrend === 'up' ? (
               <MoveUp className="h-3.5 w-3.5 shrink-0 text-success" />
@@ -337,7 +375,7 @@ function PerformanceMetricCard({
               <MoveRight className="h-3.5 w-3.5 shrink-0 text-black" />
             )}
           </div>
-          <div className="mt-1 flex min-w-0 items-baseline gap-x-2 whitespace-nowrap">
+          <div className="mt-auto flex min-w-0 items-baseline gap-x-2 whitespace-nowrap pt-1">
             {rpmTexts.map((rpmText, index) => (
               <Fragment key={index}>
                 {index > 0 ? (
@@ -374,7 +412,7 @@ function PerformanceMetricCard({
 
 function StatsSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+    <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
       {Array.from({ length: 8 }).map((_, index) => (
         <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]" key={index}>
           <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
@@ -405,15 +443,20 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
     const rank = (plan: string) => plan === 'plus' ? 0 : plan === 'pro' ? 1 : 2;
     return rank(left.plan) - rank(right.plan);
   });
+  // Bell 徽章配色锚定 plus 套餐 5h 窗口的剩余标准余额。
+  const plus5hWindow = usageEstimates
+    .find((estimate) => estimate.plan === 'plus')
+    ?.windows.find((window) => window.window === '5h');
+  const plus5hRemainingCost = plus5hWindow?.status === 'ready' ? plus5hWindow.remaining_cost : undefined;
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+    <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
       <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
         <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
-          <div className="ag-dashboard-metric-copy">
-            <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">
-              {t('dashboard.users_summary', { active: stats.active_users, total: stats.total_users })} {t('dashboard.new_users', { count: stats.new_users_today })}
-            </div>
-            <div className="mt-1 flex min-w-0 items-baseline gap-x-2 whitespace-nowrap">
+        <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
+          <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">
+            {t('dashboard.users_summary', { active: stats.active_users, total: stats.total_users })} {t('dashboard.new_users', { count: stats.new_users_today })}
+          </div>
+          <div className="mt-auto flex min-w-0 items-baseline gap-x-2 whitespace-nowrap pt-1">
               <span className="flex items-baseline gap-1">
                 <span className="font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">{stats.enabled_api_keys}</span>
                 <span className="text-xs font-semibold leading-none text-text">{t('dashboard.enabled_label')}</span>
@@ -458,20 +501,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
             : undefined
         }
       />
-      <MetricCard
-        icon={<Astroid className="h-5 w-5" />}
-        tone="amber"
-        title={t('dashboard.today_tokens')}
-        value={fmtNum(stats.today_tokens)}
-        meta={<CostPair actual={stats.today_cost} standard={stats.today_standard_cost} />}
-      />
-      <MetricCard
-        icon={<Calculator className="h-5 w-5" />}
-        tone="stream"
-        title={t('dashboard.total_tokens')}
-        value={fmtNum(stats.alltime_tokens)}
-        meta={<CostPair actual={stats.alltime_cost} standard={stats.alltime_standard_cost} />}
-      />
       <PerformanceMetricCard
         icon={<Zap className="h-5 w-5" />}
         title={t('dashboard.performance_window', {
@@ -485,16 +514,16 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       />
       <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
         <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
-          <div className="ag-dashboard-metric-copy flex min-h-12 flex-col justify-center">
+          <div className="ag-dashboard-metric-copy flex min-h-12 flex-col self-stretch">
             <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">
               {t('dashboard.usage_estimate')} (1min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_1m)} />/10min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_10m)} />)
             </div>
             {usageEstimates.length === 0 ? (
-              <div className="mt-1 flex min-h-7 items-center font-mono text-xs font-semibold leading-none text-text">
+              <div className="mt-auto flex min-h-7 items-center pt-1 font-mono text-xs font-semibold leading-none text-text">
                 <span className="text-text-tertiary">-</span>
               </div>
             ) : (
-              <div className="mt-1 flex min-h-7 flex-col justify-center gap-0.5 font-mono text-sm font-semibold leading-none text-text">
+              <div className="mt-auto flex min-h-7 flex-col justify-center gap-0.5 pt-1 font-mono text-sm font-semibold leading-none text-text">
                 {usageEstimateWindows.map((windowKey) => {
                   const estimatesForWindow = orderedUsageEstimates
                     .flatMap((estimate) => {
@@ -518,8 +547,27 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
               </div>
             )}
           </div>
+          <span
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${usageEstimateBadgeClass(plus5hRemainingCost)}`}
+          >
+            <Bell className="h-5 w-5" />
+          </span>
         </Card.Content>
       </Card>
+      <MetricCard
+        icon={<Astroid className="h-5 w-5" />}
+        tone="amber"
+        title={t('dashboard.today_tokens')}
+        value={fmtNum(stats.today_tokens)}
+        meta={<CostPair actual={stats.today_cost} standard={stats.today_standard_cost} />}
+      />
+      <MetricCard
+        icon={<Calculator className="h-5 w-5" />}
+        tone="stream"
+        title={t('dashboard.total_tokens')}
+        value={fmtNum(stats.alltime_tokens)}
+        meta={<CostPair actual={stats.alltime_cost} standard={stats.alltime_standard_cost} />}
+      />
     </div>
   );
 }
