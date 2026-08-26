@@ -331,8 +331,10 @@ function prepareRequestTime(value: string | undefined): PreparedRequestTime {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return { display: '-', iso: '' };
   const pad = (part: number) => String(part).padStart(2, '0');
+  const clock = `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+  const date = `${pad(parsed.getMonth() + 1)}/${pad(parsed.getDate())}`;
   return {
-    display: `${pad(parsed.getHours())}:${pad(parsed.getMinutes())} ${pad(parsed.getMonth() + 1)}/${pad(parsed.getDate())}`,
+    display: `${clock} ${date}`,
     iso: parsed.toISOString(),
   };
 }
@@ -348,6 +350,11 @@ export function isObservedToday(value: string | undefined, now = new Date()) {
 
 function formatDailyUsageGrowth(value: number) {
   if (!Number.isFinite(value) || value < 0) return '0';
+  return String(Math.round(value));
+}
+
+function formatUsageFullCost(value: number | undefined) {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null;
   return String(Math.round(value));
 }
 
@@ -811,14 +818,24 @@ export function useAccountTableColumns({
         const access = prepareRequestTime(row.last_used_at);
         const growth = [
           isObservedToday(row.usage_5h_observed_at)
-            ? { slot: '5h', value: formatDailyUsageGrowth(row.usage_5h_daily_growth ?? 0) }
+            ? {
+                slot: '5h',
+                value: formatDailyUsageGrowth(row.usage_5h_daily_growth ?? 0),
+                fullCost: formatUsageFullCost(row.usage_5h_full_cost),
+              }
             : null,
           isObservedToday(row.usage_7d_observed_at)
-            ? { slot: '7d', value: formatDailyUsageGrowth(row.usage_7d_daily_growth ?? 0) }
+            ? {
+                slot: '7d',
+                value: formatDailyUsageGrowth(row.usage_7d_daily_growth ?? 0),
+                fullCost: formatUsageFullCost(row.usage_7d_full_cost),
+              }
             : null,
-        ].filter((item): item is { slot: string; value: string } => item !== null);
-        const growthText = growth.map((item) => `${item.slot} +${item.value}%`).join(' ');
-        const detail = [access.display, growthText].filter(Boolean).join('\n');
+        ].filter((item): item is { slot: string; value: string; fullCost: string | null } => item !== null);
+        const usageText = growth.map((item) => (
+          `${item.slot} +${item.value}%${item.fullCost === null ? '' : `/$${item.fullCost}`}`
+        )).join('\n');
+        const detail = [access.display, usageText].filter(Boolean).join('\n');
         return (
           <div className="ag-account-request-times" title={detail}>
             <div className="ag-account-request-time">
@@ -829,9 +846,20 @@ export function useAccountTableColumns({
             {growth.length > 0 ? (
               <div className="ag-account-daily-usage-growth">
                 {growth.map((item) => (
-                  <span key={item.slot} className="ag-account-daily-usage-growth-item">
-                    <span>{item.slot}</span>
-                    <span className="ag-account-daily-usage-growth-value">+{item.value}%</span>
+                  <span key={item.slot} className="ag-account-daily-usage-growth-item" data-slot={item.slot}>
+                    <span className="ag-account-daily-usage-growth-slot">{item.slot}</span>
+                    <span className="ag-account-daily-usage-growth-content">
+                      <span className="ag-account-daily-usage-growth-value">+{item.value}%</span>
+                      {item.fullCost !== null ? (
+                        <>
+                          <span className="ag-account-usage-full-estimate-separator">/</span>
+                          <span className="ag-account-usage-full-estimate">
+                            <span className="ag-account-usage-full-estimate-dollar">$</span>
+                            {item.fullCost}
+                          </span>
+                        </>
+                      ) : null}
+                    </span>
                   </span>
                 ))}
               </div>

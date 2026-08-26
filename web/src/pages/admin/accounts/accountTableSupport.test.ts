@@ -21,9 +21,11 @@ const account: AccountResp = {
   usage_5h_growth_date: '2026-08-25',
   usage_5h_daily_growth: 10,
   usage_5h_observed_at: '2026-08-25T01:00:00Z',
+  usage_5h_full_cost: 1000,
   usage_7d_growth_date: '2026-08-25',
   usage_7d_daily_growth: 20,
   usage_7d_observed_at: '2026-08-25T01:00:00Z',
+  usage_7d_full_cost: 2000,
   created_at: '',
   updated_at: '',
 };
@@ -33,6 +35,13 @@ describe('accountTableCellRowsEqual', () => {
     expect(accountTableCellRowsEqual('last_used_at', account, {
       ...account,
       usage_7d_observed_at: '2026-08-26T01:00:00Z',
+    })).toBe(false);
+  });
+
+  it('invalidates recent usage when only a full-window estimate changes', () => {
+    expect(accountTableCellRowsEqual('last_used_at', account, {
+      ...account,
+      usage_7d_full_cost: 2100,
     })).toBe(false);
   });
 });

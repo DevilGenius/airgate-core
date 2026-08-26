@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"math"
 	"time"
 
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
@@ -26,8 +27,10 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		UpstreamIsPool:          account.UpstreamIsPool,
 		Usage5hGrowthDate:       account.UsageEstimateMeta.FiveHour.GrowthDate,
 		Usage5hDailyGrowth:      account.UsageEstimateMeta.FiveHour.DailyGrowth,
+		Usage5hFullCost:         accountUsageFullCost(account.UsageEstimateMeta.FiveHour.CostPerPercent),
 		Usage7dGrowthDate:       account.UsageEstimateMeta.SevenDay.GrowthDate,
 		Usage7dDailyGrowth:      account.UsageEstimateMeta.SevenDay.DailyGrowth,
+		Usage7dFullCost:         accountUsageFullCost(account.UsageEstimateMeta.SevenDay.CostPerPercent),
 		Extra:                   account.Extra,
 		GroupIDs:                account.GroupIDs,
 		TimeMixin: dto.TimeMixin{
@@ -81,6 +84,17 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 	}
 
 	return resp
+}
+
+func accountUsageFullCost(costPerPercent float64) *float64 {
+	if costPerPercent <= 0 || math.IsNaN(costPerPercent) || math.IsInf(costPerPercent, 0) {
+		return nil
+	}
+	fullCost := costPerPercent * 100
+	if math.IsNaN(fullCost) || math.IsInf(fullCost, 0) {
+		return nil
+	}
+	return &fullCost
 }
 
 func toAccountExportItem(account appaccount.Account) dto.AccountExportItem {

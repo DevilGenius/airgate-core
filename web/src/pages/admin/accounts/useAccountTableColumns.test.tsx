@@ -156,9 +156,11 @@ describe('useAccountTableColumns usage refresh', () => {
       usage_5h_growth_date: today,
       usage_5h_daily_growth: 65,
       usage_5h_observed_at: now.toISOString(),
+      usage_5h_full_cost: 2000,
       usage_7d_growth_date: today,
       usage_7d_daily_growth: 16,
       usage_7d_observed_at: now.toISOString(),
+      usage_7d_full_cost: 8000,
     };
 
     const { container } = render(
@@ -169,6 +171,33 @@ describe('useAccountTableColumns usage refresh', () => {
 
     expect(screen.getByText('+65%')).toBeInTheDocument();
     expect(screen.getByText('+16%')).toBeInTheDocument();
+    expect(Array.from(container.querySelectorAll('.ag-account-daily-usage-growth-item')).map((item) => item.textContent))
+      .toEqual(['5h+65%/$2000', '7d+16%/$8000']);
+    expect(container.querySelectorAll('.ag-account-usage-full-estimate-dollar')).toHaveLength(2);
     expect(container.querySelectorAll('time')).toHaveLength(1);
+  });
+
+  it('shows only the 7d full estimate when the account has no observed 5h window', () => {
+    const now = new Date();
+    const row: AccountResp = {
+      ...account,
+      last_used_at: now.toISOString(),
+      usage_5h_full_cost: 2000,
+      usage_7d_daily_growth: 16,
+      usage_7d_observed_at: now.toISOString(),
+      usage_7d_full_cost: 8000,
+    };
+
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RecentUsageHarness row={row} />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByText('5h')).not.toBeInTheDocument();
+    expect(screen.getByText('7d')).toBeInTheDocument();
+    expect(Array.from(container.querySelectorAll('.ag-account-daily-usage-growth-item')).map((item) => item.textContent))
+      .toEqual(['7d+16%/$8000']);
+    expect(container.querySelectorAll('.ag-account-usage-full-estimate-dollar')).toHaveLength(1);
   });
 });

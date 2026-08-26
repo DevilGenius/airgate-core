@@ -191,10 +191,14 @@ export interface AccountResp {
   /** Positive daily usage growth (increase in consumed percentage); the UI renders it with a plus sign. */
   usage_5h_daily_growth?: number;
   usage_5h_observed_at?: string;
+  /** Estimated standard cost represented by 100% of the 5h usage window. */
+  usage_5h_full_cost?: number;
   usage_7d_growth_date?: string;
   /** Positive daily usage growth (increase in consumed percentage); the UI renders it with a plus sign. */
   usage_7d_daily_growth?: number;
   usage_7d_observed_at?: string;
+  /** Estimated standard cost represented by 100% of the 7d usage window. */
+  usage_7d_full_cost?: number;
   deleted_at?: string;
   group_ids: number[];
   /** 当前在 Redis 上仍生效的家族级限流冷却列表；后端 omitempty，没有冷却时缺省。 */

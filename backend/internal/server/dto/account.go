@@ -60,9 +60,11 @@ type AccountResp struct {
 	Usage5hGrowthDate       string              `json:"usage_5h_growth_date,omitempty"`
 	Usage5hDailyGrowth      float64             `json:"usage_5h_daily_growth"` // 正数用量增长幅度（已消耗百分比增量）
 	Usage5hObservedAt       *string             `json:"usage_5h_observed_at,omitempty"`
+	Usage5hFullCost         *float64            `json:"usage_5h_full_cost,omitempty"` // 5h 窗口 100% 用量的账号标准成本估值
 	Usage7dGrowthDate       string              `json:"usage_7d_growth_date,omitempty"`
 	Usage7dDailyGrowth      float64             `json:"usage_7d_daily_growth"` // 正数用量增长幅度（已消耗百分比增量）
 	Usage7dObservedAt       *string             `json:"usage_7d_observed_at,omitempty"`
+	Usage7dFullCost         *float64            `json:"usage_7d_full_cost,omitempty"` // 7d 窗口 100% 用量的账号标准成本估值
 	DeletedAt               *string             `json:"deleted_at,omitempty"`
 	GroupIDs                []int64             `json:"group_ids"`
 	FamilyCooldowns         []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`
