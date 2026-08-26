@@ -151,7 +151,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
 
   const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
     <span
-      className="inline-flex h-[1.0625rem] items-center gap-1 px-1.5 rounded-full text-[10px] font-semibold border whitespace-nowrap"
+      className="inline-flex h-[0.875rem] items-center gap-1 px-1.5 rounded-full text-[10px] font-semibold border whitespace-nowrap"
       style={{ background: bg, color: fg, borderColor: `color-mix(in oklab, ${fg} 70%, transparent)` }}
       title={tooltip}
     >

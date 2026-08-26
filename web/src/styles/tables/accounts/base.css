@@ -72,10 +72,11 @@
 }
 
 /* Status column: compressed chips so up to three rows (state, family cooldown,
-   model demotion) fit without inflating row height. */
+   model demotion) fit within the 3rem row height: 3 × 0.875rem chips + 2 × 0.125rem
+   gaps = 2.875rem, leaving slack so the row height never inflates. */
 
 .ag-accounts-table .ag-account-status-pill {
-  height: 1.0625rem;
+  height: 0.875rem;
   padding-inline: 0.375rem;
   font-size: 0.625rem;
 }
