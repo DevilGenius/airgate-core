@@ -26,17 +26,17 @@ func newServerTestContext(method, target string, params gin.Params) (*gin.Contex
 	return c, w
 }
 
-func TestExtractCCBearerKeyAndMissingBalanceAuth(t *testing.T) {
+func TestExtractBearerAPIKeyAndMissingUsageAuth(t *testing.T) {
 	c, _ := newServerTestContext(http.MethodGet, "/v1/usage", nil)
-	if got := extractCCBearerKey(c); got != "" {
+	if got := extractBearerAPIKey(c); got != "" {
 		t.Fatalf("missing bearer = %q", got)
 	}
 	c.Request.Header.Set("Authorization", "Basic sk-test")
-	if got := extractCCBearerKey(c); got != "" {
+	if got := extractBearerAPIKey(c); got != "" {
 		t.Fatalf("basic bearer = %q", got)
 	}
 	c.Request.Header.Set("Authorization", "Bearer  sk-test  ")
-	if got := extractCCBearerKey(c); got != "sk-test" {
+	if got := extractBearerAPIKey(c); got != "sk-test" {
 		t.Fatalf("bearer = %q", got)
 	}
 
@@ -46,16 +46,16 @@ func TestExtractCCBearerKeyAndMissingBalanceAuth(t *testing.T) {
 		if header != "" {
 			c.Request.Header.Set("Authorization", header)
 		}
-		s.handleCCCompatUserBalance(c)
+		s.handleAPIKeyUsage(c)
 		if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), `"is_active":false`) {
 			t.Fatalf("header %q status/body = %d %s", header, w.Code, w.Body.String())
 		}
 	}
 }
 
-func TestCCCompatUserBalanceWithSQLite(t *testing.T) {
+func TestAPIKeyUsageCompatWithSQLite(t *testing.T) {
 	ctx := context.Background()
-	db := testdb.OpenMemoryEnt(t, "server_cc_compat", schema.WithGlobalUniqueID(false))
+	db := testdb.OpenMemoryEnt(t, "server_apikey_usage_compat", schema.WithGlobalUniqueID(false))
 	defer func() {
 		if err := db.Close(); err != nil {
 			t.Fatalf("close db: %v", err)
@@ -97,7 +97,7 @@ func TestCCCompatUserBalanceWithSQLite(t *testing.T) {
 		}
 		c, w := newServerTestContext(http.MethodGet, "/v1/usage", nil)
 		c.Request.Header.Set("Authorization", "Bearer "+tt.key)
-		s.handleCCCompatUserBalance(c)
+		s.handleAPIKeyUsage(c)
 		if w.Code != http.StatusOK {
 			t.Fatalf("%s status = %d body=%s", tt.name, w.Code, w.Body.String())
 		}
@@ -107,11 +107,49 @@ func TestCCCompatUserBalanceWithSQLite(t *testing.T) {
 		if strings.Contains(w.Body.String(), `"is_active":true`) != tt.wantActive {
 			t.Fatalf("%s active body = %s", tt.name, w.Body.String())
 		}
+		if !strings.Contains(w.Body.String(), `"object":"credit_summary"`) ||
+			!strings.Contains(w.Body.String(), `"total_available":`) ||
+			!strings.Contains(w.Body.String(), `"remaining":`) {
+			t.Fatalf("%s upgraded usage body = %s", tt.name, w.Body.String())
+		}
+	}
+
+	newAPICompatCases := []struct {
+		name    string
+		target  string
+		handler gin.HandlerFunc
+		want    []string
+	}{
+		{
+			name:    "subscription",
+			target:  "/v1/dashboard/billing/subscription",
+			handler: s.handleNewAPICompatSubscription,
+			want:    []string{`"object":"billing_subscription"`, `"hard_limit_usd":10`, `"has_payment_method":true`},
+		},
+		{
+			name:    "usage",
+			target:  "/v1/dashboard/billing/usage?start_date=2026-08-01&end_date=2026-08-26",
+			handler: s.handleNewAPICompatUsage,
+			want:    []string{`"object":"list"`, `"total_usage":400`},
+		},
+	}
+	for _, tt := range newAPICompatCases {
+		c, w := newServerTestContext(http.MethodGet, tt.target, nil)
+		c.Request.Header.Set("Authorization", "Bearer sk-limited")
+		tt.handler(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s status = %d body=%s", tt.name, w.Code, w.Body.String())
+		}
+		for _, want := range tt.want {
+			if !strings.Contains(w.Body.String(), want) {
+				t.Fatalf("%s body = %s, want %q", tt.name, w.Body.String(), want)
+			}
+		}
 	}
 
 	c, w := newServerTestContext(http.MethodGet, "/v1/usage", nil)
 	c.Request.Header.Set("Authorization", "Bearer sk-missing")
-	s.handleCCCompatUserBalance(c)
+	s.handleAPIKeyUsage(c)
 	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "invalid api key") {
 		t.Fatalf("missing key status/body = %d %s", w.Code, w.Body.String())
 	}

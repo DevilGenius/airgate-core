@@ -296,15 +296,14 @@ func (s *Server) registerRoutes() {
 	r.GET("/status", statusProxy)
 	r.GET("/status/*path", statusProxy)
 
-	// === cc-switch 通用模板兼容端点（使用 sk-xxx API Key 自鉴权） ===
-	// cc-switch（https://github.com/farion1231/cc-switch）的"通用模板"会
-	// 打 GET {baseUrl}/v1/usage，extractor 依次读 response.remaining /
-	// response.quota.remaining / response.balance 作为剩余额度，并读
-	// response.is_active 作为 key 状态。这里注册 /v1/usage 返回
-	// { is_active, balance } 即可命中。
+	// === API Key 用量兼容端点（使用 sk-xxx API Key 自鉴权） ===
+	// /v1/usage 兼容 cc-switch 与 OpenAI credit_summary；dashboard/billing
+	// 两个端点兼容 new-api 普通 OpenAI/自定义渠道的余额查询。
 	// 必须注册在 NoRoute 之前，否则会被插件动态路由吃掉。
-	// 实现见 cc_compat.go。
-	r.GET("/v1/usage", s.handleCCCompatUserBalance)
+	// 实现见 apikey_usage_compat.go。
+	r.GET("/v1/usage", s.handleAPIKeyUsage)
+	r.GET("/v1/dashboard/billing/subscription", s.handleNewAPICompatSubscription)
+	r.GET("/v1/dashboard/billing/usage", s.handleNewAPICompatUsage)
 
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
 	r.GET("/uploads/*path", serveUploadAsset("data/uploads"))
