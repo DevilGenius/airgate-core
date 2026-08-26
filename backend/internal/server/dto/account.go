@@ -14,6 +14,9 @@ type FamilyCooldownDTO struct {
 	Family string `json:"family"`
 	Until  string `json:"until"` // RFC3339 UTC
 	Reason string `json:"reason,omitempty"`
+	// DurationMs 本次冷却窗口的总时长（固定 N 秒或指数退避档位），供前端 tooltip
+	// 展示"总退避时间"；升级前写入的旧数据没有该值，为 0 时前端退化为显示剩余时间。
+	DurationMs int64 `json:"duration_ms,omitempty"`
 }
 
 // ModelDemotionDTO 账号当前 30 分钟桶内因成功率低于阈值而被降级的调度模型（内存态）。

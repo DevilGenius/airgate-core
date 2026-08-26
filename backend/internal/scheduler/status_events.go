@@ -7,7 +7,7 @@ import "time"
 // cooldowns shown by the credentials management page.
 type AccountStatusEventPublisher interface {
 	PublishAccountStateChanged(accountID int, state string, stateUntil *time.Time, errorMsg string)
-	PublishAccountFamilyCooldownChanged(accountID int, action, family string, until *time.Time, reason string)
+	PublishAccountFamilyCooldownChanged(accountID int, action, family string, until *time.Time, reason string, durationMs int64)
 }
 
 // SetAccountStatusEventPublisher injects a best-effort status event publisher.
@@ -25,16 +25,16 @@ func (sm *StateMachine) publishAccountStateChanged(accountID int, state string, 
 	sm.statusPublisher.PublishAccountStateChanged(accountID, state, stateUntil, errorMsg)
 }
 
-func (sm *StateMachine) publishAccountFamilyCooldownUpsert(accountID int, family string, until time.Time, reason string) {
+func (sm *StateMachine) publishAccountFamilyCooldownUpsert(accountID int, family string, until time.Time, reason string, window time.Duration) {
 	if sm == nil || sm.statusPublisher == nil || accountID <= 0 || family == "" {
 		return
 	}
-	sm.statusPublisher.PublishAccountFamilyCooldownChanged(accountID, "upsert", family, &until, reason)
+	sm.statusPublisher.PublishAccountFamilyCooldownChanged(accountID, "upsert", family, &until, reason, window.Milliseconds())
 }
 
 func (sm *StateMachine) publishAccountFamilyCooldownClear(accountID int) {
 	if sm == nil || sm.statusPublisher == nil || accountID <= 0 {
 		return
 	}
-	sm.statusPublisher.PublishAccountFamilyCooldownChanged(accountID, "clear", "", nil, "")
+	sm.statusPublisher.PublishAccountFamilyCooldownChanged(accountID, "clear", "", nil, "", 0)
 }

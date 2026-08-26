@@ -174,7 +174,7 @@ func TestFamilyCooldownNilRedisAndPureHelpers(t *testing.T) {
 		t.Fatalf("familyCooldownReasonKey = %q", got)
 	}
 
-	fc.Mark(ctx, 7, "gpt-image", time.Now().Add(time.Minute), "429")
+	fc.Mark(ctx, 7, "gpt-image", time.Now().Add(time.Minute), "429", time.Minute)
 	if until, ok := fc.Until(ctx, 7, "gpt-image"); ok || !until.IsZero() {
 		t.Fatalf("Until nil redis = %v, %v", until, ok)
 	}
@@ -193,7 +193,7 @@ func TestFamilyCooldownNilRedisAndPureHelpers(t *testing.T) {
 	}
 
 	var nilFC *FamilyCooldown
-	nilFC.Mark(ctx, 7, "gpt-image", time.Now(), "noop")
+	nilFC.Mark(ctx, 7, "gpt-image", time.Now(), "noop", time.Second)
 	if _, ok := nilFC.Until(ctx, 7, "gpt-image"); ok {
 		t.Fatal("nil FamilyCooldown Until returned ok")
 	}

@@ -22,10 +22,10 @@ func TestCoalescingStatusPublisherKeepsLatestValuesAndClearOrder(t *testing.T) {
 	latestFamilyUntil := now.Add(3 * time.Hour)
 	publisher.PublishAccountStateChanged(7, "active", nil, "")
 	publisher.PublishAccountStateChanged(7, "degraded", &stateUntil, "upstream")
-	publisher.PublishAccountFamilyCooldownChanged(7, "upsert", "old-family", &oldFamilyUntil, "old")
-	publisher.PublishAccountFamilyCooldownChanged(7, "clear", "", nil, "")
-	publisher.PublishAccountFamilyCooldownChanged(7, "upsert", "gpt-5", &oldFamilyUntil, "old")
-	publisher.PublishAccountFamilyCooldownChanged(7, "upsert", "gpt-5", &latestFamilyUntil, "latest")
+	publisher.PublishAccountFamilyCooldownChanged(7, "upsert", "old-family", &oldFamilyUntil, "old", 1000)
+	publisher.PublishAccountFamilyCooldownChanged(7, "clear", "", nil, "", 0)
+	publisher.PublishAccountFamilyCooldownChanged(7, "upsert", "gpt-5", &oldFamilyUntil, "old", 2000)
+	publisher.PublishAccountFamilyCooldownChanged(7, "upsert", "gpt-5", &latestFamilyUntil, "latest", 3000)
 
 	publisher.flush()
 
@@ -43,7 +43,8 @@ func TestCoalescingStatusPublisherKeepsLatestValuesAndClearOrder(t *testing.T) {
 
 	upsertEvent := nextEvent(t, ch)
 	if upsertEvent.FamilyAction != "upsert" || upsertEvent.Family != "gpt-5" ||
-		upsertEvent.FamilyUntil != latestFamilyUntil.Format(time.RFC3339Nano) || upsertEvent.FamilyReason != "latest" {
+		upsertEvent.FamilyUntil != latestFamilyUntil.Format(time.RFC3339Nano) || upsertEvent.FamilyReason != "latest" ||
+		upsertEvent.FamilyDurationMs != 3000 {
 		t.Fatalf("upsert event = %#v", upsertEvent)
 	}
 

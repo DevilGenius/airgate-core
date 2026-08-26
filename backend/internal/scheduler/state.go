@@ -152,8 +152,8 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		// 有 Family 信息时走家族级冷却：撞 gpt-image 4000/min 不会让同账号 chat 被跳过。
 		// 无 Family（admin 巡检 / 老插件）保留账号级 rate_limited 兜底，行为与改造前一致。
 		if j.Family != "" && sm.familyCooldown != nil {
-			sm.familyCooldown.Mark(ctx, accountID, j.Family, until, j.Reason)
-			sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason)
+			sm.familyCooldown.Mark(ctx, accountID, j.Family, until, j.Reason, dur)
+			sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason, dur)
 			slog.Info("scheduler_family_cooldown",
 				sdk.LogFieldAccountID, accountID,
 				"family", j.Family,
@@ -253,8 +253,8 @@ func (sm *StateMachine) applyFamilyTransientAvoidance(ctx context.Context, accou
 		return
 	}
 	until := time.Now().Add(delay)
-	sm.familyCooldown.MarkTransient(ctx, accountID, j.Family, until, j.Reason, nextStep)
-	sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason)
+	sm.familyCooldown.MarkTransient(ctx, accountID, j.Family, until, j.Reason, nextStep, delay)
+	sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason, delay)
 
 	slog.Warn("scheduler_family_transient_cooldown",
 		sdk.LogFieldAccountID, accountID,
@@ -290,8 +290,8 @@ func (sm *StateMachine) applyFixedFamilyTransientAvoidance(ctx context.Context, 
 	}
 
 	until := time.Now().Add(delay)
-	sm.familyCooldown.Mark(ctx, accountID, j.Family, until, j.Reason)
-	sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason)
+	sm.familyCooldown.Mark(ctx, accountID, j.Family, until, j.Reason, delay)
+	sm.publishAccountFamilyCooldownUpsert(accountID, j.Family, until, j.Reason, delay)
 	slog.Warn("scheduler_family_transient_cooldown",
 		sdk.LogFieldAccountID, accountID,
 		"family", j.Family,

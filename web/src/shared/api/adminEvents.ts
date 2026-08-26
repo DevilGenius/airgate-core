@@ -17,6 +17,8 @@ export interface AdminServerEvent {
   family?: string;
   family_until?: string;
   family_reason?: string;
+  /** 本次家族冷却窗口的总时长（毫秒），用于 tooltip 展示"总退避时间"。 */
+  family_duration_ms?: number;
   expected_seq?: number;
   received_seq?: number;
   [key: string]: unknown;

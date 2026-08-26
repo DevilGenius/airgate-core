@@ -20,7 +20,7 @@ func (p *recordingAccountStatusPublisher) PublishAccountStateChanged(accountID i
 	p.stateValues = append(p.stateValues, state)
 }
 
-func (p *recordingAccountStatusPublisher) PublishAccountFamilyCooldownChanged(accountID int, _, _ string, _ *time.Time, _ string) {
+func (p *recordingAccountStatusPublisher) PublishAccountFamilyCooldownChanged(accountID int, _, _ string, _ *time.Time, _ string, _ int64) {
 	p.cooldownAccountIDs = append(p.cooldownAccountIDs, accountID)
 }
 
@@ -52,7 +52,7 @@ func TestAccountStatusEventPublisher(t *testing.T) {
 	s.SetAccountStatusEventPublisher(publisher)
 	s.state.publishAccountStateChanged(0, "active", nil, "")
 	s.state.publishAccountStateChanged(7, "active", nil, "")
-	s.state.publishAccountFamilyCooldownUpsert(8, "gpt-5.6-sol", time.Now().Add(time.Hour), "limited")
+	s.state.publishAccountFamilyCooldownUpsert(8, "gpt-5.6-sol", time.Now().Add(time.Hour), "limited", time.Hour)
 	s.state.publishAccountFamilyCooldownClear(9)
 
 	if len(publisher.stateAccountIDs) != 1 || publisher.stateAccountIDs[0] != 7 {

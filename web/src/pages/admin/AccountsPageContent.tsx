@@ -256,6 +256,9 @@ function applyAccountStatusEventToRow(row: AccountResp, event: AdminServerEvent)
       ...(typeof event.family_reason === 'string' && event.family_reason
         ? { reason: event.family_reason }
         : {}),
+      ...(typeof event.family_duration_ms === 'number' && event.family_duration_ms > 0
+        ? { duration_ms: event.family_duration_ms }
+        : {}),
     };
     const now = Date.now();
     next = {

@@ -43,6 +43,21 @@ function formatCountdown(ms: number): string {
   return `${sec}s`;
 }
 
+// formatBackoffTotal 格式化总退避时长：指数退避档位的 7.5s 需要保留一位小数，
+// 整数秒 / 分钟级窗口直接复用倒计时格式。
+function formatBackoffTotal(ms: number): string {
+  if (ms <= 0) return '';
+  if (ms < 60000 && ms % 1000 !== 0) {
+    return `${Number((ms / 1000).toFixed(1))}s`;
+  }
+  return formatCountdown(ms);
+}
+
+function extractHttpStatusLabel(reason: string | undefined): string | undefined {
+  const match = reason?.match(/\bHTTP\s*([1-5]\d{2})\b/i);
+  return match ? `HTTP ${match[1]}` : undefined;
+}
+
 function accountHasLiveCooldown(row: AccountResp, now: number): boolean {
   const stateUntil = row.state_until ? Date.parse(row.state_until) : 0;
   if (stateUntil > now) return true;
@@ -139,15 +154,19 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   const rateLimitedFamilyCooldowns = liveFamilyCooldowns.filter(
     (cooldown) => !isTransientFamilyCooldown(cooldown),
   );
-  const cooldownTooltip = (cooldowns: FamilyCooldownDTO[]) => cooldowns
+  // showTotal=true 时 tooltip 展示本次冷却窗口的总退避时长（后端 duration_ms，
+  // 来自系统设置的固定 N 秒或指数退避档位）；旧数据没有该字段时退化为剩余时间。
+  const cooldownTooltip = (cooldowns: FamilyCooldownDTO[], showTotal: boolean) => cooldowns
     .map((fc) => {
-      const ms = Date.parse(fc.until) - now;
+      const showTotalValue = showTotal && typeof fc.duration_ms === 'number' && fc.duration_ms > 0;
+      const ms = showTotalValue ? fc.duration_ms! : Date.parse(fc.until) - now;
+      const formatted = showTotal ? formatBackoffTotal(ms) : formatCountdown(ms);
       const reason = fc.reason ? ` — ${fc.reason.slice(0, 80)}` : '';
-      return `${fc.family} ${formatCountdown(ms)}${reason}`;
+      return `${fc.family} ${formatted}${reason}`;
     })
     .join('\n');
-  const familyTooltip = cooldownTooltip(rateLimitedFamilyCooldowns);
-  const transientFamilyTooltip = cooldownTooltip(transientFamilyCooldowns);
+  const familyTooltip = cooldownTooltip(rateLimitedFamilyCooldowns, false);
+  const transientFamilyTooltip = cooldownTooltip(transientFamilyCooldowns, true);
 
   const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
     <span
@@ -193,6 +212,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     const trimmedError = row.error_msg?.trim();
     const isManualDisabled = trimmedError === '手动关闭' || trimmedError === '管理员手动关闭调度';
     const reason = trimmedError === '管理员手动关闭调度' ? '手动关闭' : trimmedError;
+    const statusLabel = extractHttpStatusLabel(reason);
     mainBadge = (
       <div className="inline-flex min-w-0 max-w-full flex-col items-center gap-0.5">
         <StatusPill
@@ -201,9 +221,9 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
           status="disabled"
           tooltip={reason || undefined}
         />
-        {reason && (
+        {statusLabel && (
           <span className="block max-w-[5.75rem] truncate text-center text-[10px] leading-none text-[var(--ag-muted)]" title={reason}>
-            {reason}
+            {statusLabel}
           </span>
         )}
       </div>
@@ -244,12 +264,18 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   }
 
   // 瞬时状态独立占据第三行，避免与主状态或模型状态混排。
+  // chip 直接显示剩余倒计时（多个家族取最长剩余，即调度恢复的最后约束），
+  // 每秒随冷却时钟刷新；hover tooltip 展示各家族的总退避时长。
   const transientStatusBadges: Array<{ key: string; badge: ReactElement }> = [];
   if (transientFamilyCooldowns.length > 0) {
+    const transientRemainingMs = transientFamilyCooldowns.reduce(
+      (max, fc) => Math.max(max, Date.parse(fc.until) - now),
+      0,
+    );
     transientStatusBadges.push({
       key: 'family_transient',
       badge: pill(
-        t('accounts.family_transient_status_label', '家族退避中'),
+        `${t('accounts.family_transient_status_label', '家族退避中')} ${formatCountdown(transientRemainingMs)}`,
         'color-mix(in srgb, #06b6d4 14%, transparent)',
         '#06b6d4',
         transientFamilyTooltip,

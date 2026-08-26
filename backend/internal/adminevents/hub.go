@@ -32,6 +32,7 @@ type Event struct {
 	Family             string  `json:"family,omitempty"`
 	FamilyUntil        string  `json:"family_until,omitempty"`
 	FamilyReason       string  `json:"family_reason,omitempty"`
+	FamilyDurationMs   int64   `json:"family_duration_ms,omitempty"`
 }
 
 // Hub fans out admin events to connected SSE clients. Publishing never blocks
@@ -142,7 +143,9 @@ func (h *Hub) PublishAccountStateChanged(accountID int, state string, stateUntil
 
 // PublishAccountFamilyCooldownChanged reports an upsert or clear delta for the
 // Redis-backed model-family cooldown list without reading the account table.
-func (h *Hub) PublishAccountFamilyCooldownChanged(accountID int, action, family string, until *time.Time, reason string) {
+// durationMs 是本次冷却窗口的总时长（固定 N 秒或指数退避档位），用于前端 tooltip
+// 展示"总退避时间"；clear 与旧调用传 0。
+func (h *Hub) PublishAccountFamilyCooldownChanged(accountID int, action, family string, until *time.Time, reason string, durationMs int64) {
 	if h == nil || accountID <= 0 || (action != "upsert" && action != "clear") {
 		return
 	}
@@ -151,12 +154,13 @@ func (h *Hub) PublishAccountFamilyCooldownChanged(accountID int, action, family 
 		untilValue = until.UTC().Format(time.RFC3339Nano)
 	}
 	h.Publish(Event{
-		Type:         TypeAccountStatusChanged,
-		AccountID:    accountID,
-		FamilyAction: action,
-		Family:       family,
-		FamilyUntil:  untilValue,
-		FamilyReason: reason,
+		Type:             TypeAccountStatusChanged,
+		AccountID:        accountID,
+		FamilyAction:     action,
+		Family:           family,
+		FamilyUntil:      untilValue,
+		FamilyReason:     reason,
+		FamilyDurationMs: durationMs,
 	})
 }
 

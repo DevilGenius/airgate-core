@@ -97,19 +97,26 @@ func familyCooldownReasonKey(accountID int, family string) string {
 	return fmt.Sprintf("ag:cooldown:family:%d:reason:%s", accountID, family)
 }
 
+// familyCooldownDurationKey 保存本次冷却窗口的总时长（毫秒），供后台 tooltip
+// 展示"总退避时间"（固定 N 秒或指数退避档位），与剩余倒计时区分。
+func familyCooldownDurationKey(accountID int, family string) string {
+	return fmt.Sprintf("ag:cooldown:family:%d:duration:%s", accountID, family)
+}
+
 func familyCooldownTransientStepKey(accountID int, family string) string {
 	return fmt.Sprintf("ag:cooldown:family:%d:transient_step:%s", accountID, family)
 }
 
 // Mark 把 (account, family) 写入冷却，TTL = until - now（最少 1ms）。
+// window 是本次冷却窗口的原始总时长，不受写入 Redis 前已流逝时间的影响。
 // 旧的 cooldown 直接被覆盖：上游每次给的 Retry-After 都视为最新建议，无须保留历史。
-func (fc *FamilyCooldown) Mark(ctx context.Context, accountID int, family string, until time.Time, reason string) {
-	fc.mark(ctx, accountID, family, until, reason, 0, false)
+func (fc *FamilyCooldown) Mark(ctx context.Context, accountID int, family string, until time.Time, reason string, window time.Duration) {
+	fc.mark(ctx, accountID, family, until, reason, window, 0, false)
 }
 
 // MarkTransient 把 (account, family) 写入瞬时退避冷却，并持久化升级 step。
-func (fc *FamilyCooldown) MarkTransient(ctx context.Context, accountID int, family string, until time.Time, reason string, step int) {
-	fc.mark(ctx, accountID, family, until, reason, step, true)
+func (fc *FamilyCooldown) MarkTransient(ctx context.Context, accountID int, family string, until time.Time, reason string, step int, window time.Duration) {
+	fc.mark(ctx, accountID, family, until, reason, window, step, true)
 }
 
 // SetTransientStep 只记录瞬时错误升级 step，不创建冷却窗口。
@@ -124,7 +131,7 @@ func (fc *FamilyCooldown) SetTransientStep(ctx context.Context, accountID int, f
 	}
 }
 
-func (fc *FamilyCooldown) mark(ctx context.Context, accountID int, family string, until time.Time, reason string, step int, transient bool) {
+func (fc *FamilyCooldown) mark(ctx context.Context, accountID int, family string, until time.Time, reason string, window time.Duration, step int, transient bool) {
 	if fc == nil || fc.rdb == nil || family == "" {
 		return
 	}
@@ -141,6 +148,7 @@ func (fc *FamilyCooldown) mark(ctx context.Context, accountID int, family string
 	activeKey := familyCooldownActiveKey(accountID)
 	pipe := fc.rdb.Pipeline()
 	pipe.Set(ctx, familyCooldownReasonKey(accountID, family), reason, ttl)
+	pipe.Set(ctx, familyCooldownDurationKey(accountID, family), strconv.FormatInt(window.Milliseconds(), 10), ttl)
 	pipe.ZAdd(ctx, indexKey, redis.Z{Score: float64(until.UnixMilli()), Member: family})
 	pipe.Eval(ctx, familyCooldownIndexExpireScript, []string{indexKey}, indexTTL.Milliseconds())
 	pipe.SetNX(ctx, activeKey, "1", 0)
@@ -230,6 +238,7 @@ func (fc *FamilyCooldown) Clear(ctx context.Context, accountID int, family strin
 	}
 	pipe := fc.rdb.Pipeline()
 	pipe.Del(ctx, familyCooldownReasonKey(accountID, family))
+	pipe.Del(ctx, familyCooldownDurationKey(accountID, family))
 	pipe.Del(ctx, familyCooldownTransientStepKey(accountID, family))
 	pipe.ZRem(ctx, familyCooldownIndexKey(accountID), family)
 	_, _ = pipe.Exec(ctx)
@@ -247,9 +256,10 @@ func (fc *FamilyCooldown) ClearAccount(ctx context.Context, accountID int) int {
 	}
 	pipe := fc.rdb.Pipeline()
 	if len(families) > 0 {
-		keys := make([]string, 0, len(families)*2)
+		keys := make([]string, 0, len(families)*3)
 		for _, family := range families {
 			keys = append(keys, familyCooldownReasonKey(accountID, family))
+			keys = append(keys, familyCooldownDurationKey(accountID, family))
 			keys = append(keys, familyCooldownTransientStepKey(accountID, family))
 		}
 		pipe.Del(ctx, keys...)
@@ -265,6 +275,9 @@ type FamilyCooldownEntry struct {
 	Family string
 	Until  time.Time
 	Reason string
+	// DurationMs 本次冷却窗口的总时长（固定 N 秒或指数退避档位）。
+	// 旧数据（升级前写入）没有该键，为 0，前端退化为显示剩余时间。
+	DurationMs int64
 }
 
 // List 列出指定账号当前所有家族冷却。供后台账号管理页展示用。
@@ -304,10 +317,11 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 	}
 
 	type pendingReason struct {
-		accountID int
-		family    string
-		until     time.Time
-		cmd       *redis.StringCmd
+		accountID   int
+		family      string
+		until       time.Time
+		cmd         *redis.StringCmd
+		durationCmd *redis.StringCmd
 	}
 	result := make(map[int][]FamilyCooldownEntry)
 	pending := make([]pendingReason, 0)
@@ -331,10 +345,11 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 		}
 		accountID := activeIDs[rawKeyIndex-1]
 		pending = append(pending, pendingReason{
-			accountID: accountID,
-			family:    family,
-			until:     until,
-			cmd:       reasonPipe.Get(ctx, familyCooldownReasonKey(accountID, family)),
+			accountID:   accountID,
+			family:      family,
+			until:       until,
+			cmd:         reasonPipe.Get(ctx, familyCooldownReasonKey(accountID, family)),
+			durationCmd: reasonPipe.Get(ctx, familyCooldownDurationKey(accountID, family)),
 		})
 	}
 	if len(pending) == 0 {
@@ -352,10 +367,15 @@ func (fc *FamilyCooldown) ListBatch(ctx context.Context, accountIDs []int) map[i
 		if err != nil {
 			continue
 		}
+		var durationMs int64
+		if raw, durationErr := item.durationCmd.Result(); durationErr == nil {
+			durationMs, _ = strconv.ParseInt(raw, 10, 64)
+		}
 		result[item.accountID] = append(result[item.accountID], FamilyCooldownEntry{
-			Family: item.family,
-			Until:  item.until,
-			Reason: reason,
+			Family:     item.family,
+			Until:      item.until,
+			Reason:     reason,
+			DurationMs: durationMs,
 		})
 	}
 	if len(stale) > 0 {

@@ -140,6 +140,11 @@ export interface FamilyCooldownDTO {
   /** RFC3339 UTC */
   until: string;
   reason?: string;
+  /**
+   * 本次冷却窗口的总时长（毫秒）：固定 N 秒或指数退避档位。
+   * 升级前写入的旧数据没有该值，缺省时前端退化为显示剩余时间。
+   */
+  duration_ms?: number;
 }
 
 /**

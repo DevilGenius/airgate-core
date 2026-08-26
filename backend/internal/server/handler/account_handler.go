@@ -141,9 +141,10 @@ func familyCooldownDTOs(entries []scheduler.FamilyCooldownEntry) []dto.FamilyCoo
 	out := make([]dto.FamilyCooldownDTO, 0, len(entries))
 	for _, e := range entries {
 		out = append(out, dto.FamilyCooldownDTO{
-			Family: e.Family,
-			Until:  e.Until.UTC().Format(time.RFC3339),
-			Reason: e.Reason,
+			Family:     e.Family,
+			Until:      e.Until.UTC().Format(time.RFC3339),
+			Reason:     e.Reason,
+			DurationMs: e.DurationMs,
 		})
 	}
 	return out

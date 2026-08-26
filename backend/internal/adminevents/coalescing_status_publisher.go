@@ -20,9 +20,10 @@ type accountFamilyKey struct {
 }
 
 type pendingFamilyCooldown struct {
-	action string
-	until  *time.Time
-	reason string
+	action     string
+	until      *time.Time
+	reason     string
+	durationMs int64
 }
 
 // CoalescingStatusPublisher keeps only the latest pending account-status
@@ -78,6 +79,7 @@ func (p *CoalescingStatusPublisher) PublishAccountFamilyCooldownChanged(
 	family string,
 	until *time.Time,
 	reason string,
+	durationMs int64,
 ) {
 	if p == nil || p.hub == nil || accountID <= 0 {
 		return
@@ -99,9 +101,10 @@ func (p *CoalescingStatusPublisher) PublishAccountFamilyCooldownChanged(
 			return
 		}
 		p.families[accountFamilyKey{accountID: accountID, family: family}] = pendingFamilyCooldown{
-			action: action,
-			until:  cloneTime(until),
-			reason: reason,
+			action:     action,
+			until:      cloneTime(until),
+			reason:     reason,
+			durationMs: durationMs,
 		}
 	}
 }
@@ -153,12 +156,12 @@ func (p *CoalescingStatusPublisher) flush() {
 
 	for key, pending := range families {
 		if pending.action == "clear" {
-			p.hub.PublishAccountFamilyCooldownChanged(key.accountID, pending.action, "", nil, "")
+			p.hub.PublishAccountFamilyCooldownChanged(key.accountID, pending.action, "", nil, "", 0)
 		}
 	}
 	for key, pending := range families {
 		if pending.action == "upsert" {
-			p.hub.PublishAccountFamilyCooldownChanged(key.accountID, pending.action, key.family, pending.until, pending.reason)
+			p.hub.PublishAccountFamilyCooldownChanged(key.accountID, pending.action, key.family, pending.until, pending.reason, pending.durationMs)
 		}
 	}
 }

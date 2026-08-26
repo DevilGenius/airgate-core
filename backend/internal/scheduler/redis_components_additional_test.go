@@ -23,12 +23,13 @@ func TestFamilyCooldownRedisPaths(t *testing.T) {
 	reasonKey := familyCooldownReasonKey(7, "gpt")
 
 	mock.ExpectSet(reasonKey, "429", time.Millisecond).SetVal("OK")
+	mock.ExpectSet(familyCooldownDurationKey(7, "gpt"), "300000", time.Millisecond).SetVal("OK")
 	mock.ExpectZAdd(indexKey, redis.Z{Score: float64(until.UnixMilli()), Member: "gpt"}).SetVal(1)
 	mock.ExpectEval(familyCooldownIndexExpireScript, []string{indexKey}, familyCooldownIndexTTL.Milliseconds()).SetVal(int64(1))
 	mock.ExpectSetNX(activeKey, "1", 0).SetVal(true)
 	mock.ExpectEval(familyCooldownIndexExpireScript, []string{activeKey}, (time.Minute + time.Millisecond).Milliseconds()).SetVal(int64(1))
 	mock.ExpectDel(familyCooldownTransientStepKey(7, "gpt")).SetVal(1)
-	fc.Mark(ctx, 7, "gpt", until, "429")
+	fc.Mark(ctx, 7, "gpt", until, "429", 5*time.Minute)
 
 	mock.ExpectGet(familyCooldownTransientStepKey(7, "gpt")).SetVal("3")
 	if got := fc.TransientStep(ctx, 7, "gpt"); got != 3 {
@@ -44,12 +45,13 @@ func TestFamilyCooldownRedisPaths(t *testing.T) {
 	fc.SetTransientStep(ctx, 7, "gpt", 1)
 
 	mock.ExpectSet(reasonKey, "overloaded", time.Millisecond).SetVal("OK")
+	mock.ExpectSet(familyCooldownDurationKey(7, "gpt"), "7500", time.Millisecond).SetVal("OK")
 	mock.ExpectZAdd(indexKey, redis.Z{Score: float64(until.UnixMilli()), Member: "gpt"}).SetVal(1)
 	mock.ExpectEval(familyCooldownIndexExpireScript, []string{indexKey}, familyCooldownIndexTTL.Milliseconds()).SetVal(int64(1))
 	mock.ExpectSetNX(activeKey, "1", 0).SetVal(true)
 	mock.ExpectEval(familyCooldownIndexExpireScript, []string{activeKey}, (time.Minute + time.Millisecond).Milliseconds()).SetVal(int64(1))
 	mock.ExpectSet(familyCooldownTransientStepKey(7, "gpt"), "2", familyTransientStepTTL).SetVal("OK")
-	fc.MarkTransient(ctx, 7, "gpt", until, "overloaded", 2)
+	fc.MarkTransient(ctx, 7, "gpt", until, "overloaded", 2, 7500*time.Millisecond)
 
 	mock.ExpectTTL(reasonKey).SetVal(time.Minute)
 	if gotUntil, ok := fc.Until(ctx, 7, "gpt"); !ok || !gotUntil.After(time.Now()) {
@@ -75,15 +77,16 @@ func TestFamilyCooldownRedisPaths(t *testing.T) {
 	}
 
 	mock.ExpectDel(reasonKey).SetVal(1)
+	mock.ExpectDel(familyCooldownDurationKey(7, "gpt")).SetVal(1)
 	mock.ExpectDel(familyCooldownTransientStepKey(7, "gpt")).SetVal(1)
 	mock.ExpectZRem(indexKey, "gpt").SetVal(1)
 	fc.Clear(ctx, 7, "gpt")
 
 	mock.ExpectZRange(indexKey, 0, -1).SetVal([]string{"gpt", "img"})
 	mock.ExpectDel(
-		familyCooldownReasonKey(7, "gpt"), familyCooldownTransientStepKey(7, "gpt"),
-		familyCooldownReasonKey(7, "img"), familyCooldownTransientStepKey(7, "img"),
-	).SetVal(4)
+		familyCooldownReasonKey(7, "gpt"), familyCooldownDurationKey(7, "gpt"), familyCooldownTransientStepKey(7, "gpt"),
+		familyCooldownReasonKey(7, "img"), familyCooldownDurationKey(7, "img"), familyCooldownTransientStepKey(7, "img"),
+	).SetVal(6)
 	mock.ExpectDel(indexKey).SetVal(1)
 	mock.ExpectDel(activeKey).SetVal(1)
 	if got := fc.ClearAccount(ctx, 7); got != 2 {
@@ -115,10 +118,14 @@ func TestFamilyCooldownListBatchRedisPaths(t *testing.T) {
 			int64(1), "bad-score", "bad",
 		})
 	mock.ExpectGet(familyCooldownReasonKey(7, "gpt")).SetVal("429")
+	mock.ExpectGet(familyCooldownDurationKey(7, "gpt")).SetVal("90000")
+	// redismock 的 pipeline 在首个返回错误的命令处停止匹配后续命令，
+	// 因此 stale 条目的 duration Get 不再有对应 expectation；生产路径不会对
+	// stale 条目读取 durationCmd，行为一致。
 	mock.ExpectGet(familyCooldownReasonKey(7, "stale")).SetErr(redis.Nil)
 	mock.ExpectZRem(familyCooldownIndexKey(7), "stale").SetVal(1)
 	got := fc.ListBatch(ctx, []int{7, 8, 7})
-	if len(got[7]) != 1 || got[7][0].Family != "gpt" || got[7][0].Reason != "429" {
+	if len(got[7]) != 1 || got[7][0].Family != "gpt" || got[7][0].Reason != "429" || got[7][0].DurationMs != 90000 {
 		t.Fatalf("ListBatch = %#v", got)
 	}
 
