@@ -31,8 +31,8 @@ describe('dashboard usage estimate formatting', () => {
   });
 
   it('picks the usage estimate badge tone from the plus 5h remaining cost', () => {
-    expect(usageEstimateBadgeClass(undefined)).toContain('cyan');
-    expect(usageEstimateBadgeClass(300)).toContain('cyan');
+    expect(usageEstimateBadgeClass(undefined)).toContain('violet');
+    expect(usageEstimateBadgeClass(300)).toContain('violet');
     expect(usageEstimateBadgeClass(299)).toContain('amber');
     expect(usageEstimateBadgeClass(200)).toContain('amber');
     expect(usageEstimateBadgeClass(199)).toContain('red');

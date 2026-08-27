@@ -314,12 +314,12 @@ function RuntimeCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric h-[190px] 2xl:h-[198px]">
-      <Card.Content className="flex h-full flex-col p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric ag-monitor-runtime-card h-[190px]">
+      <Card.Content className="flex h-full flex-col p-3">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text-tertiary">{label}</div>
-            <div className="mt-1 h-6 min-w-0 truncate font-mono text-[21px] font-semibold leading-6 text-text 2xl:h-7 2xl:text-2xl">
+            <div className="ag-monitor-runtime-value mt-1 h-6 min-w-0 truncate font-mono text-[21px] font-semibold leading-6 text-text">
               {value}
             </div>
           </div>
@@ -340,7 +340,7 @@ function RuntimeCard({
 
 function MetricIcon({ icon, tone }: { icon: ReactNode; tone: string }) {
   return (
-    <span className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${tone}`}>
+    <span className={`ag-overview-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${tone}`}>
       {icon}
     </span>
   );
@@ -403,8 +403,8 @@ function MonitorSummaryCard({
 }) {
   const { t } = useTranslation();
   return (
-    <Card className="ag-dashboard-metric h-[190px] 2xl:h-[198px]">
-      <Card.Content className="flex h-full flex-col p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric ag-monitor-runtime-card h-[190px]">
+      <Card.Content className="flex h-full flex-col p-3">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text-tertiary">
@@ -487,7 +487,7 @@ export function MonitorRuntimeStats({
   const stale = latency?.stale || latency1H?.stale;
 
   return (
-    <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+    <div className="ag-overview-metrics-grid mb-6 grid gap-3">
       <MonitorSummaryCard showActiveCounts={showActiveCounts} summary={summary} />
       <RuntimeCard
         details={[
@@ -520,7 +520,7 @@ export function MonitorRuntimeStats({
           latency1H?.image_duration_p50_ms,
         )}
         tone="bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-400/15 dark:text-sky-300 dark:ring-sky-400/25"
-        value={<span className="text-[17px] tracking-tight 2xl:text-xl">{latencyFRTValue}</span>}
+        value={<span className="ag-monitor-latency-value text-[17px] tracking-tight">{latencyFRTValue}</span>}
       />
       <RuntimeCard
         details={[

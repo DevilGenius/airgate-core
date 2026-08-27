@@ -59,6 +59,7 @@
 }
 
 .ag-topbar {
+  padding-inline: 1rem;
   background: color-mix(in oklab, var(--background) 78%, transparent);
   border-bottom: 1px solid color-mix(in oklab, var(--border) 28%, transparent);
   box-shadow:
@@ -440,6 +441,28 @@
   scrollbar-gutter: stable;
 }
 
+.ag-main-content {
+  container-name: ag-main-shell;
+  container-type: inline-size;
+  padding: 1rem;
+}
+
+.ag-centered-page {
+  padding: 1.5rem 1rem;
+}
+
+.ag-public-page-gutter {
+  padding-inline: 1.5rem;
+}
+
+.ag-home-hero-spacing {
+  padding: 4rem 1.5rem 5rem;
+}
+
+.ag-auth-panel-padding {
+  padding: 1.5rem;
+}
+
 .ag-main:has([data-full-bleed]),
 .ag-main:has([data-full-bleed]) .ag-main-scroll {
   overflow: hidden;
@@ -732,4 +755,169 @@
   flex: 1 1 auto;
   min-width: 0;
   text-align: left;
+}
+
+.ag-main-content:has(> .ag-dashboard-page) {
+  container-name: ag-main-shell ag-dashboard-shell;
+}
+
+.ag-overview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ag-overview-metrics-grid,
+.ag-overview-detail-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ag-overview-metric-badge {
+  display: none;
+}
+
+.ag-overview-metric-badge--always {
+  display: flex;
+}
+
+.ag-dashboard-page,
+.ag-dashboard-trends {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ag-dashboard-metrics-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ag-dashboard-metric-badge {
+  display: none;
+}
+
+@container ag-dashboard-shell (min-width: 40rem) {
+  .ag-dashboard-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container ag-main-shell (min-width: 40rem) {
+  .ag-overview-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container ag-dashboard-shell (min-width: 64rem) {
+  .ag-dashboard-page .ag-dashboard-toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .ag-dashboard-trend-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container ag-main-shell (min-width: 64rem) {
+  .ag-overview-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 四列阈值按 4 张 22rem 卡片与 3 个 1rem 间距计算，不依赖视口宽度。 */
+@container ag-dashboard-shell (min-width: 91rem) {
+  .ag-dashboard-metrics-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .ag-dashboard-page .ag-dashboard-metric {
+    min-height: 4.875rem;
+  }
+
+  .ag-dashboard-page .ag-dashboard-metric-value {
+    font-size: 1.5rem;
+  }
+
+  .ag-dashboard-page .ag-dashboard-usage-estimate-value {
+    font-size: 1.125rem;
+  }
+
+  .ag-dashboard-page .ag-dashboard-metric-badge {
+    display: flex;
+  }
+
+  .ag-dashboard-page .ag-dashboard-metric-badge-skeleton {
+    display: block;
+  }
+
+  .ag-dashboard-token-trend-chart {
+    height: 18rem;
+  }
+
+  .ag-dashboard-api-key-trend-chart,
+  .ag-dashboard-token-trend-skeleton {
+    height: 20rem;
+  }
+
+  .ag-dashboard-api-key-trend-skeleton {
+    height: 22.5rem;
+  }
+}
+
+@container ag-main-shell (min-width: 91rem) {
+  .ag-overview-metrics-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .ag-overview-metrics-grid--three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ag-overview-metric-card {
+    height: 4.875rem;
+    min-height: 4.875rem;
+  }
+
+  .ag-overview-metric-value {
+    font-size: 1.5rem;
+  }
+
+  .ag-overview-metric-value-row,
+  .ag-monitor-runtime-value {
+    height: 1.75rem;
+  }
+
+  .ag-overview-metric-separator {
+    font-size: 1.125rem;
+  }
+
+  .ag-overview-metric-badge {
+    display: flex;
+  }
+
+  .ag-overview-metric-badge-skeleton {
+    display: block;
+  }
+
+  .ag-overview-metric-badge--always {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .ag-overview-chart {
+    height: 18rem;
+  }
+
+  .ag-monitor-runtime-card {
+    height: 12.375rem;
+  }
+
+  .ag-monitor-runtime-value {
+    font-size: 1.5rem;
+  }
+
+  .ag-monitor-latency-value {
+    font-size: 1.25rem;
+  }
 }

@@ -35,7 +35,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-bg-deep text-text relative overflow-hidden">
       {/* 导航栏 */}
-      <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-4 max-w-6xl mx-auto">
+      <nav className="ag-public-page-gutter relative z-10 flex items-center justify-between py-4 max-w-6xl mx-auto">
         <div className="flex items-center gap-2.5">
           <img src={site.site_logo || defaultLogoUrl} alt="" className="w-8 h-8 rounded-sm object-cover" />
           <span className="text-base font-bold">{site.site_name || 'AirGate'}</span>
@@ -78,7 +78,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section className="relative z-10 text-center px-6 pt-16 pb-20 md:pt-24 md:pb-28 max-w-4xl mx-auto">
+      <section className="ag-home-hero-spacing relative z-10 text-center max-w-4xl mx-auto">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-[var(--radius)] text-xs font-medium mb-6 border border-border bg-surface">
           <Code className="w-3.5 h-3.5 text-[var(--ag-primary)]" />
           <span className="text-text-secondary">{t('home.badge')}</span>

@@ -167,7 +167,7 @@ function UsageEstimateCell({ window }: { window: DashboardUsageEstimateWindow })
   const cost = fmtUsageEstimateCost(window.remaining_cost);
   if (!duration) return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
   return (
-    <span className="font-mono text-base font-semibold leading-none text-text 2xl:text-lg">
+    <span className="ag-dashboard-usage-estimate-value font-mono text-base font-semibold leading-none text-text">
       {duration}-<GreenCost text={cost} />
     </span>
   );
@@ -250,7 +250,7 @@ function DashboardCard({
     <Card className="ag-dashboard-panel">
       {hasHeader ? (
         <div
-          className={`flex items-center gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2 ${title ? 'justify-between' : 'justify-end'}`}
+          className={`flex items-center gap-3 p-3 pb-2 ${title ? 'justify-between' : 'justify-end'}`}
         >
           {title ? <h3 className="text-base font-semibold leading-none text-text">{title}</h3> : null}
           {extra ? (
@@ -258,7 +258,7 @@ function DashboardCard({
           ) : null}
         </div>
       ) : null}
-      <Card.Content className={hasHeader ? 'px-3 pb-3 2xl:px-4 2xl:pb-4' : 'p-3 2xl:p-4'}>{children}</Card.Content>
+      <Card.Content className={hasHeader ? 'px-3 pb-3' : 'p-3'}>{children}</Card.Content>
     </Card>
   );
 }
@@ -281,12 +281,12 @@ function MetricCard({
   valueSuffix?: string;
 }) {
   return (
-    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric min-h-[72px]">
+      <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
           <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
           <div className="mt-auto flex min-w-0 items-baseline gap-2 pt-1">
-            <div className="flex min-w-0 items-baseline font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">
+            <div className="ag-dashboard-metric-value flex min-w-0 items-baseline font-mono text-xl font-semibold leading-none text-text">
               {value}
               {valueSuffix ? <span className="ml-1.5 text-[11px] font-medium leading-none text-text-tertiary">{valueSuffix}</span> : null}
             </div>
@@ -294,7 +294,7 @@ function MetricCard({
           </div>
         </div>
         <span
-          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES[tone]}`}
+          className={`ag-dashboard-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${METRIC_TONE_CLASSES[tone]}`}
           style={METRIC_TONE_STYLES[tone]}
         >
           {icon}
@@ -325,8 +325,7 @@ function rpmBadge(rpm: number): { className: string; style?: CSSProperties } {
   return { className: RPM_BADGE_MAX_CLASS };
 }
 
-/** 用量估算 Bell 徽章配色：按 plus 套餐 5h 窗口剩余标准余额分档，<300 警告色(amber)，<200 危险色(红)，<100 黑；其余/无数据保持 cyan。 */
-const USAGE_ESTIMATE_BADGE_CYAN_CLASS = 'bg-cyan-100 text-cyan-600 ring-cyan-200 dark:bg-cyan-400/15 dark:text-cyan-300 dark:ring-cyan-400/25';
+/** 用量估算 Bell 徽章配色：按 plus 套餐 5h 窗口剩余标准余额分档，<300 警告色(amber)，<200 危险色(红)，<100 黑；其余/无数据保持 violet。 */
 const USAGE_ESTIMATE_BADGE_LEVELS: Array<{ maxExclusive: number; className: string }> = [
   { maxExclusive: 100, className: METRIC_BADGE_CRITICAL_CLASS },
   { maxExclusive: 200, className: METRIC_BADGE_DANGER_CLASS },
@@ -334,11 +333,11 @@ const USAGE_ESTIMATE_BADGE_LEVELS: Array<{ maxExclusive: number; className: stri
 ];
 
 export function usageEstimateBadgeClass(remainingCost: number | undefined): string {
-  if (remainingCost == null || !Number.isFinite(remainingCost)) return USAGE_ESTIMATE_BADGE_CYAN_CLASS;
+  if (remainingCost == null || !Number.isFinite(remainingCost)) return METRIC_TONE_CLASSES.violet;
   for (const level of USAGE_ESTIMATE_BADGE_LEVELS) {
     if (remainingCost < level.maxExclusive) return level.className;
   }
-  return USAGE_ESTIMATE_BADGE_CYAN_CLASS;
+  return METRIC_TONE_CLASSES.violet;
 }
 
 function PerformanceMetricCard({
@@ -364,8 +363,8 @@ function PerformanceMetricCard({
   const rpmTrend = rpm1mInteger > rpm10mInteger ? 'up' : rpm1mInteger < rpm10mInteger ? 'down' : 'flat';
   const badge = rpmBadge(rpm1m);
   return (
-    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric min-h-[72px]">
+      <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
           <div className="flex h-5 min-w-0 items-center gap-1 text-sm font-semibold tracking-normal text-text-tertiary">
             <span className="truncate">{title}</span>
@@ -385,7 +384,7 @@ function PerformanceMetricCard({
                 ) : null}
                 <span className="flex items-baseline gap-x-1.5">
                   <span className="flex items-baseline gap-1">
-                    <span className="font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">
+                    <span className="ag-dashboard-metric-value font-mono text-xl font-semibold leading-none text-text">
                       {rpmText}
                     </span>
                     <span className="text-[11px] font-medium leading-none text-text-tertiary">{t('dashboard.rpm')}</span>
@@ -402,7 +401,7 @@ function PerformanceMetricCard({
           </div>
         </div>
         <span
-          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${badge.className}`}
+          className={`ag-dashboard-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${badge.className}`}
           style={badge.style}
         >
           {icon}
@@ -414,10 +413,10 @@ function PerformanceMetricCard({
 
 function StatsSkeleton() {
   return (
-    <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+    <div className="ag-dashboard-metrics-grid grid auto-rows-fr gap-3">
       {Array.from({ length: 8 }).map((_, index) => (
-        <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]" key={index}>
-          <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+        <Card className="ag-dashboard-metric min-h-[72px]" key={index}>
+          <Card.Content className="ag-dashboard-metric-content p-3">
             <div className="ag-dashboard-metric-copy space-y-2">
               <Skeleton className="h-3 w-24" />
               <div className="flex items-baseline gap-2">
@@ -425,7 +424,7 @@ function StatsSkeleton() {
                 <Skeleton className="h-3 w-32" />
               </div>
             </div>
-            <Skeleton className="hidden h-11 w-11 shrink-0 rounded-[var(--field-radius)] 2xl:block" />
+            <Skeleton className="ag-dashboard-metric-badge ag-dashboard-metric-badge-skeleton h-11 w-11 shrink-0 rounded-[var(--field-radius)]" />
           </Card.Content>
         </Card>
       ))}
@@ -451,26 +450,26 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
     ?.windows.find((window) => window.window === '5h');
   const plus5hRemainingCost = plus5hWindow?.status === 'ready' ? plus5hWindow.remaining_cost : undefined;
   return (
-    <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
-      <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-        <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+    <div className="ag-dashboard-metrics-grid grid auto-rows-fr gap-3">
+      <Card className="ag-dashboard-metric min-h-[72px]">
+        <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
           <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">
             {t('dashboard.users_summary', { active: stats.active_users, total: stats.total_users })} {t('dashboard.new_users', { count: stats.new_users_today })}
           </div>
           <div className="mt-auto flex min-w-0 items-baseline gap-x-2 whitespace-nowrap pt-1">
               <span className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">{stats.enabled_api_keys}</span>
+                <span className="ag-dashboard-metric-value font-mono text-xl font-semibold leading-none text-text">{stats.enabled_api_keys}</span>
                 <span className="text-xs font-semibold leading-none text-text">{t('dashboard.enabled_label')}</span>
               </span>
               <span className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">{stats.total_api_keys}</span>
+                <span className="ag-dashboard-metric-value font-mono text-xl font-semibold leading-none text-text">{stats.total_api_keys}</span>
                 <span className="text-xs font-semibold leading-none text-text">{t('dashboard.total_label')}</span>
               </span>
             </div>
           </div>
           <span
-            className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES.gray}`}
+            className={`ag-dashboard-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${METRIC_TONE_CLASSES.gray}`}
             style={METRIC_TONE_STYLES.gray}
           >
             <KeyRound className="h-5 w-5" />
@@ -486,7 +485,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       />
       <MetricCard
         icon={<Activity className="h-5 w-5" />}
-        tone="violet"
+        tone="cyan"
         title={t('dashboard.today_requests')}
         value={`${fmtNum(todayTextRequests)}/${fmtNum(todayImageRequests)}`}
         valueSuffix={t('dashboard.image_suffix')}
@@ -514,8 +513,8 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         rpm10m={stats.rpm_10m ?? 0}
         tpm10m={stats.tpm_10m ?? 0}
       />
-      <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-        <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+      <Card className="ag-dashboard-metric min-h-[72px]">
+        <Card.Content className="ag-dashboard-metric-content p-3">
           <div className="ag-dashboard-metric-copy flex min-h-12 flex-col self-stretch">
             <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">
               {t('dashboard.usage_estimate')} (1min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_1m)} />/10min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_10m)} />)
@@ -550,7 +549,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
             )}
           </div>
           <span
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${usageEstimateBadgeClass(plus5hRemainingCost)}`}
+            className={`ag-dashboard-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${usageEstimateBadgeClass(plus5hRemainingCost)}`}
           >
             <Bell className="h-5 w-5" />
           </span>
@@ -817,7 +816,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
   return (
     <DashboardCard title={t('dashboard.token_trend')}>
       {chartData.length > 0 ? (
-        <div className="flex h-[248px] w-full min-w-0 flex-col 2xl:h-[288px]">
+        <div className="ag-dashboard-token-trend-chart flex h-[248px] w-full min-w-0 flex-col">
           <div className="min-h-0 flex-1">
             <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOKEN_TREND_INITIAL_DIMENSION}>
               <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 4, top: 4 }}>
@@ -863,7 +862,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
           <TokenTrendLegend lineLabels={lineLabels} />
         </div>
       ) : (
-        <div className="flex h-[248px] items-center justify-center text-sm text-text 2xl:h-[288px]">{t('common.no_data')}</div>
+        <div className="ag-dashboard-token-trend-chart flex h-[248px] items-center justify-center text-sm text-text">{t('common.no_data')}</div>
       )}
     </DashboardCard>
   );
@@ -922,7 +921,7 @@ function TopAPIKeysCard({ trend }: { trend: DashboardTrendResp }) {
   return (
     <DashboardCard title={t('dashboard.top_api_keys')}>
       {topAPIKeys.length > 0 ? (
-        <div className="flex h-[268px] w-full min-w-0 flex-col 2xl:h-[320px]">
+        <div className="ag-dashboard-api-key-trend-chart flex h-[268px] w-full min-w-0 flex-col">
           <div className="min-h-0 flex-1">
             <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOP_USERS_INITIAL_DIMENSION}>
               <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 8, top: 4 }}>
@@ -954,7 +953,7 @@ function TopAPIKeysCard({ trend }: { trend: DashboardTrendResp }) {
           <TopAPIKeysLegend apiKeys={apiKeySeries} />
         </div>
       ) : (
-        <div className="flex h-[268px] items-center justify-center text-sm text-text 2xl:h-[320px]">{t('common.no_data')}</div>
+        <div className="ag-dashboard-api-key-trend-chart flex h-[268px] items-center justify-center text-sm text-text">{t('common.no_data')}</div>
       )}
     </DashboardCard>
   );
@@ -975,8 +974,8 @@ function TopAPIKeysLegend({ apiKeys }: { apiKeys: Array<{ color: string; id: num
 
 function TrendCharts({ trend }: { trend: DashboardTrendResp }) {
   return (
-    <div className="ag-dashboard-trends space-y-4 2xl:space-y-5">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div className="ag-dashboard-trends">
+      <div className="ag-dashboard-trend-grid grid grid-cols-1 gap-4">
         <ModelDistributionCard trend={trend} />
         <TokenTrendCard trend={trend} />
       </div>
@@ -1025,7 +1024,7 @@ export default function DashboardPage() {
   const isDashboardRefreshing = statsQuery.isFetching || trendQuery.isFetching;
 
   return (
-    <div className="space-y-4 2xl:space-y-5">
+    <div className="ag-dashboard-page">
       {statsQuery.error ? (
         <Alert status="danger">
           {t('dashboard.load_failed', { error: statsQuery.error instanceof Error ? statsQuery.error.message : '' })}
@@ -1034,7 +1033,7 @@ export default function DashboardPage() {
 
       {statsQuery.isLoading ? <StatsSkeleton /> : statsQuery.data ? <StatsCards stats={statsQuery.data} /> : null}
 
-      <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4 2xl:p-5 xl:flex-row xl:items-center xl:justify-between">
+      <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.time_range')}</span>
           <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={range} onSelectionChange={(key) => setRange(key as RangePreset)}>
@@ -1114,19 +1113,19 @@ export default function DashboardPage() {
       </div>
 
       {trendQuery.isLoading && !trendQuery.data ? (
-        <div className="ag-dashboard-trends space-y-4 2xl:space-y-5">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="ag-dashboard-trends">
+          <div className="ag-dashboard-trend-grid grid grid-cols-1 gap-4">
             {Array.from({ length: 2 }).map((_, index) => (
               <Card className="ag-dashboard-panel" key={index}>
                 <Card.Content>
-                  <Skeleton className="h-[280px] w-full 2xl:h-[320px]" />
+                  <Skeleton className="ag-dashboard-token-trend-skeleton h-[280px] w-full" />
                 </Card.Content>
               </Card>
             ))}
           </div>
           <Card className="ag-dashboard-panel">
             <Card.Content>
-              <Skeleton className="h-[300px] w-full 2xl:h-[360px]" />
+              <Skeleton className="ag-dashboard-api-key-trend-skeleton h-[300px] w-full" />
             </Card.Content>
           </Card>
         </div>

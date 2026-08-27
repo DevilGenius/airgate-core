@@ -40,10 +40,10 @@ const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
 function DashboardCard({ children, title }: { children: ReactNode; title: string }) {
   return (
     <Card className="ag-dashboard-panel">
-      <div className="flex items-center justify-between gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2">
+      <div className="flex items-center justify-between gap-3 p-3 pb-2">
         <h3 className="text-base font-semibold leading-none text-text">{title}</h3>
       </div>
-      <Card.Content className="px-3 pb-3 2xl:px-4 2xl:pb-4">{children}</Card.Content>
+      <Card.Content className="px-3 pb-3">{children}</Card.Content>
     </Card>
   );
 }
@@ -60,17 +60,17 @@ function StatCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric ag-overview-metric-card min-h-[72px]">
+      <Card.Content className="ag-dashboard-metric-content ag-overview-metric-content p-3">
         <div className="ag-dashboard-metric-copy">
           <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
           <div className="mt-1 flex min-w-0 items-baseline gap-2">
-            <div className="flex min-w-0 items-baseline font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">
+            <div className="ag-overview-metric-value flex min-w-0 items-baseline font-mono text-[22px] font-semibold leading-none text-text">
               {value}
             </div>
           </div>
         </div>
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:h-11 2xl:w-11 ${METRIC_TONE_CLASSES[tone]}`}>
+        <span className={`ag-overview-metric-badge ag-overview-metric-badge--always h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${METRIC_TONE_CLASSES[tone]}`}>
           {icon}
         </span>
       </Card.Content>
@@ -197,9 +197,9 @@ export default function UserOverviewPage() {
   };
 
   return (
-    <div className="space-y-5 2xl:space-y-6">
+    <div className="ag-overview-page">
       {/* 账户信息 */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+      <div className="ag-overview-metrics-grid grid gap-3">
         <StatCard
           title={t('user_overview.balance')}
           value={`$${(user?.balance ?? 0).toFixed(2)}`}
@@ -227,7 +227,7 @@ export default function UserOverviewPage() {
       </div>
 
       {/* 时间范围选择 */}
-      <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4 2xl:p-5 sm:flex-row sm:items-center">
+      <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
         <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.time_range')}</span>
         <Tabs
           className="ag-segmented-tabs ag-segmented-tabs-compact"
@@ -247,7 +247,7 @@ export default function UserOverviewPage() {
       </div>
 
       {/* 模型分布 + Token 趋势 */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="ag-overview-detail-grid grid grid-cols-1 gap-4">
         {/* 模型分布 */}
         <DashboardCard title={t('dashboard.model_distribution')}>
           <div className="ag-distribution-table-scroll">
@@ -300,7 +300,7 @@ export default function UserOverviewPage() {
         {/* Token 趋势 */}
         <DashboardCard title={t('dashboard.token_trend')}>
           {trendData.length > 0 ? (
-            <div className="flex h-[248px] w-full min-w-0 flex-col 2xl:h-[288px]">
+            <div className="ag-overview-chart flex h-[248px] w-full min-w-0 flex-col">
               <div className="min-h-0 flex-1">
                 <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={USER_OVERVIEW_TOKEN_TREND_INITIAL_DIMENSION}>
                   <LineChart data={trendData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
@@ -317,7 +317,7 @@ export default function UserOverviewPage() {
               <TokenTrendLegend labels={tokenTrendLabels} />
             </div>
           ) : (
-            <div className="flex h-[248px] items-center justify-center text-sm text-text 2xl:h-[288px]">{t('common.no_data')}</div>
+            <div className="ag-overview-chart flex h-[248px] items-center justify-center text-sm text-text">{t('common.no_data')}</div>
           )}
         </DashboardCard>
       </div>

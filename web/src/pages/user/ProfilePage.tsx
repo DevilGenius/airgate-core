@@ -88,7 +88,7 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+    <div className="ag-centered-page w-full max-w-6xl mx-auto">
       {/* 用户信息 */}
       <Card className="mb-6">
         <Card.Header>

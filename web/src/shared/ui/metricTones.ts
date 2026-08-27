@@ -1,5 +1,6 @@
 export type MetricTone =
   | 'blue'
+  | 'cyan'
   | 'gray'
   | 'violet'
   | 'emerald'
@@ -21,6 +22,7 @@ export const STREAM_BLUE = 'oklch(62.04% 0.1950 253.83)';
 export const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
   amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
   blue: 'bg-blue-100 text-blue-600 ring-blue-200 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-blue-400/25',
+  cyan: 'bg-cyan-100 text-cyan-600 ring-cyan-200 dark:bg-cyan-400/15 dark:text-cyan-300 dark:ring-cyan-400/25',
   emerald: '',
   gray: 'bg-zinc-100 text-zinc-600 ring-zinc-200 dark:bg-zinc-400/15 dark:text-zinc-300 dark:ring-zinc-400/25',
   indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',

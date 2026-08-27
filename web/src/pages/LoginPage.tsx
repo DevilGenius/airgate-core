@@ -552,7 +552,7 @@ export default function LoginPage() {
       </div>
 
       {/* ===== 右侧表单区 ===== */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-bg-deep relative">
+      <div className="ag-auth-panel-padding flex-1 flex items-center justify-center bg-bg-deep relative">
         {/* 主题切换按钮 */}
         <Button
           aria-label={theme === 'dark' ? 'Light mode' : 'Dark mode'}

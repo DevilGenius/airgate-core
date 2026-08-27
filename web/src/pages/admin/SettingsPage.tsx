@@ -362,7 +362,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 md:py-8 flex flex-col gap-6 min-h-screen">
+    <div className="ag-centered-page max-w-6xl mx-auto w-full flex flex-col gap-6 min-h-screen">
       <div className="mx-auto w-full max-w-full overflow-x-auto hide-scrollbar pb-1">
         <Tabs
           className="ag-page-tabs ag-settings-tabs whitespace-nowrap"

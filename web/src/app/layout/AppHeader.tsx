@@ -42,7 +42,7 @@ export const AppHeader = memo(function AppHeader({
   };
 
   return (
-    <header className="ag-topbar pointer-events-auto absolute inset-x-0 top-0 z-20 flex h-12 items-center justify-between gap-3 px-4 md:px-5">
+    <header className="ag-topbar pointer-events-auto absolute inset-x-0 top-0 z-20 flex h-12 items-center justify-between gap-3">
       <div className="flex shrink-0 items-center gap-3">
         {isMobile && (
           <Button

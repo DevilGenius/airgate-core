@@ -57,14 +57,14 @@ function SectionCard({
   return (
     <Card className="ag-dashboard-panel">
       <div
-        className="flex min-w-0 items-center justify-between gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2"
+        className="flex min-w-0 items-center justify-between gap-3 p-3 pb-2"
       >
         <h3 className="min-w-0 truncate text-base font-semibold leading-none text-text">{title}</h3>
         {extra ? (
           <div className="min-w-0 shrink">{extra}</div>
         ) : null}
       </div>
-      <Card.Content className="px-3 pb-3 2xl:px-4 2xl:pb-4">{children}</Card.Content>
+      <Card.Content className="px-3 pb-3">{children}</Card.Content>
     </Card>
   );
 }
@@ -81,16 +81,16 @@ function StatCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric ag-overview-metric-card min-h-[72px]">
+      <Card.Content className="ag-dashboard-metric-content ag-overview-metric-content p-3">
         <div className="ag-dashboard-metric-copy">
           <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
           <div className="mt-1 flex min-w-0 items-baseline gap-2">
-            <div className="min-w-0 truncate font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">{value}</div>
+            <div className="ag-overview-metric-value min-w-0 truncate font-mono text-[22px] font-semibold leading-none text-text">{value}</div>
           </div>
         </div>
         <span
-          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES[tone]}`}
+          className={`ag-overview-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${METRIC_TONE_CLASSES[tone]}`}
           style={METRIC_TONE_STYLES[tone]}
         >
           {icon}
@@ -102,15 +102,15 @@ function StatCard({
 
 function StatsSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+    <div className="ag-overview-metrics-grid grid gap-3">
       {Array.from({ length: 4 }).map((_, index) => (
-        <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]" key={index}>
-          <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+        <Card className="ag-dashboard-metric ag-overview-metric-card min-h-[72px]" key={index}>
+          <Card.Content className="ag-dashboard-metric-content ag-overview-metric-content p-3">
             <div className="ag-dashboard-metric-copy space-y-2">
               <Skeleton className="h-3 w-24" />
               <Skeleton className="h-6 w-24" />
             </div>
-            <Skeleton className="hidden h-11 w-11 shrink-0 rounded-[var(--field-radius)] 2xl:block" />
+            <Skeleton className="ag-overview-metric-badge ag-overview-metric-badge-skeleton h-11 w-11 shrink-0 rounded-[var(--field-radius)]" />
           </Card.Content>
         </Card>
       ))}
@@ -466,7 +466,7 @@ function GroupStatsCard({
         </Tabs>
       }
     >
-      <div className="h-[248px] min-w-0 overflow-auto 2xl:h-[288px]">
+      <div className="ag-overview-chart h-[248px] min-w-0 overflow-auto">
         <CompactDataTable
           ariaLabel={t('usage.group_stats')}
           className="ag-compact-data-table--dense"
@@ -560,7 +560,7 @@ function TokenTrendCard({
   if (data.length === 0) {
     return (
       <SectionCard title={t('usage.token_trend')} extra={granularityTabs}>
-        <div className="flex h-[248px] items-center justify-center text-sm text-text-tertiary 2xl:h-[288px]">
+        <div className="ag-overview-chart flex h-[248px] items-center justify-center text-sm text-text-tertiary">
           {t('common.no_data')}
         </div>
       </SectionCard>
@@ -572,7 +572,7 @@ function TokenTrendCard({
       title={t('usage.token_trend')}
       extra={granularityTabs}
     >
-      <div className="h-[248px] 2xl:h-[288px]">
+      <div className="ag-overview-chart h-[248px]">
         <Suspense fallback={<div className="h-full w-full" />}>
           <UsageTokenTrendChart data={data} lineLabels={lineLabels} />
         </Suspense>
@@ -1039,7 +1039,7 @@ export default function UsagePage() {
       {/* 聚合统计 */}
       <div className="mb-6 space-y-4">
         {activeStats ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+          <div className="ag-overview-metrics-grid grid gap-3">
             <StatCard
               title={t('usage.total_requests')}
               value={activeStats.total_requests.toLocaleString()}

@@ -21,15 +21,15 @@ function StatCard({
   total: number;
 }) {
   return (
-    <Card className="ag-dashboard-metric h-[72px] 2xl:h-[78px]">
-      <Card.Content className="ag-dashboard-metric-content h-full p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric ag-overview-metric-card h-[72px]">
+      <Card.Content className="ag-dashboard-metric-content ag-overview-metric-content h-full p-3">
         <div className="ag-dashboard-metric-copy">
           <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text-tertiary">{label}</div>
-          <div className="mt-1 flex h-6 min-w-0 items-center gap-1 font-mono text-[22px] font-semibold leading-none text-text 2xl:h-7 2xl:text-2xl">
+          <div className="ag-overview-metric-value ag-overview-metric-value-row mt-1 flex h-6 min-w-0 items-center gap-1 font-mono text-[22px] font-semibold leading-none text-text">
             {showActiveRatio ? (
               <>
                 <span className="truncate">{fmtNum(active)}</span>
-                <span className="text-base leading-none text-text-tertiary 2xl:text-lg">/</span>
+                <span className="ag-overview-metric-separator text-base leading-none text-text-tertiary">/</span>
                 <span className="truncate">{fmtNum(total)}</span>
               </>
             ) : (
@@ -37,7 +37,7 @@ function StatCard({
             )}
           </div>
         </div>
-        <span className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${tone}`}>
+        <span className={`ag-overview-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${tone}`}>
           {icon}
         </span>
       </Card.Content>
@@ -54,7 +54,7 @@ export function MonitorStats({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+    <div className="ag-overview-metrics-grid mb-6 grid gap-3">
       <StatCard
         active={summary?.critical_active_total ?? 0}
         icon={<TriangleAlert className="h-5 w-5" />}

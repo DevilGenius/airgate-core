@@ -157,7 +157,7 @@ export default function DocsPage() {
     <div className="min-h-screen bg-bg-deep text-text">
       {/* 顶栏：拉到 7xl，和正文同宽，避免顶栏窄、正文宽的撕裂感 */}
       <nav className="sticky top-0 z-20 bg-bg-deep/80 backdrop-blur border-b border-border/50">
-        <div className="flex items-center justify-between px-6 md:px-12 py-4 max-w-7xl mx-auto">
+        <div className="ag-public-page-gutter flex items-center justify-between py-4 max-w-7xl mx-auto">
           <Link to="/home" className="flex items-center gap-2.5">
             <img src={site.site_logo || defaultLogoUrl} alt="" className="w-8 h-8 rounded-sm object-cover" />
             <span className="text-base font-bold">{siteName}</span>
@@ -194,7 +194,7 @@ export default function DocsPage() {
       </nav>
 
       {/* 文档主体：左侧 TOC + 右侧正文，两侧不再大片留白 */}
-      <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_200px] gap-x-12 gap-y-8">
+      <div className="ag-public-page-gutter max-w-7xl mx-auto py-10 grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_200px] gap-x-12 gap-y-8">
         {/* 左侧目录（lg 以上才显示） */}
         <aside className="hidden lg:block">
           <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-2">

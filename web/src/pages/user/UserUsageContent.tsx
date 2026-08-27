@@ -124,16 +124,16 @@ function StatCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+    <Card className="ag-dashboard-metric ag-overview-metric-card min-h-[72px]">
+      <Card.Content className="ag-dashboard-metric-content ag-overview-metric-content p-3">
         <div className="ag-dashboard-metric-copy">
           <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
           <div className="mt-1 flex min-w-0 items-baseline gap-2">
-            <div className="min-w-0 truncate font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">{value}</div>
+            <div className="ag-overview-metric-value min-w-0 truncate font-mono text-[22px] font-semibold leading-none text-text">{value}</div>
           </div>
         </div>
         <span
-          className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES[tone]}`}
+          className={`ag-overview-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${METRIC_TONE_CLASSES[tone]}`}
           style={METRIC_TONE_STYLES[tone]}
         >
           {icon}
@@ -439,7 +439,7 @@ export default function UserUsageContent() {
       <APIKeyInfoBar />
 
       {/* 概览统计 */}
-      <div className={`mb-6 grid grid-cols-1 gap-3 ${customerScope ? 'md:grid-cols-3 xl:grid-cols-3' : 'md:grid-cols-2 xl:grid-cols-4'} 2xl:gap-4`}>
+      <div className={`ag-overview-metrics-grid mb-6 grid gap-3 ${customerScope ? 'ag-overview-metrics-grid--three' : ''}`}>
         <StatCard
           title={t('usage.total_requests')}
           value={(stats?.total_requests ?? 0).toLocaleString()}

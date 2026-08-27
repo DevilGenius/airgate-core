@@ -29,7 +29,7 @@ export const AppMainOutlet = memo(function AppMainOutlet() {
     <main className="min-h-0 flex flex-1 flex-col bg-bg pt-12 ag-main">
       <PageFooterProvider container={footerContainer}>
         <div className="ag-main-scroll min-h-0 flex-1 overflow-auto">
-          <div className="ag-main-content mx-auto w-full max-w-[1920px] p-4 md:p-6 2xl:p-8">
+          <div className="ag-main-content mx-auto w-full max-w-[1920px]">
             {ready ? <Outlet /> : <RouteRenderPlaceholder />}
           </div>
         </div>
