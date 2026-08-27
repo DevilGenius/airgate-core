@@ -180,7 +180,10 @@ func (p usageEstimateWindowPool) estimate(window string, requiredPlans []string,
 	result.FullCost = rateSum * 100
 	if remainingAvailable {
 		result.RemainingCost = &remainingCost
-		if accountCostPerMinute > 0 {
+		if remainingCost <= 0 {
+			minutes := 0.0
+			result.RemainingMinutes = &minutes
+		} else if accountCostPerMinute > 0 {
 			minutes := remainingCost / accountCostPerMinute
 			result.RemainingMinutes = &minutes
 		}

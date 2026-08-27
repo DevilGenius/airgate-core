@@ -158,10 +158,12 @@ function GreenCost({ text }: { text: string }) {
 /** 用量估算单窗口单元格：剩余时间-剩余标准用量。 */
 function UsageEstimateCell({ window }: { window: DashboardUsageEstimateWindow }) {
   const { t } = useTranslation();
-  if (window.status !== 'ready' || window.remaining_minutes == null || window.remaining_cost == null) {
+  if (window.status !== 'ready' || window.remaining_cost == null) {
     return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
   }
-  const duration = fmtUsageEstimateDuration(window.remaining_minutes);
+  const duration = window.remaining_minutes == null
+    ? '>1000h'
+    : fmtUsageEstimateDuration(window.remaining_minutes);
   const cost = fmtUsageEstimateCost(window.remaining_cost);
   if (!duration) return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
   return (

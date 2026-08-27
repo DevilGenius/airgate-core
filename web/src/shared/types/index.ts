@@ -925,6 +925,7 @@ export interface DashboardUsageEstimateWindow {
   daily_growth_percent: number;
   full_cost: number;
   remaining_cost?: number;
+  /** Omitted with ready status and a remaining cost when the available duration is unbounded. */
   remaining_minutes?: number;
 }
 

@@ -102,6 +102,24 @@ func TestBuildUsageEstimatesSharesWeightedStandardWithinPlan(t *testing.T) {
 	}
 }
 
+func TestBuildUsageEstimatesWithoutCurrentConsumptionLeavesDurationUnbounded(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	meta := accountusage.EstimateMeta{SevenDay: accountusage.WindowEstimate{
+		GrowthDate: "2026-08-24", DailyGrowth: 10, LastPercent: 50,
+		CostPerPercent: 1, CalibrationWeight: 10, CalibratedAt: &now, ObservedAt: &now,
+	}}
+
+	result := BuildUsageEstimates([]UsageEstimateSource{{Plan: "plus", Meta: meta}}, now, 0)
+	if len(result) != 1 || len(result[0].Windows) != 1 {
+		t.Fatalf("result = %+v", result)
+	}
+	window := result[0].Windows[0]
+	if window.Status != "ready" || window.RemainingCost == nil || *window.RemainingCost != 50 ||
+		window.RemainingMinutes != nil {
+		t.Fatalf("zero current consumption estimate = %+v", window)
+	}
+}
+
 func TestProShortTermEstimateUsesSevenDayWhenProHasNoFiveHour(t *testing.T) {
 	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
 	window := func(rate, last float64) accountusage.WindowEstimate {

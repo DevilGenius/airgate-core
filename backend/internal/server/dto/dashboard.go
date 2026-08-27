@@ -68,7 +68,8 @@ type DashboardUsageEstimateWindow struct {
 	DailyGrowthPercent float64  `json:"daily_growth_percent"` // 正数用量增长幅度（已消耗百分比增量）
 	FullCost           float64  `json:"full_cost"`
 	RemainingCost      *float64 `json:"remaining_cost,omitempty"`
-	RemainingMinutes   *float64 `json:"remaining_minutes,omitempty"`
+	// RemainingMinutes 在状态为 ready 且仍有剩余标准额度时为空，表示可用时长无上限。
+	RemainingMinutes *float64 `json:"remaining_minutes,omitempty"`
 }
 
 // DashboardStatsReq 仪表盘统计查询参数

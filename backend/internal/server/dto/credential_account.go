@@ -34,7 +34,8 @@ type CredentialUsageEstimateResp struct {
 }
 
 type CredentialUsageAvailabilityResp struct {
-	Status                string   `json:"status"`
+	Status string `json:"status"`
+	// AvailableMinutes 在状态为 ready 且仍有剩余标准额度时为空，表示可用时长无上限。
 	AvailableMinutes      *float64 `json:"available_minutes"`
 	AvailableStandardCost *float64 `json:"available_standard_cost"`
 }

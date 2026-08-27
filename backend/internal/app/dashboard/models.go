@@ -96,7 +96,8 @@ type UsageEstimateWindow struct {
 	DailyGrowthPercent float64 // 正数的当日累计用量增长（已消耗百分比增量）
 	FullCost           float64
 	RemainingCost      *float64
-	RemainingMinutes   *float64
+	// RemainingMinutes 在 Status=ready 且仍有剩余标准额度时为空，表示可用时长无上限。
+	RemainingMinutes *float64
 }
 
 // TrendQuery 表示趋势查询参数。
