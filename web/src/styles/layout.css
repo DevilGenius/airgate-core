@@ -733,15 +733,3 @@
   min-width: 0;
   text-align: left;
 }
-
-.ag-dashboard-trends {
-  margin-block-start: 2rem !important;
-  margin-top: 2rem !important;
-}
-
-@media (min-width: 96rem) {
-  .ag-dashboard-trends {
-    margin-block-start: 2.5rem !important;
-    margin-top: 2.5rem !important;
-  }
-}

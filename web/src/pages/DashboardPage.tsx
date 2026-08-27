@@ -1023,7 +1023,7 @@ export default function DashboardPage() {
   const isDashboardRefreshing = statsQuery.isFetching || trendQuery.isFetching;
 
   return (
-    <div className="space-y-5 2xl:space-y-6">
+    <div className="space-y-4 2xl:space-y-5">
       {statsQuery.error ? (
         <Alert status="danger">
           {t('dashboard.load_failed', { error: statsQuery.error instanceof Error ? statsQuery.error.message : '' })}
