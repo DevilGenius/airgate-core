@@ -127,6 +127,7 @@ func TestAccountStoreObserveUsageGrowthAccumulatesResetsAndDays(t *testing.T) {
 		t.Fatalf("create reset calibration usage: %v", err)
 	}
 	observe("2026-08-24", firstObservedAt.Add(2*time.Hour), value(5), value(36))
+	observe("2026-08-24", firstObservedAt.Add(2*time.Hour+time.Minute), value(5), nil)
 
 	got, err := db.Account.Get(ctx, item.ID)
 	if err != nil {
@@ -134,8 +135,8 @@ func TestAccountStoreObserveUsageGrowthAccumulatesResetsAndDays(t *testing.T) {
 	}
 	fiveHour := got.UsageEstimateMeta.FiveHour
 	sevenDay := got.UsageEstimateMeta.SevenDay
-	if fiveHour.GrowthDate != "2026-08-24" || fiveHour.DailyGrowth != 65 || fiveHour.LastPercent != 5 {
-		t.Fatalf("5h growth state = %+v, want date=2026-08-24 growth=65 last=5", fiveHour)
+	if fiveHour.GrowthDate != "2026-08-24" || fiveHour.DailyGrowth != 65 || fiveHour.LastPercent != 5 || fiveHour.PendingDecreasePercent != nil {
+		t.Fatalf("5h growth state = %+v, want date=2026-08-24 growth=65 last=5 pending=false", fiveHour)
 	}
 	if sevenDay.GrowthDate != "2026-08-24" || sevenDay.DailyGrowth != 16 || sevenDay.LastPercent != 36 {
 		t.Fatalf("7d growth state = %+v, want date=2026-08-24 growth=16 last=36", sevenDay)
@@ -163,6 +164,68 @@ func TestAccountStoreObserveUsageGrowthAccumulatesResetsAndDays(t *testing.T) {
 	}
 	if fiveHour.CostPerPercent != 2 || sevenDay.CostPerPercent != 7.5 {
 		t.Fatalf("cross-day baseline should retain calibration: (5h=%+v, 7d=%+v)", fiveHour, sevenDay)
+	}
+}
+
+func TestAccountStoreObserveUsageGrowthPersistsZeroPendingDecrease(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	item, err := db.Account.Create().
+		SetName("usage-growth-pending-zero").
+		SetPlatform("openai").
+		SetType("oauth").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	store := NewAccountStore(db)
+	base := time.Date(2026, 8, 24, 10, 0, 0, 0, time.Local)
+	observe := func(offset time.Duration, percent float64) {
+		t.Helper()
+		if err := store.ObserveUsageGrowth(ctx, item.ID, account.UsageGrowthObservation{
+			Day: "2026-08-24", ObservedAt: base.Add(offset), FiveHourPercent: &percent,
+		}); err != nil {
+			t.Fatalf("ObserveUsageGrowth(%v): %v", percent, err)
+		}
+	}
+
+	observe(0, 70)
+	observe(time.Minute, 0)
+	pending, err := db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get pending account: %v", err)
+	}
+	window := pending.UsageEstimateMeta.FiveHour
+	if window.DailyGrowth != 0 || window.LastPercent != 70 ||
+		window.PendingDecreasePercent == nil || *window.PendingDecreasePercent != 0 {
+		t.Fatalf("pending zero decrease was not persisted: %+v", window)
+	}
+	if _, err := db.UsageLog.Create().
+		SetBillingEventID("bill_usage_growth_pending_reset").
+		SetPlatform("openai").
+		SetModel("gpt-5").
+		SetAccountCost(6).
+		SetAccountID(item.ID).
+		SetCreatedAt(base.Add(90 * time.Second)).
+		Save(ctx); err != nil {
+		t.Fatalf("create pending reset calibration usage: %v", err)
+	}
+
+	observe(2*time.Minute, 3)
+	confirmed, err := db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get confirmed account: %v", err)
+	}
+	window = confirmed.UsageEstimateMeta.FiveHour
+	if window.DailyGrowth != 3 || window.LastPercent != 3 || window.PendingDecreasePercent != nil ||
+		window.CostPerPercent != 2 || window.CalibrationWeight != 3 {
+		t.Fatalf("confirmed different lower value = %+v, want growth=3 last=3 cost=2 weight=3 pending=nil", window)
 	}
 }
 

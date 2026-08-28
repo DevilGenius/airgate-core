@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	CalibrationHalfLife  = 24 * time.Hour
-	FiveHourMaxSampleGap = 6 * time.Hour
-	SevenDayMaxSampleGap = 24 * time.Hour
+	CalibrationHalfLife           = 24 * time.Hour
+	FiveHourMaxSampleGap          = 6 * time.Hour
+	SevenDayMaxSampleGap          = 24 * time.Hour
+	usageRollbackTolerancePercent = 2.0
 )
 
 // WindowObservation 是一次基础用量窗口观测。
@@ -29,20 +30,33 @@ type CalibrationInterval struct {
 // CostInterval 判断本次观测是否可以形成滚动成本校准样本。
 func (w WindowEstimate) CostInterval(observation WindowObservation) (CalibrationInterval, bool) {
 	if !validPercent(observation.CurrentPercent) || observation.ObservedAt.IsZero() ||
-		(w.ObservedAt != nil && !observation.ObservedAt.After(*w.ObservedAt)) ||
-		w.CalibrationCursorAt == nil {
+		(w.ObservedAt != nil && !observation.ObservedAt.After(*w.ObservedAt)) {
 		return CalibrationInterval{}, false
 	}
-	gap := observation.ObservedAt.Sub(*w.CalibrationCursorAt)
+	if w.PendingDecreasePercent != nil && observation.CurrentPercent >= w.LastPercent {
+		// 待确认下降恢复到旧基线或更高时，无法区分瞬时异常与快速 reset，丢弃歧义区间。
+		return CalibrationInterval{}, false
+	}
+	start := w.CalibrationCursorAt
+	previousPercent := w.LastPercent
+	if w.PendingDecreasePercent != nil && observation.CurrentPercent < w.LastPercent {
+		// 第二个低值确认回退时，只校准首次低值之后的增长；异常恢复则继续使用正式 cursor。
+		start = w.ObservedAt
+		previousPercent = *w.PendingDecreasePercent
+	}
+	if start == nil {
+		return CalibrationInterval{}, false
+	}
+	gap := observation.ObservedAt.Sub(*start)
 	if gap <= 0 || gap > observation.MaxSampleGap {
 		return CalibrationInterval{}, false
 	}
-	delta := percentDelta(w.LastPercent, observation.CurrentPercent)
+	delta := observation.CurrentPercent - previousPercent
 	if delta <= 0 {
 		return CalibrationInterval{}, false
 	}
 	return CalibrationInterval{
-		Start:        *w.CalibrationCursorAt,
+		Start:        *start,
 		End:          observation.ObservedAt,
 		PercentDelta: delta,
 	}, true
@@ -61,10 +75,11 @@ func (w *WindowEstimate) ApplyObservation(observation WindowObservation, costDel
 	interval, canCalibrate := w.CostInterval(observation)
 	w.ObservedAt = cloneTime(&observation.ObservedAt)
 
-	date, consumed, last, changed := nextDailyConsumption(
+	date, consumed, last, pendingDecreasePercent, moveCursor, changed := nextDailyConsumption(
 		w.GrowthDate,
 		w.DailyGrowth,
 		w.LastPercent,
+		w.PendingDecreasePercent,
 		observation.CurrentPercent,
 		observation.Day,
 	)
@@ -78,7 +93,10 @@ func (w *WindowEstimate) ApplyObservation(observation WindowObservation, costDel
 	w.GrowthDate = date
 	w.DailyGrowth = consumed
 	w.LastPercent = last
-	w.CalibrationCursorAt = cloneTime(&observation.ObservedAt)
+	w.PendingDecreasePercent = pendingDecreasePercent
+	if moveCursor {
+		w.CalibrationCursorAt = cloneTime(&observation.ObservedAt)
+	}
 	if canCalibrate && validPositive(costDelta) {
 		sample := costDelta / interval.PercentDelta
 		if validPositive(sample) {
@@ -112,31 +130,63 @@ func DecayWeight(weight float64, elapsed time.Duration) float64 {
 	return weight * math.Exp(-math.Ln2*float64(elapsed)/float64(CalibrationHalfLife))
 }
 
-func nextDailyConsumption(storedDate string, consumed, last, current float64, day string) (string, float64, float64, bool) {
+func nextDailyConsumption(
+	storedDate string,
+	consumed float64,
+	last float64,
+	pendingDecreasePercent *float64,
+	current float64,
+	day string,
+) (date string, nextConsumed float64, nextLast float64, nextPendingDecreasePercent *float64, moveCursor bool, changed bool) {
 	if day == "" || !validPercent(current) {
-		return storedDate, consumed, last, false
+		return storedDate, consumed, last, pendingDecreasePercent, false, false
 	}
 	if storedDate != "" && day < storedDate {
-		return storedDate, consumed, last, false
+		return storedDate, consumed, last, pendingDecreasePercent, false, false
 	}
-	if storedDate != day {
-		return day, 0, current, true
+	if storedDate == "" {
+		return day, 0, current, nil, true, true
 	}
-	if current == last {
-		return storedDate, consumed, last, false
-	}
-	delta := current - last
-	if delta < 0 {
-		delta = current
-	}
-	return storedDate, consumed + delta, current, true
-}
 
-func percentDelta(previous, current float64) float64 {
-	if current >= previous {
-		return current - previous
+	date = storedDate
+	nextConsumed = consumed
+	nextLast = last
+	nextPendingDecreasePercent = pendingDecreasePercent
+	newDay := storedDate != day
+	if newDay {
+		date = day
+		nextConsumed = 0
+		changed = true
 	}
-	return current
+
+	if current >= last {
+		nextPendingDecreasePercent = nil
+		if current > last {
+			if !newDay {
+				nextConsumed += current - last
+			}
+			nextLast = current
+			return date, nextConsumed, nextLast, nextPendingDecreasePercent, true, true
+		}
+		if pendingDecreasePercent != nil {
+			changed = true
+		}
+		return date, nextConsumed, nextLast, nextPendingDecreasePercent, newDay, changed
+	}
+
+	if pendingDecreasePercent == nil {
+		return date, nextConsumed, nextLast, cloneFloat64(&current), false, true
+	}
+
+	// 连续第二次低于已确认基线才确认下降。超过 2% 视为窗口从 0 重置；
+	// 2% 以内视为读数回拨，只累计待确认期间能够直接观测到的正增长。
+	lowestObserved := math.Min(*pendingDecreasePercent, current)
+	if last-lowestObserved > usageRollbackTolerancePercent {
+		nextConsumed += current
+	} else if current > *pendingDecreasePercent {
+		nextConsumed += current - *pendingDecreasePercent
+	}
+	return date, nextConsumed, current, nil, true, true
 }
 
 func validPercent(value float64) bool {
