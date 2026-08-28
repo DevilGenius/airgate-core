@@ -13,7 +13,7 @@ import {
 import { useToast } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
 import { pluginsApi } from '../../shared/api/plugins';
-import { subscribeAdminEvents, type AdminServerEvent } from '../../shared/api/adminEvents';
+import { getAdminServerNowMs, subscribeAdminEvents, type AdminServerEvent } from '../../shared/api/adminEvents';
 import { groupsApi } from '../../shared/api/groups';
 import { proxiesApi } from '../../shared/api/proxies';
 import { AccountTestModal } from './AccountTestModal';
@@ -260,7 +260,7 @@ function applyAccountStatusEventToRow(row: AccountResp, event: AdminServerEvent)
         ? { duration_ms: event.family_duration_ms }
         : {}),
     };
-    const now = Date.now();
+    const now = getAdminServerNowMs();
     next = {
       ...next,
       family_cooldowns: [

@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Ban } from 'lucide-react';
+import { getAdminServerNowMs } from '../../../shared/api/adminEvents';
 import type { AccountResp, FamilyCooldownDTO } from '../../../shared/types';
 import { AccountCapacityStore } from './accountRuntimeStores';
 import { NativeSoftChip } from './accountNativeChip';
@@ -32,7 +33,7 @@ function StatusPill({
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
 function formatCountdown(ms: number): string {
   if (ms <= 0) return '';
-  const s = Math.floor(ms / 1000);
+  const s = Math.ceil(ms / 1000);
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -89,16 +90,16 @@ function isTransientFamilyCooldown(cooldown: FamilyCooldownDTO): boolean {
   return TRANSIENT_FAMILY_COOLDOWN_REASON_MARKERS.some((marker) => reason.includes(marker));
 }
 
-let cooldownClockNow = Date.now();
+let cooldownClockNow = getAdminServerNowMs();
 let cooldownClockTimer: number | null = null;
 const cooldownClockListeners = new Set<() => void>();
 
 function subscribeCooldownClock(listener: () => void) {
-  cooldownClockNow = Date.now();
+  cooldownClockNow = getAdminServerNowMs();
   cooldownClockListeners.add(listener);
   if (cooldownClockTimer == null) {
     cooldownClockTimer = window.setInterval(() => {
-      cooldownClockNow = Date.now();
+      cooldownClockNow = getAdminServerNowMs();
       cooldownClockListeners.forEach((notify) => notify());
     }, 1000);
   }
@@ -136,11 +137,11 @@ function useCooldownClock(enabled: boolean): number {
  */
 export function AccountStatusCell({ row }: { row: AccountResp }) {
   const { t } = useTranslation();
-  const hasLiveCooldown = accountHasLiveCooldown(row, Date.now());
+  const hasLiveCooldown = accountHasLiveCooldown(row, getAdminServerNowMs());
   const [isCooldownHovered, setIsCooldownHovered] = useState(false);
   const hoverNowRef = useRef<number | null>(null);
   const tickingNow = useCooldownClock(hasLiveCooldown && !isCooldownHovered);
-  const liveNow = hasLiveCooldown ? tickingNow : Date.now();
+  const liveNow = hasLiveCooldown ? tickingNow : getAdminServerNowMs();
   const now = isCooldownHovered && hoverNowRef.current != null ? hoverNowRef.current : liveNow;
   const untilMs = row.state_until ? Date.parse(row.state_until) : 0;
   const remainingMs = untilMs - now;

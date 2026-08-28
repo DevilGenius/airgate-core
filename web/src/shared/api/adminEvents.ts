@@ -3,6 +3,21 @@ import { getToken } from './client';
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const ADMIN_EVENTS_PATH = '/api/v1/admin/events';
 
+let adminServerClockOffsetMs = 0;
+
+function syncAdminServerClock(timestamp: string | undefined) {
+  const serverNow = Date.parse(timestamp ?? '');
+  if (Number.isFinite(serverNow)) {
+    adminServerClockOffsetMs = serverNow - Date.now();
+  }
+}
+
+// 管理状态中的截止时间由服务端生成，统一用校准后的服务端时间计算剩余时长，
+// 避免浏览器与服务端时钟不一致导致倒计时虚高或提前消失。
+export function getAdminServerNowMs() {
+  return Date.now() + adminServerClockOffsetMs;
+}
+
 export interface AdminServerEvent {
   type: string;
   ts?: string;
@@ -182,6 +197,7 @@ class AdminEventStream {
 
     const sequence = Number(event.seq);
     if (event.type === 'connected') {
+      syncAdminServerClock(event.ts);
       this.hasSequenceBaseline = Number.isSafeInteger(sequence) && sequence >= 0;
       this.lastSequence = this.hasSequenceBaseline ? sequence : 0;
       this.emit(event);
