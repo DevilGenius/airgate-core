@@ -151,7 +151,6 @@ func nextDailyConsumption(
 	date = storedDate
 	nextConsumed = consumed
 	nextLast = last
-	nextPendingDecreasePercent = pendingDecreasePercent
 	newDay := storedDate != day
 	if newDay {
 		date = day
