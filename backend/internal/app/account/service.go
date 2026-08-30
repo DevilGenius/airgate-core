@@ -474,6 +474,18 @@ func (s *Service) ListAll(ctx context.Context, filter ListFilter) ([]Account, er
 	return s.repo.ListAll(ctx, filter)
 }
 
+// ListFreeAccountMetadata 查询 Free 汇总所需的最小账号元数据。
+// 支持该能力的仓储不会加载分组、代理、用量和调度运行态；旧仓储实现回退到
+// ListAll。
+func (s *Service) ListFreeAccountMetadata(ctx context.Context, platform string) ([]Account, error) {
+	if reader, ok := s.repo.(interface {
+		ListFreeAccountMetadata(context.Context, string) ([]Account, error)
+	}); ok {
+		return reader.ListFreeAccountMetadata(ctx, platform)
+	}
+	return s.repo.ListAll(ctx, ListFilter{Platform: platform})
+}
+
 // OccupiedPriorities 返回现有启用账号按优先级聚合后的占用数量，供配置导入分配序列优先级。
 func (s *Service) OccupiedPriorities(ctx context.Context) (map[int]int, error) {
 	return s.repo.OccupiedEnabledPriorities(ctx)

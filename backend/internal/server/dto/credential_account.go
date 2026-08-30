@@ -3,16 +3,20 @@ package dto
 // CredentialAccountsOverviewReq 查询凭证管理账号概览。
 //
 // platform 用于限制查询范围，account_type 沿用账号管理页的类型标识，
-// 包括 oauth、apikey 和 oauth_plan:<platform>:<key>。
+// 包括 oauth、apikey 和 oauth_plan:<platform>:<key>；include_free 独立控制
+// 是否读取 Free 账号汇总，Free 不应加入 account_type。
 type CredentialAccountsOverviewReq struct {
 	Platform    string `json:"platform" binding:"required"`
 	AccountType string `json:"account_type"`
+	IncludeFree bool   `json:"include_free"`
 	Page        int    `json:"page" binding:"omitempty,min=1"`
 	PageSize    int    `json:"page_size" binding:"omitempty,min=1,max=200"`
 }
 
 // CredentialAccountsOverviewResp 是凭证管理 API Key 使用的只读账号快照。
-// 不返回 credentials、extra、代理凭证或模型策略。
+// Accounts 始终只返回非 Free 账号的详细运行态列表；请求 include_free=true 时，
+// FreeAccounts 额外返回独立的状态汇总和 HTTP 401 禁用账号脱敏信息。未请求 Free
+// 时不返回 FreeAccounts。不返回 credentials、extra、代理凭证或模型策略。
 type CredentialAccountsOverviewResp struct {
 	SchemaVersion  int                          `json:"schema_version"`
 	GeneratedAt    string                       `json:"generated_at"`
@@ -20,7 +24,26 @@ type CredentialAccountsOverviewResp struct {
 	UsageEstimate  CredentialUsageEstimateResp  `json:"usage_estimate"`
 	Scheduling     CredentialSchedulingResp     `json:"scheduling"`
 	AccountSummary CredentialAccountSummaryResp `json:"account_summary"`
+	FreeAccounts   *CredentialFreeAccountsResp  `json:"free_accounts,omitempty"`
 	Accounts       CredentialAccountsPageResp   `json:"accounts"`
+}
+
+// CredentialFreeAccountsResp 仅在请求 include_free=true 时返回。
+// Free 账号不读取 Redis 容量/占用信息；UnauthorizedAccounts 是 disabled 且
+// 状态原因为 HTTP 401 的子集。
+type CredentialFreeAccountsResp struct {
+	Total                int                         `json:"total"`
+	ByState              map[string]int              `json:"by_state"`
+	UnauthorizedCount    int                         `json:"unauthorized_count"`
+	UnauthorizedAccounts []CredentialFreeAccountResp `json:"unauthorized_accounts,omitempty"`
+}
+
+// CredentialFreeAccountResp 是 HTTP 401 Free 账号的脱敏简化信息，不包含容量、占用和原因字段。
+type CredentialFreeAccountResp struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"`
+	State string `json:"state"`
 }
 
 // CredentialUsageEstimateResp 提供账号池标准消耗速率及四个套餐窗口的可用量估算。
@@ -70,6 +93,7 @@ type CredentialQueueResp struct {
 	MaxAccountWaiters int `json:"max_account_waiters"`
 }
 
+// CredentialAccountSummaryResp 汇总按请求筛选得到的非 Free Accounts；Free 状态见 FreeAccounts。
 type CredentialAccountSummaryResp struct {
 	Platform           string         `json:"platform"`
 	AccountType        string         `json:"account_type,omitempty"`

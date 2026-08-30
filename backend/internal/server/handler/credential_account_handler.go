@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,7 +15,9 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/server/response"
 )
 
-const credentialAccountsOverviewSchemaVersion = 2
+const credentialAccountsOverviewSchemaVersion = 4
+
+var http401ReasonPattern = regexp.MustCompile(`(?i)(^|[^0-9])(?:http\s*)?401(?:[^0-9]|$)`)
 
 // CredentialAccountHandler 提供凭证管理 API Key 的只读账号概览。
 //
@@ -39,8 +42,8 @@ func NewCredentialAccountHandler(
 
 // GetOverview 返回账号状态、全局流量和调度容量的精简快照。
 // RPM/TPM 复用 Dashboard Service 的 1 分钟和 10 分钟统计口径；全局运行态容量复用
-// RuntimeSampler 的内存快照。账号列表的当前并发只做一次批量运行态读取，
-// 这些操作均不在请求转发热路径中执行。
+// RuntimeSampler 的内存快照。非 Free 账号列表的当前并发只做一次批量运行态读取；
+// include_free=true 时，Free 只返回状态汇总和 401 脱敏列表，不读取 Redis 容量/占用信息。
 func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 	if h == nil || h.accounts == nil || h.dashboard == nil {
 		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "凭证账号概览服务不可用")
@@ -79,13 +82,40 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 		return
 	}
 
-	accountIDs := make([]int, 0, len(accounts))
+	now := time.Now().UTC()
+	freeRequested := request.IncludeFree
+	var freeSummary *dto.CredentialFreeAccountsResp
+	if freeRequested {
+		// 只有请求明确包含 Free 时才读取 Free 汇总；仓储只返回汇总所需的最小字段。
+		freeMetadata, metadataErr := h.accounts.ListFreeAccountMetadata(c.Request.Context(), platform)
+		if metadataErr != nil {
+			response.InternalError(c, "查询 Free 账号状态失败")
+			return
+		}
+		freeAccounts := make([]appaccount.Account, 0, len(freeMetadata))
+		for _, account := range freeMetadata {
+			if isFreeCredentialAccountAt(account, now) {
+				freeAccounts = append(freeAccounts, account)
+			}
+		}
+		summary := buildFreeAccountsSummary(freeAccounts)
+		freeSummary = &summary
+	}
+
+	// Free 账号始终不进入详细列表；include_free 只控制是否返回其独立汇总。
+	detailedAccounts := make([]appaccount.Account, 0, len(accounts))
 	for _, account := range accounts {
+		if isFreeCredentialAccountAt(account, now) {
+			continue
+		}
+		detailedAccounts = append(detailedAccounts, account)
+	}
+	accountIDs := make([]int, 0, len(detailedAccounts))
+	for _, account := range detailedAccounts {
 		accountIDs = append(accountIDs, account.ID)
 	}
 	currentCounts := h.accounts.GetCapacity(c.Request.Context(), accountIDs)
 
-	now := time.Now().UTC()
 	result := dto.CredentialAccountsOverviewResp{
 		SchemaVersion: credentialAccountsOverviewSchemaVersion,
 		GeneratedAt:   now.Format(time.RFC3339),
@@ -102,7 +132,7 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 		AccountSummary: dto.CredentialAccountSummaryResp{
 			Platform:    platform,
 			AccountType: accountType,
-			Total:       len(accounts),
+			Total:       len(detailedAccounts),
 			ByState: map[string]int{
 				"active":       0,
 				"rate_limited": 0,
@@ -110,8 +140,9 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 				"disabled":     0,
 			},
 		},
+		FreeAccounts: freeSummary,
 		Accounts: dto.CredentialAccountsPageResp{
-			Total:    len(accounts),
+			Total:    len(detailedAccounts),
 			Page:     page,
 			PageSize: pageSize,
 			List:     make([]dto.CredentialAccountResp, 0),
@@ -139,7 +170,7 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 		}
 	}
 
-	for _, account := range accounts {
+	for _, account := range detailedAccounts {
 		current := currentCounts[account.ID]
 		if account.State == "active" && account.MaxConcurrency > 0 {
 			result.AccountSummary.ConfiguredCapacity += account.MaxConcurrency
@@ -147,23 +178,85 @@ func (h *CredentialAccountHandler) GetOverview(c *gin.Context) {
 		result.AccountSummary.CurrentConcurrency += current
 		result.AccountSummary.ByState[account.State]++
 	}
-	start := len(accounts)
-	totalPages := (len(accounts) + pageSize - 1) / pageSize
+	start := len(detailedAccounts)
+	totalPages := (len(detailedAccounts) + pageSize - 1) / pageSize
 	if page <= totalPages {
 		start = (page - 1) * pageSize
 	}
-	if start < len(accounts) {
+	if start < len(detailedAccounts) {
 		end := start + pageSize
-		if end > len(accounts) {
-			end = len(accounts)
+		if end > len(detailedAccounts) {
+			end = len(detailedAccounts)
 		}
 		result.Accounts.List = make([]dto.CredentialAccountResp, 0, end-start)
-		for _, account := range accounts[start:end] {
+		for _, account := range detailedAccounts[start:end] {
 			result.Accounts.List = append(result.Accounts.List, credentialAccountResp(account, currentCounts[account.ID]))
 		}
 	}
 
 	response.Success(c, result)
+}
+
+func isFreeCredentialAccountAt(account appaccount.Account, now time.Time) bool {
+	typeValue := strings.ToLower(strings.TrimSpace(account.Type))
+	if typeValue == "free" || strings.HasSuffix(typeValue, ":free") {
+		return true
+	}
+	plan := appaccount.NormalizePlanType(account.Credentials["plan_type"])
+	if plan == "free" {
+		return true
+	}
+	// 订阅过期的 OAuth 账号在调度/用量估算中按 Free 处理，概览保持同一口径。
+	if plan == "" || typeValue != "oauth" {
+		return false
+	}
+	rawExpiry := strings.TrimSpace(account.Credentials["subscription_active_until"])
+	if rawExpiry == "" {
+		return false
+	}
+	expiresAt, err := time.Parse(time.RFC3339, rawExpiry)
+	return err == nil && !expiresAt.After(now)
+}
+
+func buildFreeAccountsSummary(accounts []appaccount.Account) dto.CredentialFreeAccountsResp {
+	byState := map[string]int{
+		"active":       0,
+		"rate_limited": 0,
+		"degraded":     0,
+		"disabled":     0,
+	}
+	unauthorized := make([]dto.CredentialFreeAccountResp, 0)
+	for _, account := range accounts {
+		if _, ok := byState[account.State]; ok {
+			byState[account.State]++
+		}
+		if account.State != "disabled" || !isHTTP401Reason(account.ErrorMsg) {
+			continue
+		}
+		unauthorized = append(unauthorized, credentialFreeAccountResp(account))
+	}
+	return dto.CredentialFreeAccountsResp{
+		Total:                len(accounts),
+		ByState:              byState,
+		UnauthorizedCount:    len(unauthorized),
+		UnauthorizedAccounts: unauthorized,
+	}
+}
+
+func credentialFreeAccountResp(account appaccount.Account) dto.CredentialFreeAccountResp {
+	result := dto.CredentialFreeAccountResp{
+		ID:    int64(account.ID),
+		Name:  account.Name,
+		State: account.State,
+	}
+	if account.Email != nil {
+		result.Email = *account.Email
+	}
+	return result
+}
+
+func isHTTP401Reason(reason string) bool {
+	return http401ReasonPattern.MatchString(strings.TrimSpace(reason))
 }
 
 func credentialUsageEstimateResp(stats appdashboard.Stats) dto.CredentialUsageEstimateResp {

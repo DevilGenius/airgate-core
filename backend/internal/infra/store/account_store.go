@@ -203,6 +203,45 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	return mapAccounts(accounts), nil
 }
 
+// ListFreeAccountMetadata 只读取 Free 汇总和 401 子集所需字段，不加载任何边或运行态字段。
+func (s *AccountStore) ListFreeAccountMetadata(ctx context.Context, platform string) ([]appaccount.Account, error) {
+	accounts, err := accountscope.Query(s.db).
+		Where(entaccount.PlatformEQ(platform)).
+		Select(
+			entaccount.FieldID,
+			entaccount.FieldName,
+			entaccount.FieldEmail,
+			entaccount.FieldPlatform,
+			entaccount.FieldType,
+			entaccount.FieldCredentials,
+			entaccount.FieldState,
+			entaccount.FieldErrorMsg,
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]appaccount.Account, 0, len(accounts))
+	for _, item := range accounts {
+		account := appaccount.Account{
+			ID:          item.ID,
+			Name:        item.Name,
+			Platform:    item.Platform,
+			Type:        item.Type,
+			Credentials: cloneCredentials(item.Credentials),
+			State:       item.State.String(),
+			ErrorMsg:    item.ErrorMsg,
+		}
+		if item.Email != nil {
+			email := *item.Email
+			account.Email = &email
+		}
+		result = append(result, account)
+	}
+	return result, nil
+}
+
 // OccupiedPriorities 返回现有未删除账号按优先级聚合后的占用数量。
 // excludeIDs 用于批量更新：本次目标账号将在序列分配中重新定位，不能把旧位置算作占用。
 func (s *AccountStore) OccupiedPriorities(ctx context.Context, excludeIDs []int) (map[int]int, error) {
