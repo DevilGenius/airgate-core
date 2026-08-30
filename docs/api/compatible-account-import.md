@@ -98,6 +98,23 @@ The response uses the standard AirGate envelope. Its `data` value follows contra
 }
 ```
 
+## Delete one account
+
+Both credential-management and administrator interfaces expose a single-account
+delete endpoint:
+
+- `POST /api/v1/credentials/accounts/delete`
+- `POST /api/v1/admin/accounts/delete`
+
+The request body accepts only the account primary key:
+
+```json
+{"id": 123}
+```
+
+The operation is a soft delete; names, emails, credentials, and batch ID lists
+are not accepted.
+
 `stage` is one of `parse`, `validation`, or `import`. A successful HTTP response can still contain item-level failures; inspect `failed` and `issues`.
 
 The Core resolves parsers by the plugin capability `account_import.v1`, the requested platform, and format. Plugin names are not part of the public contract.

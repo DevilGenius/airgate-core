@@ -127,6 +127,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/accounts/import-config", handlers.Account.UpdateImportConfig)
 		adminGroup.POST("/accounts/import", handlers.Account.ImportAccounts)
 		adminGroup.POST("/accounts/import/compat", middleware.PublicRateLimit(20, time.Minute), handlers.CredentialImport.ImportCompatibleAccounts)
+		adminGroup.POST("/accounts/delete", middleware.PublicRateLimit(20, time.Minute), handlers.CredentialImport.DeleteAccount)
 		adminGroup.POST("/accounts/bulk-update", handlers.Account.BulkUpdateAccounts)
 		adminGroup.POST("/accounts/bulk-delete", handlers.Account.BulkDeleteAccounts)
 		adminGroup.POST("/accounts/bulk-clear-family-cooldowns", handlers.Account.BulkClearFamilyCooldowns)
@@ -245,6 +246,7 @@ func (s *Server) registerRoutes() {
 	{
 		credentialGroup.POST("/accounts/overview", handlers.CredentialAccount.GetOverview)
 		credentialGroup.POST("/accounts/import/compat", handlers.CredentialImport.ImportCompatibleAccounts)
+		credentialGroup.POST("/accounts/delete", handlers.CredentialImport.DeleteAccount)
 	}
 
 	// === Extension 插件 API 路由（JWT 认证 + 管理员权限，支持 admin- 管理员 API Key） ===

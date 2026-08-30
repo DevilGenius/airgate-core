@@ -21,3 +21,8 @@ type CompatibleAccountImportResp struct {
 	Failed          int                                `json:"failed"`
 	Issues          []CompatibleAccountImportIssueResp `json:"issues,omitempty"`
 }
+
+// CredentialAccountDeleteReq 仅允许通过账号主键 ID 删除账号。
+type CredentialAccountDeleteReq struct {
+	ID int `json:"id"`
+}

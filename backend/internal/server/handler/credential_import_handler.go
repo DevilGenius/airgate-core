@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -140,6 +141,40 @@ func (h *CredentialImportHandler) ImportCompatibleAccounts(c *gin.Context) {
 	}
 
 	response.Success(c, result)
+}
+
+// DeleteAccount 按账号主键软删除单个账号。
+// 请求体严格限制为 {"id": <positive integer>}，不接受邮箱、名称或账号配置。
+func (h *CredentialImportHandler) DeleteAccount(c *gin.Context) {
+	if h == nil || h.accounts == nil || h.accounts.service == nil {
+		response.InternalError(c, "账号删除服务不可用")
+		return
+	}
+
+	var req dto.CredentialAccountDeleteReq
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		response.BadRequest(c, "请求只能包含有效的账号 id")
+		return
+	}
+	var trailing json.RawMessage
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		response.BadRequest(c, "请求只能包含一个账号 id")
+		return
+	}
+	if req.ID <= 0 {
+		response.BadRequest(c, "账号 id 必须是正整数")
+		return
+	}
+
+	if err := h.accounts.service.Delete(c.Request.Context(), req.ID); err != nil {
+		httpCode, message := h.accounts.handleError("删除账号失败", "删除失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	h.accounts.removeRouteGraphAccount(req.ID)
+	response.Success(c, nil)
 }
 
 func readCompatibleImportRequest(c *gin.Context) (compatibleImportRequest, error) {

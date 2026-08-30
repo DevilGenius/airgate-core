@@ -6,9 +6,17 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
+	"entgo.io/ent/dialect/sql/schema"
 	"github.com/gin-gonic/gin"
+
+	"github.com/DevilGenius/airgate-core/ent/account"
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	"github.com/DevilGenius/airgate-core/internal/infra/store"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
+	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
 
 func TestReadCompatibleImportRequest(t *testing.T) {
@@ -58,5 +66,62 @@ func TestReadCompatibleImportRequestRejectsNonMultipart(t *testing.T) {
 	var requestErr *compatibleImportRequestError
 	if err == nil || !errors.As(err, &requestErr) || requestErr.Status != http.StatusBadRequest {
 		t.Fatalf("error = %#v, want bad request", err)
+	}
+}
+
+func TestCredentialImportDeleteAccountAcceptsOnlyPrimaryID(t *testing.T) {
+	ctx := t.Context()
+	db := testdb.OpenMemoryEnt(t, "credential_account_delete", schema.WithGlobalUniqueID(false))
+	defer func() { _ = db.Close() }()
+
+	item, err := db.Account.Create().
+		SetName("delete-me").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{"access_token": "secret"}).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	accountService := appaccount.NewService(store.NewAccountStore(db), nil, scheduler.NewConcurrencyManager(nil), nil)
+	accountHandler := NewAccountHandler(accountService, nil)
+	handler := NewCredentialImportHandler(accountHandler, nil)
+
+	invalid := invokeHandlerForValidation(
+		http.MethodPost,
+		"/credentials/accounts/delete",
+		`{"id":1,"name":"must-reject"}`,
+		nil,
+		nil,
+		handler.DeleteAccount,
+	)
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("unknown delete field status = %d, body=%s", invalid.Code, invalid.Body.String())
+	}
+	unchanged, err := db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get unchanged account: %v", err)
+	}
+	if unchanged.State != account.StateActive || unchanged.DeletedAt != nil {
+		t.Fatalf("invalid delete changed account: state=%s deleted_at=%v", unchanged.State, unchanged.DeletedAt)
+	}
+
+	valid := invokeHandlerForValidation(
+		http.MethodPost,
+		"/credentials/accounts/delete",
+		`{"id":`+strconv.Itoa(item.ID)+`}`,
+		nil,
+		nil,
+		handler.DeleteAccount,
+	)
+	if valid.Code != http.StatusOK {
+		t.Fatalf("valid delete status = %d, body=%s", valid.Code, valid.Body.String())
+	}
+	deleted, err := db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get deleted account: %v", err)
+	}
+	if deleted.State != account.StateDisabled || deleted.DeletedAt == nil {
+		t.Fatalf("valid delete did not soft-delete account: state=%s deleted_at=%v", deleted.State, deleted.DeletedAt)
 	}
 }
