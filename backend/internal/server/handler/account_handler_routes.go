@@ -295,8 +295,13 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 // BulkUpdateAccounts 批量更新账号字段（group_ids 为整体替换模式）。
 func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 	var req dto.BulkUpdateAccountsReq
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BindError(c, err)
+		return
+	}
+	rawPayload, err := decodeRawJSONBody(c)
+	if err != nil {
+		response.BadRequest(c, "请求体格式错误")
 		return
 	}
 	var prioritySequence *appaccount.PrioritySequenceInput
@@ -308,6 +313,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		}
 	}
 
+	_, hasProxyID := rawPayload["proxy_id"]
 	result := h.service.BulkUpdate(c.Request.Context(), appaccount.BulkUpdateInput{
 		IDs:                     req.AccountIDs,
 		State:                   req.State,
@@ -321,7 +327,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		GroupIDs:                req.GroupIDs,
 		HasGroupIDs:             req.GroupIDs != nil,
 		ProxyID:                 req.ProxyID,
-		HasProxyID:              req.ProxyID != nil,
+		HasProxyID:              hasProxyID,
 		ProxyAssignment:         req.ProxyAssignment,
 		ProxySlot:               req.ProxySlot,
 		Extra:                   req.Extra,

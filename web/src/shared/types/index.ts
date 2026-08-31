@@ -268,7 +268,7 @@ export interface BulkUpdateAccountsReq {
   model_downgrade_threshold?: number | null;
   model_policy?: ModelPolicy | null;
   group_ids?: number[];
-  proxy_id?: number;
+  proxy_id?: number | null;
   proxy_assignment?: 'random' | 'custom';
   proxy_slot?: number;
   extra?: Record<string, unknown>;

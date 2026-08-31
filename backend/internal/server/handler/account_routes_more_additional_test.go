@@ -13,6 +13,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/accountimportdsl"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
@@ -148,6 +149,62 @@ func TestBulkUpdateAccountsCanEditDisabledAccount(t *testing.T) {
 	}
 	if updated.State != account.StateDisabled || updated.Priority != priority {
 		t.Fatalf("disabled account after bulk update = state %q priority %d", updated.State, updated.Priority)
+	}
+}
+
+func TestBulkUpdateAccountsCanClearProxy(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.OpenMemoryEnt(t, "handler_bulk_update_clear_proxy", schema.WithGlobalUniqueID(false))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	proxy, err := store.NewProxyStore(db).Create(ctx, appproxy.CreateInput{
+		Name: "bound-proxy", Protocol: "http", Address: "127.0.0.1", Port: 8080,
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	proxyID := int64(proxy.ID)
+	accountStore := store.NewAccountStore(db)
+	accountIDs := make([]int, 0, 2)
+	for _, name := range []string{"clear-one", "clear-two"} {
+		item, createErr := accountStore.Create(ctx, appaccount.CreateInput{
+			Name: name, Platform: "openai", Type: "apikey",
+			Credentials: map[string]string{"api_key": name}, ProxyID: &proxyID,
+		})
+		if createErr != nil {
+			t.Fatalf("create account %s: %v", name, createErr)
+		}
+		accountIDs = append(accountIDs, item.ID)
+	}
+
+	accountHandler := NewAccountHandler(
+		appaccount.NewService(accountStore, nil, scheduler.NewConcurrencyManager(nil), nil),
+		nil,
+	)
+	w := invokeHandlerForValidation(
+		http.MethodPost,
+		"/accounts/bulk-update",
+		fmt.Sprintf(`{"account_ids":[%d,%d],"proxy_id":null}`, accountIDs[0], accountIDs[1]),
+		nil,
+		nil,
+		accountHandler.BulkUpdateAccounts,
+	)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	if !strings.Contains(w.Body.String(), `"success":2`) {
+		t.Fatalf("bulk proxy clear body = %s", w.Body.String())
+	}
+	for _, id := range accountIDs {
+		hasProxy, queryErr := db.Account.Query().Where(account.IDEQ(id)).QueryProxy().Exist(ctx)
+		if queryErr != nil {
+			t.Fatalf("query proxy for account %d: %v", id, queryErr)
+		}
+		if hasProxy {
+			t.Fatalf("account %d still has a proxy after bulk clear", id)
+		}
 	}
 }
 

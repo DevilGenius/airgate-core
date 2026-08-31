@@ -167,7 +167,7 @@ export function BulkEditAccountModal({
     && prioritySequenceValid
     && rateMultiplierValid
     && modelDowngradeThresholdValid
-    && (!enableProxy || (proxyId != null && proxyBinding.valid));
+    && (!enableProxy || proxyBinding.valid);
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -195,7 +195,7 @@ export function BulkEditAccountModal({
       patch.model_downgrade_threshold = modelDowngradeThresholdEmpty ? null : modelDowngradeThresholdValue;
     }
     if (enableGroups) patch.group_ids = groupIds;
-    if (enableProxy && proxyId != null) {
+    if (enableProxy) {
       patch.proxy_id = proxyId;
       if (proxyBinding.assignment) {
         patch.proxy_assignment = proxyBinding.assignment;
@@ -543,7 +543,7 @@ export function BulkEditAccountModal({
         >
           <ProxyBindingFields
             disabled={!enableProxy}
-            emptyLabel={t('accounts.select_proxy')}
+            emptyLabel={t('accounts.no_proxy')}
             onProxyChange={handleProxyChange}
             onSlotChange={setProxySlotInput}
             proxies={proxies}
