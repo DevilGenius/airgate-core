@@ -675,8 +675,11 @@ func TestCloneAndCategoryHelpers(t *testing.T) {
 	if got := extraString(map[string]interface{}{"plan": 42}, "plan"); got != "" {
 		t.Fatalf("extraString non-string = %q", got)
 	}
-	if got := accountCategoryAliases("plain text"); len(got) != 0 {
-		t.Fatalf("aliases without known category = %#v", got)
+	if replacement, aliases := accountCategoryMapping("plain text"); replacement != "" || len(aliases) != 0 {
+		t.Fatalf("mapping without known category = replacement %q aliases %#v", replacement, aliases)
+	}
+	if replacement, aliases := accountCategoryMapping("ChatGPT K12"); replacement != "team" || len(aliases) != 0 {
+		t.Fatalf("K12 mapping = replacement %q aliases %#v, want team replacement", replacement, aliases)
 	}
 
 	groupRates := map[int64]float64{1: 2}

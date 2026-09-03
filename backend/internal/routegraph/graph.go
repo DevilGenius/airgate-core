@@ -845,12 +845,13 @@ func accountCategoryKeys(account *ent.Account) []string {
 		keys = append(keys, key)
 	}
 	addCategoryValue := func(value string) {
-		if replacement, ok := accountCategoryReplacement(value); ok {
+		replacement, aliases := accountCategoryMapping(value)
+		if replacement != "" {
 			addNormalized(replacement)
 			return
 		}
 		addNormalized(value)
-		for _, alias := range accountCategoryAliases(value) {
+		for _, alias := range aliases {
 			addNormalized(alias)
 		}
 	}
@@ -898,36 +899,22 @@ func normalizeCategory(value string) string {
 	return builder.String()
 }
 
-func accountCategoryAliases(value string) []string {
-	tokens := accountCategoryTokens(value)
-	if len(tokens) == 0 {
-		return nil
-	}
+// accountCategoryMapping 单次切词后返回替换类别或普通别名。
+// replacement 非空时调用方只保留该类别；aliases 仅在不替换时使用。
+func accountCategoryMapping(value string) (string, []string) {
+	tokens := strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+	})
 	aliases := make([]string, 0, len(tokens))
 	for _, token := range tokens {
-		if replacement, ok := accountCategoryTokenReplacements[token]; ok {
-			aliases = append(aliases, replacement)
+		if mapped, ok := accountCategoryTokenReplacements[token]; ok {
+			return mapped, nil
 		}
 		if _, ok := knownAccountCategoryAliases[token]; ok {
 			aliases = append(aliases, token)
 		}
 	}
-	return aliases
-}
-
-func accountCategoryTokens(value string) []string {
-	return strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
-		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
-	})
-}
-
-func accountCategoryReplacement(value string) (string, bool) {
-	for _, token := range accountCategoryTokens(value) {
-		if replacement, ok := accountCategoryTokenReplacements[token]; ok {
-			return replacement, true
-		}
-	}
-	return "", false
+	return "", aliases
 }
 
 func extraString(extra map[string]interface{}, key string) string {
