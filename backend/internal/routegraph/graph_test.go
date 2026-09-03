@@ -67,13 +67,25 @@ func TestAccountsForModelAppliesModelPolicies(t *testing.T) {
 	}
 }
 
-func TestAccountsForModelOAuthDefaultPolicyOnlyMatchesDefaultOAuth(t *testing.T) {
+func TestAccountsForModelOAuthDefaultAndTeamPolicies(t *testing.T) {
 	defaultOAuth := &ent.Account{ID: 1, Platform: "openai", Type: "oauth"}
-	teamOAuth := &ent.Account{
+	k12OAuth := &ent.Account{
 		ID:          2,
 		Platform:    "openai",
 		Type:        "oauth",
 		Credentials: map[string]string{"plan_type": "k12"},
+	}
+	proLiteOAuth := &ent.Account{
+		ID:          4,
+		Platform:    "openai",
+		Type:        "oauth",
+		Credentials: map[string]string{"plan_type": "Self_serve_business_prolite"},
+	}
+	teamOAuth := &ent.Account{
+		ID:          5,
+		Platform:    "openai",
+		Type:        "oauth",
+		Credentials: map[string]string{"plan_type": "team"},
 	}
 	apiKey := &ent.Account{ID: 3, Platform: "openai", Type: "apikey"}
 	group := &ent.Group{
@@ -84,16 +96,29 @@ func TestAccountsForModelOAuthDefaultPolicyOnlyMatchesDefaultOAuth(t *testing.T)
 			"team":  {Deny: []string{"team-blocked"}},
 		},
 	}
-	group.Edges.Accounts = []*ent.Account{defaultOAuth, teamOAuth, apiKey}
-	restore := SetSnapshotForTesting([]*ent.Group{group})
+	group.Edges.Accounts = []*ent.Account{defaultOAuth, k12OAuth, proLiteOAuth, teamOAuth, apiKey}
+	allowGroup := &ent.Group{
+		ID:                       12,
+		Platform:                 "openai",
+		AccountTypeModelPolicies: map[string]modelpolicy.Policy{"team": {Allow: []string{"team-allowed"}}},
+	}
+	allowGroup.Edges.Accounts = []*ent.Account{k12OAuth, proLiteOAuth, teamOAuth, apiKey}
+	restore := SetSnapshotForTesting([]*ent.Group{group, allowGroup})
 	defer restore()
 
 	node := Group(group.ID)
-	if got := accountIDs(node.AccountsForModel("default-blocked")); !sameIDs(got, []int{2, 3}) {
-		t.Fatalf("default-blocked accounts = %v, want [2 3]", got)
+	if got := accountIDs(node.AccountsForModel("default-blocked")); !sameIDs(got, []int{2, 4, 5, 3}) {
+		t.Fatalf("default-blocked accounts = %v, want [2 4 5 3]", got)
 	}
 	if got := accountIDs(node.AccountsForModel("team-blocked")); !sameIDs(got, []int{1, 3}) {
 		t.Fatalf("team-blocked accounts = %v, want [1 3]", got)
+	}
+	allowNode := Group(allowGroup.ID)
+	if got := accountIDs(allowNode.AccountsForModel("team-allowed")); !sameIDs(got, []int{2, 4, 5, 3}) {
+		t.Fatalf("team-allowed accounts = %v, want [2 4 5 3]", got)
+	}
+	if got := accountIDs(allowNode.AccountsForModel("other")); !sameIDs(got, []int{3}) {
+		t.Fatalf("Team allowlist should restrict K12, ProLite, and Team equally: %v", got)
 	}
 }
 
@@ -610,15 +635,31 @@ func TestCloneAndCategoryHelpers(t *testing.T) {
 	if accountCategoryKeys(nil) != nil {
 		t.Fatal("accountCategoryKeys(nil) should return nil")
 	}
+	for _, key := range []string{"k12", "prolite"} {
+		if _, exists := knownAccountCategoryAliases[key]; exists {
+			t.Fatalf("%q must not be an independent account category", key)
+		}
+	}
 	account := &ent.Account{
 		Type:        "OAuth",
-		Credentials: map[string]string{"plan_type": "ChatGPT Plus", "account_category": "Builder-Id Pro", "plan": "k12"},
+		Credentials: map[string]string{"plan_type": "ChatGPT Plus", "account_category": "Builder-Id Pro", "plan": "k12", "subscription_type": "Self_serve_business_prolite"},
 		Extra:       map[string]interface{}{"subscription_type": "Team", "plan": 42},
 	}
 	keys := accountCategoryKeys(account)
-	for _, want := range []string{"chatgptplus", "plus", "builderidpro", "pro", "k12", "team"} {
+	for _, want := range []string{"chatgptplus", "plus", "builderidpro", "pro", "team"} {
 		if !containsString(keys, want) {
 			t.Fatalf("category keys = %v, missing %q", keys, want)
+		}
+	}
+	for _, unwanted := range []string{"k12", "selfservebusinessprolite", "prolite"} {
+		if containsString(keys, unwanted) {
+			t.Fatalf("category keys = %v, should fold %q into team", keys, unwanted)
+		}
+	}
+	for _, plan := range []string{"team", "k12", "Self_serve_business_prolite", "prolite"} {
+		planKeys := accountCategoryKeys(&ent.Account{Type: "oauth", Credentials: map[string]string{"plan_type": plan}})
+		if len(planKeys) != 1 || planKeys[0] != "team" {
+			t.Fatalf("account plan %q category keys = %v, want [team]", plan, planKeys)
 		}
 	}
 	if containsString(keys, "oauth") {

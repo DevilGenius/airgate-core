@@ -14,6 +14,8 @@ func TestNormalizePlanType(t *testing.T) {
 		{name: "professional alias", raw: "Professional", want: "pro"},
 		{name: "team", raw: "Team", want: "team"},
 		{name: "k12 stays distinct", raw: "K12", want: "k12"},
+		{name: "self serve business prolite stays distinct", raw: "Self_serve_business_prolite", want: "prolite"},
+		{name: "prolite alias", raw: "ChatGPT ProLite", want: "prolite"},
 		{name: "free", raw: "free", want: "free"},
 		{name: "enterprise", raw: "Enterprise", want: "enterprise"},
 		{name: "unknown", raw: "Custom Plan", want: "custom plan"},

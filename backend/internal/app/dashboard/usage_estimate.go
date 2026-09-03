@@ -47,7 +47,7 @@ func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCo
 	hasPlusAccounts := false
 	planHasFiveHour := make(map[string]bool)
 	for _, source := range sources {
-		if source.Plan != "plus" && source.Plan != "team" && source.Plan != "k12" && source.Plan != "pro" {
+		if source.Plan != "plus" && source.Plan != "team" && source.Plan != "k12" && source.Plan != "prolite" && source.Plan != "pro" {
 			continue
 		}
 		planHasFiveHour[source.Plan] = planHasFiveHour[source.Plan] || observationSupported(usageEstimateObservation{
@@ -59,7 +59,7 @@ func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCo
 	proShortTerm := make([]usageEstimateObservation, 0, len(sources))
 	day := now.In(time.Local).Format("2006-01-02")
 	for _, source := range sources {
-		isPlusPool := source.Plan == "plus" || source.Plan == "team" || source.Plan == "k12"
+		isPlusPool := source.Plan == "plus" || source.Plan == "team" || source.Plan == "k12" || source.Plan == "prolite"
 		isProPlan := source.Plan == "pro"
 		if !isPlusPool && !isProPlan {
 			continue

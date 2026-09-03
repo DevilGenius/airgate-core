@@ -13,6 +13,7 @@ backend/server
 backend/bin/
 backend/tmp/
 backend/.gocache/
+backend/.gocache-test/
 .gocache/
 backend/web
 

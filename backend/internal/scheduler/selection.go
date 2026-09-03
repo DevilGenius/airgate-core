@@ -526,9 +526,9 @@ func excludeAccounts(candidates []*ent.Account, excludeIDs []int) []*ent.Account
 	return filtered
 }
 
-// AccountFailoverType 返回账号轮换使用的精确类型标识。
-// OAuth 账号优先使用套餐字段，并刻意不应用 routegraph 的类别别名，确保 k12 与 team
-// 在第三次 failover 时被视为不同类型；其它账号至少按实体 Type 区分。
+// AccountFailoverType 返回账号轮换使用的重试类型标识。
+// OAuth 账号优先使用套餐字段；Team 类别中的 team / k12 / prolite 统一为 team，
+// 第三次 failover 不在这三种套餐之间做伪类型切换。其它账号至少按实体 Type 区分。
 func AccountFailoverType(acc *ent.Account) string {
 	if acc == nil {
 		return ""
@@ -553,6 +553,14 @@ func AccountFailoverType(acc *ent.Account) string {
 
 func normalizeFailoverAccountType(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
+	for _, token := range strings.FieldsFunc(value, func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+	}) {
+		switch token {
+		case "team", "k12", "prolite":
+			return "team"
+		}
+	}
 	var builder strings.Builder
 	builder.Grow(len(value))
 	for _, r := range value {

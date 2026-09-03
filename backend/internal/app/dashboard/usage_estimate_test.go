@@ -207,6 +207,29 @@ func TestFiveHourRowVisibilityDependsOnlyOnPlus(t *testing.T) {
 	}
 }
 
+func TestBuildUsageEstimatesTreatsProLiteLikeK12(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	window := func(rate float64) accountusage.WindowEstimate {
+		return accountusage.WindowEstimate{
+			GrowthDate: "2026-08-24", DailyGrowth: 10, LastPercent: 50,
+			CostPerPercent: rate, CalibrationWeight: 10, CalibratedAt: &now, ObservedAt: &now,
+		}
+	}
+	result := BuildUsageEstimates([]UsageEstimateSource{
+		{Plan: "plus", Meta: accountusage.EstimateMeta{FiveHour: window(1), SevenDay: window(1)}},
+		{Plan: "prolite", Meta: accountusage.EstimateMeta{FiveHour: window(2), SevenDay: window(2)}},
+	}, now, 1)
+	if len(result) != 1 || result[0].Plan != "plus" || len(result[0].Windows) != 2 {
+		t.Fatalf("result = %+v, want one Plus estimate with 5h and 7d", result)
+	}
+	for _, estimate := range result[0].Windows {
+		if estimate.Status != "ready" || estimate.FullCost != 300 ||
+			estimate.RemainingCost == nil || *estimate.RemainingCost != 150 {
+			t.Fatalf("ProLite should contribute like K12: %+v", estimate)
+		}
+	}
+}
+
 func TestUsageEstimateFreshnessWindows(t *testing.T) {
 	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
 	calibratedAt := now.Add(-6 * 24 * time.Hour)

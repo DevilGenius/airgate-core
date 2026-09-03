@@ -75,8 +75,9 @@ var knownAccountCategoryAliases = map[string]struct{}{
 	"enterprise": {},
 }
 
-var accountCategoryTokenAliases = map[string][]string{
-	"k12": {"team"},
+var accountCategoryTokenReplacements = map[string]string{
+	"k12":     "team",
+	"prolite": "team",
 }
 
 type UserNode struct {
@@ -844,6 +845,10 @@ func accountCategoryKeys(account *ent.Account) []string {
 		keys = append(keys, key)
 	}
 	addCategoryValue := func(value string) {
+		if replacement, ok := accountCategoryReplacement(value); ok {
+			addNormalized(replacement)
+			return
+		}
 		addNormalized(value)
 		for _, alias := range accountCategoryAliases(value) {
 			addNormalized(alias)
@@ -894,22 +899,35 @@ func normalizeCategory(value string) string {
 }
 
 func accountCategoryAliases(value string) []string {
-	tokens := strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
-		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
-	})
+	tokens := accountCategoryTokens(value)
 	if len(tokens) == 0 {
 		return nil
 	}
 	aliases := make([]string, 0, len(tokens))
 	for _, token := range tokens {
-		if values, ok := accountCategoryTokenAliases[token]; ok {
-			aliases = append(aliases, values...)
+		if replacement, ok := accountCategoryTokenReplacements[token]; ok {
+			aliases = append(aliases, replacement)
 		}
 		if _, ok := knownAccountCategoryAliases[token]; ok {
 			aliases = append(aliases, token)
 		}
 	}
 	return aliases
+}
+
+func accountCategoryTokens(value string) []string {
+	return strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+	})
+}
+
+func accountCategoryReplacement(value string) (string, bool) {
+	for _, token := range accountCategoryTokens(value) {
+		if replacement, ok := accountCategoryTokenReplacements[token]; ok {
+			return replacement, true
+		}
+	}
+	return "", false
 }
 
 func extraString(extra map[string]interface{}, key string) string {

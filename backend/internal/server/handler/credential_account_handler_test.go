@@ -15,6 +15,7 @@ import (
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
+	"github.com/DevilGenius/airgate-core/internal/plugin"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
@@ -30,7 +31,7 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		SetEmail("active@example.com").
 		SetPlatform("openai").
 		SetType("oauth").
-		SetCredentials(map[string]string{"access_token": "secret", "plan_type": "ChatGPT Plus"}).
+		SetCredentials(map[string]string{"access_token": "secret", "plan_type": "plus"}).
 		SetMaxConcurrency(20).
 		SetPriority(120).
 		SetRateMultiplier(1).
@@ -49,10 +50,29 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		Save(ctx); err != nil {
 		t.Fatalf("create disabled account: %v", err)
 	}
+	if _, err := db.Account.Create().
+		SetName("prolite-team").
+		SetEmail("prolite@example.com").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{"access_token": "secret-3", "plan_type": "Self_serve_business_prolite"}).
+		SetMaxConcurrency(0).
+		SetRateMultiplier(1).
+		Save(ctx); err != nil {
+		t.Fatalf("create ProLite account: %v", err)
+	}
 
 	accountService := appaccount.NewService(
 		store.NewAccountStore(db),
-		nil,
+		accountHandlerPluginCatalogStub{allPluginMetadata: []plugin.PluginMeta{{
+			Platform: "openai",
+			Metadata: map[string]string{
+				"account.oauth_plans": `[
+					{"key":"plus","credential_key":"plan_type","matches":["plus"]},
+					{"key":"team","credential_key":"plan_type","matches":["team","Team","k12","K12","self_serve_business_prolite","Self_serve_business_prolite"]}
+				]`,
+			},
+		}}},
 		scheduler.NewConcurrencyManager(nil),
 		nil,
 	)
@@ -61,7 +81,7 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 	w := invokeHandlerForValidation(
 		http.MethodPost,
 		"/credentials/accounts/overview",
-		`{"platform":"openai","account_type":"oauth","page":1,"page_size":10}`,
+		`{"platform":"openai","account_type":"oauth_plan:openai:team,oauth_plan:openai:plus","page":1,"page_size":10}`,
 		nil,
 		nil,
 		handler.GetOverview,
@@ -88,13 +108,13 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		envelope.Data.UsageEstimate.Pro7d.Status != "insufficient" {
 		t.Fatalf("usage estimate defaults = %+v", envelope.Data.UsageEstimate)
 	}
-	if envelope.Data.AccountSummary.Total != 2 ||
-		envelope.Data.AccountSummary.ByState["active"] != 1 ||
+	if envelope.Data.AccountSummary.Total != 3 ||
+		envelope.Data.AccountSummary.ByState["active"] != 2 ||
 		envelope.Data.AccountSummary.ByState["disabled"] != 1 ||
 		envelope.Data.AccountSummary.ConfiguredCapacity != 20 {
 		t.Fatalf("account summary = %+v", envelope.Data.AccountSummary)
 	}
-	if len(envelope.Data.Accounts.List) != 2 {
+	if len(envelope.Data.Accounts.List) != 3 {
 		t.Fatalf("account list = %+v", envelope.Data.Accounts)
 	}
 	byName := make(map[string]dto.CredentialAccountResp, len(envelope.Data.Accounts.List))
@@ -102,7 +122,8 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		byName[item.Name] = item
 	}
 	if byName["active-team"].Email == "" || byName["active-team"].PlanType != "plus" ||
-		byName["active-team"].Priority != 120 || byName["disabled-team"].PlanType != "k12" || byName["disabled-team"].Priority != 50 {
+		byName["active-team"].Priority != 120 || byName["disabled-team"].PlanType != "k12" || byName["disabled-team"].Priority != 50 ||
+		byName["prolite-team"].PlanType != "prolite" {
 		t.Fatalf("account priority mapping = %+v", byName)
 	}
 	if strings.Contains(w.Body.String(), "access_token") || strings.Contains(w.Body.String(), "secret") {

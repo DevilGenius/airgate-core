@@ -446,7 +446,7 @@ func (s *DashboardStore) loadDashboardUsageEstimates(
 	sources := make([]appdashboard.UsageEstimateSource, 0, len(accounts))
 	for _, item := range accounts {
 		plan := dashboardEstimatePlan(item.Credentials, now)
-		if plan != "plus" && plan != "team" && plan != "k12" && plan != "pro" {
+		if plan != "plus" && plan != "team" && plan != "k12" && plan != "prolite" && plan != "pro" {
 			continue
 		}
 		sources = append(sources, appdashboard.UsageEstimateSource{Plan: plan, Meta: item.UsageEstimateMeta})
