@@ -168,6 +168,7 @@ type UpdateInput struct {
 	Credentials             map[string]string
 	ModelPolicy             *modelpolicy.Policy
 	State                   *string
+	ErrorMsg                *string
 	Priority                *int
 	MaxConcurrency          *int
 	RateMultiplier          *float64

@@ -98,6 +98,10 @@ The response uses the standard AirGate envelope. Its `data` value follows contra
 }
 ```
 
+`stage` is one of `parse`, `validation`, or `import`. A successful HTTP response can still contain item-level failures; inspect `failed` and `issues`.
+
+The Core resolves parsers by the plugin capability `account_import.v1`, the requested platform, and format. Plugin names are not part of the public contract.
+
 ## Delete one account
 
 Both credential-management and administrator interfaces expose a single-account
@@ -115,6 +119,19 @@ The request body accepts only the account primary key:
 The operation is a soft delete; names, emails, credentials, and batch ID lists
 are not accepted.
 
-`stage` is one of `parse`, `validation`, or `import`. A successful HTTP response can still contain item-level failures; inspect `failed` and `issues`.
+## Ban one account
 
-The Core resolves parsers by the plugin capability `account_import.v1`, the requested platform, and format. Plugin names are not part of the public contract.
+Both credential-management and administrator interfaces expose a single-account
+ban endpoint:
+
+- `POST /api/v1/credentials/accounts/ban`
+- `POST /api/v1/admin/accounts/ban`
+
+The request body uses the same account primary-key form:
+
+```json
+{"id": 123}
+```
+
+Only an account that has not been soft-deleted is changed. Its state becomes
+`disabled` and its state detail is set to `Banned`.

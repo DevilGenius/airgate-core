@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
 	"github.com/gin-gonic/gin"
@@ -123,5 +124,90 @@ func TestCredentialImportDeleteAccountAcceptsOnlyPrimaryID(t *testing.T) {
 	}
 	if deleted.State != account.StateDisabled || deleted.DeletedAt == nil {
 		t.Fatalf("valid delete did not soft-delete account: state=%s deleted_at=%v", deleted.State, deleted.DeletedAt)
+	}
+}
+
+func TestCredentialImportBanAccountUpdatesOnlyUndeletedAccount(t *testing.T) {
+	ctx := t.Context()
+	db := testdb.OpenMemoryEnt(t, "credential_account_ban", schema.WithGlobalUniqueID(false))
+	defer func() { _ = db.Close() }()
+
+	item, err := db.Account.Create().
+		SetName("ban-me").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{"access_token": "secret"}).
+		SetState(account.StateRateLimited).
+		SetStateUntil(time.Now().Add(time.Hour)).
+		SetErrorMsg("old reason").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	deleted, err := db.Account.Create().
+		SetName("already-deleted").
+		SetPlatform("openai").
+		SetType("oauth").
+		SetCredentials(map[string]string{"access_token": "deleted"}).
+		SetState(account.StateDisabled).
+		SetErrorMsg("keep me").
+		SetDeletedAt(time.Now()).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create deleted account: %v", err)
+	}
+
+	accountService := appaccount.NewService(store.NewAccountStore(db), nil, scheduler.NewConcurrencyManager(nil), nil)
+	accountHandler := NewAccountHandler(accountService, nil)
+	handler := NewCredentialImportHandler(accountHandler, nil)
+
+	invalid := invokeHandlerForValidation(
+		http.MethodPost,
+		"/credentials/accounts/ban",
+		`{"id":1,"name":"must-reject"}`,
+		nil,
+		nil,
+		handler.BanAccount,
+	)
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("unknown ban field status = %d, body=%s", invalid.Code, invalid.Body.String())
+	}
+
+	valid := invokeHandlerForValidation(
+		http.MethodPost,
+		"/credentials/accounts/ban",
+		`{"id":`+strconv.Itoa(item.ID)+`}`,
+		nil,
+		nil,
+		handler.BanAccount,
+	)
+	if valid.Code != http.StatusOK {
+		t.Fatalf("valid ban status = %d, body=%s", valid.Code, valid.Body.String())
+	}
+	banned, err := db.Account.Get(ctx, item.ID)
+	if err != nil {
+		t.Fatalf("get banned account: %v", err)
+	}
+	if banned.State != account.StateDisabled || banned.StateUntil != nil || banned.ErrorMsg != "Banned" || banned.DeletedAt != nil {
+		t.Fatalf("banned account = state=%s until=%v reason=%q deleted_at=%v", banned.State, banned.StateUntil, banned.ErrorMsg, banned.DeletedAt)
+	}
+
+	deletedResponse := invokeHandlerForValidation(
+		http.MethodPost,
+		"/credentials/accounts/ban",
+		`{"id":`+strconv.Itoa(deleted.ID)+`}`,
+		nil,
+		nil,
+		handler.BanAccount,
+	)
+	if deletedResponse.Code != http.StatusNotFound {
+		t.Fatalf("deleted account ban status = %d, body=%s", deletedResponse.Code, deletedResponse.Body.String())
+	}
+	unchanged, err := db.Account.Get(ctx, deleted.ID)
+	if err != nil {
+		t.Fatalf("get deleted account: %v", err)
+	}
+	if unchanged.State != account.StateDisabled || unchanged.ErrorMsg != "keep me" || unchanged.DeletedAt == nil {
+		t.Fatalf("deleted account changed = state=%s reason=%q deleted_at=%v", unchanged.State, unchanged.ErrorMsg, unchanged.DeletedAt)
 	}
 }

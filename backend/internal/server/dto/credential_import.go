@@ -26,3 +26,8 @@ type CompatibleAccountImportResp struct {
 type CredentialAccountDeleteReq struct {
 	ID int `json:"id"`
 }
+
+// CredentialAccountBanReq 仅允许通过账号主键 ID 封禁账号。
+type CredentialAccountBanReq struct {
+	ID int `json:"id"`
+}

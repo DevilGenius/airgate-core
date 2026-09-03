@@ -48,6 +48,8 @@ const autoTokenRefreshInterval = 6 * time.Hour
 
 const deprecatedGroupPrioritiesExtraKey = "group_priorities"
 
+const bannedAccountReason = "Banned"
+
 // StateWriter 管理员巡检场景下对账号状态的写入口。
 // 由 scheduler 包实现；让 account service 不直接依赖 scheduler。
 type StateWriter interface {
@@ -714,6 +716,54 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	return err
 }
 
+// Ban 将未删除账号永久置为 disabled，并记录统一的封禁原因。
+//
+// 生产环境通过 StateWriter 写入，确保状态缓存和调度路由同步刷新。
+// 没有注入 StateWriter 的轻量测试/降级场景则直接走仓储更新，仍保持
+// "仅允许未删除账号" 的 accountscope 约束。
+func (s *Service) Ban(ctx context.Context, id int) error {
+	logger := sdk.LoggerFromContext(ctx)
+	// StateWriter 的直接更新会返回底层 Ent not-found 错误；先通过领域
+	// 仓储确认账号仍在未删除作用域内，保证 API 对不存在/已删除账号返回
+	// 统一的 ErrAccountNotFound。
+	if _, err := s.repo.FindByID(ctx, id, LoadOptions{}); err != nil {
+		return err
+	}
+	if s.stateWriter != nil {
+		if err := s.stateWriter.ManualDisable(ctx, id, bannedAccountReason); err != nil {
+			logger.Error("account_ban_failed",
+				sdk.LogFieldAccountID, id,
+				sdk.LogFieldError, err)
+			return err
+		}
+	} else {
+		state := "disabled"
+		reason := bannedAccountReason
+		if _, err := s.repo.Update(ctx, id, UpdateInput{State: &state, ErrorMsg: &reason}); err != nil {
+			logger.Error("account_ban_failed",
+				sdk.LogFieldAccountID, id,
+				sdk.LogFieldError, err)
+			return err
+		}
+	}
+
+	// 状态会影响账号用量缓存中的可用账号集合。
+	s.InvalidateUsageCache("")
+	// profile cache 还保存 state/error_msg，不能只清理 usage 快照；更新后
+	// 尽力回写最新账号资料，避免后台探测继续使用旧的 active 状态。
+	if s.usage != nil {
+		if updated, err := s.repo.FindByID(ctx, id, LoadOptions{WithGroups: true, WithProxy: true}); err == nil {
+			s.usage.cacheAccountProfiles(ctx, []Account{updated})
+		} else {
+			logger.Warn("account_ban_profile_cache_refresh_failed",
+				sdk.LogFieldAccountID, id,
+				sdk.LogFieldError, err)
+		}
+	}
+	logger.Info("account_banned", sdk.LogFieldAccountID, id)
+	return nil
+}
+
 // BulkUpdate 批量更新账号。逐条执行并收集每个账号的成功/失败信息，允许部分成功。
 // group_ids 为整体替换：若提供则覆盖账号原有分组，未提供则不触碰。
 func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkResult {
@@ -964,6 +1014,7 @@ func hasUpdateInputChanges(input UpdateInput) bool {
 		input.Type != nil ||
 		input.Credentials != nil ||
 		input.State != nil ||
+		input.ErrorMsg != nil ||
 		input.Priority != nil ||
 		input.MaxConcurrency != nil ||
 		input.RateMultiplier != nil ||

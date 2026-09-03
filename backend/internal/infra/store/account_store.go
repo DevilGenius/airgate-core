@@ -680,7 +680,14 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 		builder = builder.SetModelPolicy(cloneModelPolicy(*input.ModelPolicy))
 	}
 	if input.State != nil {
-		builder = builder.SetState(entaccount.State(*input.State))
+		state := entaccount.State(*input.State)
+		builder = builder.SetState(state)
+		if state == entaccount.StateDisabled {
+			builder = builder.ClearStateUntil()
+		}
+	}
+	if input.ErrorMsg != nil {
+		builder = builder.SetErrorMsg(*input.ErrorMsg)
 	}
 	if input.Priority != nil {
 		builder = builder.SetPriority(*input.Priority)

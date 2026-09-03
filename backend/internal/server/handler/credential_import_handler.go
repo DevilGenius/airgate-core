@@ -177,6 +177,42 @@ func (h *CredentialImportHandler) DeleteAccount(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// BanAccount 按账号主键将未删除账号置为 disabled，并记录状态详情 Banned。
+// 请求体严格限制为 {"id": <positive integer>}，不接受邮箱、名称或账号配置。
+func (h *CredentialImportHandler) BanAccount(c *gin.Context) {
+	if h == nil || h.accounts == nil || h.accounts.service == nil {
+		response.InternalError(c, "账号封禁服务不可用")
+		return
+	}
+
+	var req dto.CredentialAccountBanReq
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		response.BadRequest(c, "请求只能包含有效的账号 id")
+		return
+	}
+	var trailing json.RawMessage
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		response.BadRequest(c, "请求只能包含一个账号 id")
+		return
+	}
+	if req.ID <= 0 {
+		response.BadRequest(c, "账号 id 必须是正整数")
+		return
+	}
+
+	if err := h.accounts.service.Ban(c.Request.Context(), req.ID); err != nil {
+		httpCode, message := h.accounts.handleError("封禁账号失败", "封禁失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	// StateWriter 在生产环境已经刷新路由；这里额外刷新可覆盖无状态写入的
+	// 测试/降级实现，且与现有账号状态接口保持一致。
+	h.accounts.refreshRouteGraphAccount(c.Request.Context(), req.ID)
+	response.Success(c, nil)
+}
+
 func readCompatibleImportRequest(c *gin.Context) (compatibleImportRequest, error) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, compatibleImportRequestMaxBytes)
 	reader, err := c.Request.MultipartReader()
