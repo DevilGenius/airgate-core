@@ -1,4 +1,5 @@
 import type { AccountResp } from '../../../shared/types';
+import { normalizeAccountPlan } from '../../../shared/utils/accountPlan';
 import type { AccountUsageWindow } from './accountUsageSupport';
 import { getWindowSlot } from './accountUsageRows';
 
@@ -37,14 +38,10 @@ export function shouldShowAccountPoolAdjustedBaseFiveHour(value: unknown) {
 }
 
 function accountPlan(account: AccountDisplaySource): AccountPlan | '' {
-  const tokens = (account.credentials.plan_type || '')
-    .trim()
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
-  const plan = tokens.find((token): token is AccountPlan => (
-    KNOWN_PLANS.has(token as AccountPlan)
-  ));
+  const normalizedPlan = normalizeAccountPlan(account.credentials.plan_type);
+  const plan = KNOWN_PLANS.has(normalizedPlan as AccountPlan)
+    ? normalizedPlan as AccountPlan
+    : undefined;
   const subscriptionUntil = account.credentials.subscription_active_until;
   const subscriptionExpired = subscriptionUntil ? new Date(subscriptionUntil) < new Date() : false;
   if (plan && subscriptionExpired && (plan === 'plus' || plan === 'pro')) return 'free';

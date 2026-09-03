@@ -62,8 +62,8 @@ func TestAccountsForModelAppliesModelPolicies(t *testing.T) {
 	if got := accountIDs(node.AccountsForModel("gpt-5.1")); !sameIDs(got, []int{2, 3, 4}) {
 		t.Fatalf("gpt-5 accounts = %v, want [2 3 4]", got)
 	}
-	if got := accountIDs(node.AccountsForModel("gpt-4o")); !sameIDs(got, []int{3, 4}) {
-		t.Fatalf("gpt-4o accounts = %v, want [3 4]", got)
+	if got := accountIDs(node.AccountsForModel("gpt-4o")); !sameIDs(got, []int{3}) {
+		t.Fatalf("gpt-4o accounts = %v, want [3]", got)
 	}
 }
 
@@ -636,7 +636,7 @@ func TestCloneAndCategoryHelpers(t *testing.T) {
 		t.Fatal("accountCategoryKeys(nil) should return nil")
 	}
 	for _, key := range []string{"k12", "prolite"} {
-		if _, exists := knownAccountCategoryAliases[key]; exists {
+		if _, exists := knownAccountCategories[key]; exists {
 			t.Fatalf("%q must not be an independent account category", key)
 		}
 	}
@@ -656,7 +656,7 @@ func TestCloneAndCategoryHelpers(t *testing.T) {
 			t.Fatalf("category keys = %v, should fold %q into team", keys, unwanted)
 		}
 	}
-	for _, plan := range []string{"team", "k12", "Self_serve_business_prolite", "prolite"} {
+	for _, plan := range []string{"team", "k12", "Self_serve_business_prolite", "ChatGPT ProLite", "pro_lite"} {
 		planKeys := accountCategoryKeys(&ent.Account{Type: "oauth", Credentials: map[string]string{"plan_type": plan}})
 		if len(planKeys) != 1 || planKeys[0] != "team" {
 			t.Fatalf("account plan %q category keys = %v, want [team]", plan, planKeys)

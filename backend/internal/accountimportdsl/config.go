@@ -13,6 +13,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
+	"github.com/DevilGenius/airgate-core/internal/plantype"
 )
 
 const (
@@ -398,17 +399,23 @@ func fieldValue(item appaccount.CreateInput, field string) string {
 }
 
 func conditionMatches(value string, condition Condition) bool {
-	normalizedValue := strings.ToLower(strings.TrimSpace(value))
 	op := strings.ToLower(strings.TrimSpace(condition.Op))
 	if op == "" {
 		op = "eq"
 	}
+	normalizeValue := func(raw string) string {
+		if (op == "eq" || op == "in") && strings.EqualFold(strings.TrimSpace(condition.Field), "credentials.plan_type") {
+			return plantype.Normalize(raw)
+		}
+		return strings.ToLower(strings.TrimSpace(raw))
+	}
+	normalizedValue := normalizeValue(value)
 	switch op {
 	case "eq":
-		return normalizedValue == strings.ToLower(strings.TrimSpace(condition.Value))
+		return normalizedValue == normalizeValue(condition.Value)
 	case "in":
 		for _, candidate := range condition.Values {
-			if normalizedValue == strings.ToLower(strings.TrimSpace(candidate)) {
+			if normalizedValue == normalizeValue(candidate) {
 				return true
 			}
 		}

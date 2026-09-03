@@ -66,6 +66,36 @@ func TestApplyUsesFirstMatchingRuleAndIndependentSequences(t *testing.T) {
 	}
 }
 
+func TestPlanTypeConditionsUseCanonicalAliases(t *testing.T) {
+	config := Config{
+		Version: Version,
+		Rules: []Rule{
+			{
+				Name: "Team plans",
+				When: []Condition{{
+					Field:  "credentials.plan_type",
+					Op:     "in",
+					Values: []string{"team", "k12", "prolite"},
+				}},
+				Set: Assignment{MaxConcurrency: intPtr(50)},
+			},
+		},
+	}
+	items := make([]appaccount.CreateInput, 0, 4)
+	for _, plan := range []string{"TEAM", "K12", "ChatGPT ProLite", "SELF_SERVE_BUSINESS_PRO_LITE"} {
+		items = append(items, appaccount.CreateInput{Credentials: map[string]string{"plan_type": plan}})
+	}
+	got, err := config.Apply(items)
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+	for index, item := range got {
+		if item.MaxConcurrency != 50 {
+			t.Fatalf("plan alias %q max concurrency = %d, want 50", items[index].Credentials["plan_type"], item.MaxConcurrency)
+		}
+	}
+}
+
 func TestParseRejectsInvalidPriorityAndUnknownFields(t *testing.T) {
 	for _, raw := range []string{
 		`{"version":1,"rules":[{"name":"bad","when":[],"set":{"priority":{"mode":"sequence","initial":1,"step":0,"group_size":1},"model_downgrade_threshold":0}}]}`,

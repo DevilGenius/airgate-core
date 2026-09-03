@@ -15,6 +15,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
+	"github.com/DevilGenius/airgate-core/internal/plantype"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
 )
 
@@ -552,23 +553,7 @@ func AccountFailoverType(acc *ent.Account) string {
 }
 
 func normalizeFailoverAccountType(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	for _, token := range strings.FieldsFunc(value, func(r rune) bool {
-		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
-	}) {
-		switch token {
-		case "team", "k12", "prolite":
-			return "team"
-		}
-	}
-	var builder strings.Builder
-	builder.Grow(len(value))
-	for _, r := range value {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			builder.WriteRune(r)
-		}
-	}
-	return builder.String()
+	return plantype.Compact(plantype.RoutingCategory(value))
 }
 
 func preferDifferentAccountTypeCandidates(normalCandidates, stickyCandidates []*ent.Account, previousType string) ([]*ent.Account, []*ent.Account) {

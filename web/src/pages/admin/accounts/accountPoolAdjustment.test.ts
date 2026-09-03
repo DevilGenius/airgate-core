@@ -58,6 +58,12 @@ describe('account pool adjustment', () => {
       proLiteAccount,
       parseAccountPoolAdjustmentPlans('free'),
     )).toBe(false);
+    for (const planType of ['pro_lite', 'pro lite', 'ChatGPT ProLite', 'SELF_SERVE_BUSINESS_PROLITE']) {
+      expect(isAccountPoolProAdjusted(
+        { ...proLiteAccount, credentials: { plan_type: planType } },
+        parseAccountPoolAdjustmentPlans('prolite'),
+      )).toBe(true);
+    }
     expect(isAccountPoolProAdjusted(
       { ...oauthAccount, credentials: { plan_type: 'team', subscription_active_until: '2020-01-01T00:00:00Z' } },
       parseAccountPoolAdjustmentPlans('free'),

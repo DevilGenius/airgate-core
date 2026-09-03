@@ -29,21 +29,25 @@ func TestAdditionalOAuthPlanFilterBranches(t *testing.T) {
 		Metadata: map[string]string{oauthPlanMetadataKey: `[
 			{"key":" ", "label":"ignored"},
 			{"key":"plus", "label":" Plus ", "credential_key":" plan ", "match":"contains", "matches":["plus"," plus ",""]},
+			{"key":"team", "match":"normalized_contains", "matches":["team","k12","prolite"]},
 			{"key":"team", "matches":[" "]},
 			{"key":"pro"}
 		]`},
 	}
 	filters := pluginOAuthPlanFilters(meta)
-	if len(filters) != 2 {
-		t.Fatalf("filters = %+v, want two valid filters", filters)
+	if len(filters) != 3 {
+		t.Fatalf("filters = %+v, want three valid filters", filters)
 	}
 	if filters[0].Key != "plus" || filters[0].Label != "Plus" || filters[0].CredentialKey != "plan" ||
 		filters[0].MatchMode != "contains" || len(filters[0].Matches) != 1 || filters[0].Matches[0] != "plus" {
 		t.Fatalf("contains filter = %+v", filters[0])
 	}
-	if filters[1].Key != "pro" || filters[1].Label != "pro" || filters[1].CredentialKey != defaultOAuthPlanCredential ||
-		filters[1].MatchMode != "exact" || len(filters[1].Matches) != 1 || filters[1].Matches[0] != "pro" {
-		t.Fatalf("fallback filter = %+v", filters[1])
+	if filters[1].Key != "team" || filters[1].MatchMode != "normalized_contains" || len(filters[1].Matches) != 3 {
+		t.Fatalf("normalized filter = %+v", filters[1])
+	}
+	if filters[2].Key != "pro" || filters[2].Label != "pro" || filters[2].CredentialKey != defaultOAuthPlanCredential ||
+		filters[2].MatchMode != "exact" || len(filters[2].Matches) != 1 || filters[2].Matches[0] != "pro" {
+		t.Fatalf("fallback filter = %+v", filters[2])
 	}
 
 	if got := normalizedPlanMatches([]string{" a ", "a", "", "b"}, "fallback"); len(got) != 2 || got[0] != "a" || got[1] != "b" {

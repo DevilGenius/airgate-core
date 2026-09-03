@@ -17,6 +17,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
+	"github.com/DevilGenius/airgate-core/internal/plantype"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -67,17 +68,12 @@ type compiledAccountTypePolicy struct {
 	policy modelpolicy.Compiled
 }
 
-var knownAccountCategoryAliases = map[string]struct{}{
-	"free":       {},
-	"plus":       {},
-	"pro":        {},
-	"team":       {},
-	"enterprise": {},
-}
-
-var accountCategoryTokenReplacements = map[string]string{
-	"k12":     "team",
-	"prolite": "team",
+var knownAccountCategories = map[string]struct{}{
+	plantype.Free:       {},
+	plantype.Plus:       {},
+	plantype.Pro:        {},
+	plantype.Team:       {},
+	plantype.Enterprise: {},
 }
 
 type UserNode struct {
@@ -899,22 +895,17 @@ func normalizeCategory(value string) string {
 	return builder.String()
 }
 
-// accountCategoryMapping 单次切词后返回替换类别或普通别名。
+// accountCategoryMapping 使用统一套餐规范化后返回替换类别或普通别名。
 // replacement 非空时调用方只保留该类别；aliases 仅在不替换时使用。
 func accountCategoryMapping(value string) (string, []string) {
-	tokens := strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
-		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
-	})
-	aliases := make([]string, 0, len(tokens))
-	for _, token := range tokens {
-		if mapped, ok := accountCategoryTokenReplacements[token]; ok {
-			return mapped, nil
-		}
-		if _, ok := knownAccountCategoryAliases[token]; ok {
-			aliases = append(aliases, token)
-		}
+	category := plantype.RoutingCategory(value)
+	if category == plantype.Team {
+		return plantype.Team, nil
 	}
-	return "", aliases
+	if _, ok := knownAccountCategories[category]; ok {
+		return "", []string{category}
+	}
+	return "", nil
 }
 
 func extraString(extra map[string]interface{}, key string) string {

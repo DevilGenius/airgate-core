@@ -55,7 +55,7 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		SetEmail("prolite@example.com").
 		SetPlatform("openai").
 		SetType("oauth").
-		SetCredentials(map[string]string{"access_token": "secret-3", "plan_type": "Self_serve_business_prolite"}).
+		SetCredentials(map[string]string{"access_token": "secret-3", "plan_type": "ChatGPT ProLite"}).
 		SetMaxConcurrency(0).
 		SetRateMultiplier(1).
 		Save(ctx); err != nil {
@@ -69,7 +69,7 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 			Metadata: map[string]string{
 				"account.oauth_plans": `[
 					{"key":"plus","credential_key":"plan_type","matches":["plus"]},
-					{"key":"team","credential_key":"plan_type","matches":["team","Team","k12","K12","self_serve_business_prolite","Self_serve_business_prolite"]}
+					{"key":"team","credential_key":"plan_type","match":"normalized_contains","matches":["team","k12","prolite"]}
 				]`,
 			},
 		}}},

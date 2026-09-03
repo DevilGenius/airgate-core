@@ -3,32 +3,16 @@ package account
 import (
 	"strings"
 	"time"
+
+	"github.com/DevilGenius/airgate-core/internal/plantype"
 )
 
 // NormalizePlanType 将插件返回的套餐描述规范化为对外稳定的套餐标识。
 //
-// 该函数只用于对外展示，不应回写 credentials.plan_type；插件声明的筛选规则
-// 可能依赖原始套餐值（例如 "Builder Id Pro"）。k12、prolite 与 team 保持为不同标识；
-// Self Serve Business ProLite 对外统一返回 prolite。
+// 返回值表示套餐身份，不应回写 credentials.plan_type；插件声明的筛选规则可能依赖
+// 原始值（例如 "Builder Id Pro"）。路由类别和估算路径由 plantype 的专用函数决定。
 func NormalizePlanType(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-
-	tokens := strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
-		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
-	})
-	for _, token := range tokens {
-		switch token {
-		case "free", "plus", "pro", "team", "k12", "prolite", "enterprise":
-			return token
-		case "professional":
-			return "pro"
-		}
-	}
-
-	return strings.ToLower(value)
+	return plantype.Normalize(value)
 }
 
 // EffectivePlanType 返回账号当前参与容量和用量估算的套餐类型。
@@ -36,12 +20,12 @@ func NormalizePlanType(value string) string {
 // plan_type 为准，不根据该时间降级为 Free。
 func EffectivePlanType(value, subscriptionActiveUntil string, now time.Time) string {
 	plan := NormalizePlanType(value)
-	if plan != "plus" && plan != "pro" {
+	if plan != plantype.Plus && plan != plantype.Pro {
 		return plan
 	}
 	expiresAt, err := time.Parse(time.RFC3339, strings.TrimSpace(subscriptionActiveUntil))
 	if err == nil && !expiresAt.After(now) {
-		return "free"
+		return plantype.Free
 	}
 	return plan
 }

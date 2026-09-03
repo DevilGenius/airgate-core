@@ -141,7 +141,7 @@ func TestSplitModelQualityCandidatesPreservesNormalStickySubset(t *testing.T) {
 func TestAccountFailoverTypeFoldsTeamK12AndProLite(t *testing.T) {
 	t.Parallel()
 
-	for _, plan := range []string{"Team", "K12", "prolite", "Self_serve_business_prolite"} {
+	for _, plan := range []string{"Team", "K12", "prolite", "Self_serve_business_prolite", "ChatGPT ProLite", "pro_lite"} {
 		account := &ent.Account{Type: "oauth", Credentials: map[string]string{"plan_type": plan}}
 		if got := AccountFailoverType(account); got != "oauth:team" {
 			t.Fatalf("%s failover type = %q, want oauth:team", plan, got)

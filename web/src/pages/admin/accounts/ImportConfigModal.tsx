@@ -57,7 +57,7 @@ export const ACCOUNT_IMPORT_DSL_EXAMPLE = serializeImportConfigDSL({
       mode: 'sequence', initial: 1000, step: -10, group_size: 5, min: 800, max: 1000,
     }),
     examplePlanRule('OpenAI OAuth Pro', ['pro'], 30, { mode: 'fixed', value: 300 }),
-    examplePlanRule('OpenAI OAuth Team', ['team', 'k12'], 50, {
+    examplePlanRule('OpenAI OAuth Team', ['team', 'k12', 'prolite'], 50, {
       mode: 'sequence', initial: 3000, step: -20, group_size: 10, min: 2600, max: 3000,
     }),
   ],

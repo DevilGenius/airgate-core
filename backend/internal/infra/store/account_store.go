@@ -24,6 +24,7 @@ import (
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
+	"github.com/DevilGenius/airgate-core/internal/plantype"
 )
 
 // AccountStore 使用 Ent 实现账号仓储。
@@ -145,15 +146,39 @@ func accountCredentialStringMatches(filter appaccount.CredentialStringFilter) pr
 	predicates = append(predicates, func(s *sql.Selector) {
 		valuePredicates := make([]*sql.Predicate, 0, len(values))
 		for _, value := range values {
-			if filter.MatchMode == "contains" {
+			switch filter.MatchMode {
+			case "contains":
 				valuePredicates = append(valuePredicates, sqljson.StringContains(entaccount.FieldCredentials, value, sqljson.Path(filter.Key)))
-			} else {
+			case "normalized_contains":
+				if normalized := plantype.Compact(value); normalized != "" {
+					valuePredicates = append(valuePredicates, normalizedJSONTextContains(entaccount.FieldCredentials, filter.Key, normalized))
+				}
+			default:
 				valuePredicates = append(valuePredicates, sqljson.ValueEQ(entaccount.FieldCredentials, value, sqljson.Path(filter.Key)))
 			}
+		}
+		if len(valuePredicates) == 0 {
+			s.Where(sql.False())
+			return
 		}
 		s.Where(sql.Or(valuePredicates...))
 	})
 	return entaccount.And(predicates...)
+}
+
+func normalizedJSONTextContains(column, key, normalized string) *sql.Predicate {
+	return sql.P(func(b *sql.Builder) {
+		if b.Dialect() == dialect.Postgres {
+			b.WriteString("REGEXP_REPLACE(LOWER(COALESCE(")
+			b.Join(sqljson.ValuePath(column, sqljson.Path(key), sqljson.Unquote(true)))
+			b.WriteString(", '')), '[^a-z0-9]+', '', 'g')")
+		} else {
+			b.WriteString("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(COALESCE(")
+			b.Join(sqljson.ValuePath(column, sqljson.Path(key), sqljson.Unquote(true)))
+			b.WriteString(", '')), '_', ''), '-', ''), ' ', ''), '.', ''), '/', ''), ':', '')")
+		}
+		b.WriteString(" LIKE ").Arg("%" + normalized + "%")
+	})
 }
 
 func nonEmptyStrings(values []string) []string {

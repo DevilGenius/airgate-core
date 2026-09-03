@@ -24,6 +24,7 @@ import (
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
+	"github.com/DevilGenius/airgate-core/internal/plantype"
 )
 
 // DashboardStore 使用 Ent 实现仪表盘仓储。
@@ -446,7 +447,7 @@ func (s *DashboardStore) loadDashboardUsageEstimates(
 	sources := make([]appdashboard.UsageEstimateSource, 0, len(accounts))
 	for _, item := range accounts {
 		plan := dashboardEstimatePlan(item.Credentials, now)
-		if plan != "plus" && plan != "team" && plan != "k12" && plan != "prolite" && plan != "pro" {
+		if plantype.EstimatePool(plan) == "" {
 			continue
 		}
 		sources = append(sources, appdashboard.UsageEstimateSource{Plan: plan, Meta: item.UsageEstimateMeta})

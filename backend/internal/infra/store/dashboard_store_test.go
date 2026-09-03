@@ -137,7 +137,7 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	}
 }
 
-func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
+func TestDashboardStoreUsageEstimatesSeparatePlusAndProPaths(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -191,8 +191,8 @@ func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
 		t.Fatalf("plus estimate = %+v, want only 7d", estimates[0])
 	}
 	plusWindow := estimates[0].Windows[0]
-	if plusWindow.Window != "7d" || plusWindow.Status != "ready" || plusWindow.DailyGrowthPercent != 30 || plusWindow.FullCost != 100 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 45 {
-		t.Fatalf("plus 7d estimate = %+v, want +30%% $100 45min", plusWindow)
+	if plusWindow.Window != "7d" || plusWindow.Status != "ready" || plusWindow.DailyGrowthPercent != 20 || plusWindow.FullCost != 50 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 25 {
+		t.Fatalf("plus 7d estimate = %+v, want +20%% $50 25min", plusWindow)
 	}
 	if estimates[1].Plan != "pro" || len(estimates[1].Windows) != 1 {
 		t.Fatalf("pro estimate = %+v, want only 7d", estimates[1])
@@ -221,7 +221,7 @@ func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load estimates with calibrated zero-growth 5h: %v", err)
 	}
-	if len(estimates[0].Windows) != 2 || estimates[0].Windows[0].Window != "5h" || estimates[0].Windows[0].Status != "ready" || estimates[0].Windows[0].DailyGrowthPercent != 20 || estimates[0].Windows[0].FullCost != 100 ||
+	if len(estimates[0].Windows) != 2 || estimates[0].Windows[0].Window != "5h" || estimates[0].Windows[0].Status != "ready" || estimates[0].Windows[0].DailyGrowthPercent != 0 || estimates[0].Windows[0].FullCost != 50 ||
 		len(estimates[1].Windows) != 2 || estimates[1].Windows[0].Window != "5h" || estimates[1].Windows[0].Status != "ready" || estimates[1].Windows[0].FullCost != 200 {
 		t.Fatalf("short-term estimates should choose 5h or 7d per plan type: %+v", estimates)
 	}
@@ -232,7 +232,7 @@ func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
 		t.Fatalf("load estimates with partial new account: %v", err)
 	}
 	plusWindow = estimates[0].Windows[1]
-	if plusWindow.Status != "ready" || plusWindow.FullCost != 150 || plusWindow.DailyGrowthPercent != 20 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 95 {
+	if plusWindow.Status != "ready" || plusWindow.FullCost != 100 || plusWindow.DailyGrowthPercent != 10 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 75 {
 		t.Fatalf("new account should use the shared Plus standard: %+v", plusWindow)
 	}
 
@@ -243,7 +243,7 @@ func TestDashboardStoreUsageEstimatesAggregatePlusTeamAndPro(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load estimates after reactivation: %v", err)
 	}
-	if estimates[0].Windows[1].Status != "ready" || estimates[0].Windows[1].FullCost != 425 ||
+	if estimates[0].Windows[1].Status != "ready" || estimates[0].Windows[1].FullCost != 375 ||
 		estimates[1].Windows[1].Status != "ready" || estimates[1].Windows[1].FullCost != 525 {
 		t.Fatalf("reactivated calibrated account should rejoin estimates: %+v", estimates)
 	}

@@ -70,7 +70,7 @@ func pluginOAuthPlanFilters(meta plugin.PluginMeta) []oauthPlanFilter {
 			credentialKey = defaultOAuthPlanCredential
 		}
 		matchMode := strings.ToLower(strings.TrimSpace(item.MatchMode))
-		if matchMode != "contains" && matchMode != "empty" {
+		if matchMode != "contains" && matchMode != "normalized_contains" && matchMode != "empty" {
 			matchMode = "exact"
 		}
 		matches := normalizedPlanMatches(item.Matches, key)

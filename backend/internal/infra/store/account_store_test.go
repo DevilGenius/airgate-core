@@ -603,6 +603,55 @@ func TestAccountStoreCredentialStringFilterMatchesPluginDeclaredPlan(t *testing.
 	}
 }
 
+func TestAccountStoreNormalizedCredentialFilterMatchesPlanAliases(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() { _ = db.Close() }()
+	ctx := context.Background()
+	accounts := []struct {
+		name string
+		plan string
+	}{
+		{name: "team", plan: "TEAM"},
+		{name: "k12", plan: "K12"},
+		{name: "snake", plan: "SELF_SERVE_BUSINESS_PROLITE"},
+		{name: "label", plan: "ChatGPT ProLite"},
+		{name: "separated", plan: "pro_lite"},
+		{name: "plus", plan: "plus"},
+	}
+	for _, item := range accounts {
+		if _, err := db.Account.Create().
+			SetName(item.name).
+			SetPlatform("openai").
+			SetType("oauth").
+			SetCredentials(map[string]string{"plan_type": item.plan}).
+			Save(ctx); err != nil {
+			t.Fatalf("create account %q: %v", item.name, err)
+		}
+	}
+
+	items, total, err := NewAccountStore(db).List(ctx, account.ListFilter{
+		Page: 1, PageSize: 20,
+		Credentials: []account.CredentialStringFilter{{
+			Platform:    "openai",
+			AccountType: "oauth",
+			Key:         "plan_type",
+			Values:      []string{"team", "k12", "prolite"},
+			MatchMode:   "normalized_contains",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("List normalized credential filter: %v", err)
+	}
+	if total != 5 || len(items) != 5 {
+		t.Fatalf("normalized credential filter total=%d items=%+v, want five Team aliases", total, items)
+	}
+	for _, item := range items {
+		if item.Name == "plus" {
+			t.Fatalf("normalized Team filter included Plus account: %+v", item)
+		}
+	}
+}
+
 func TestAccountStoreListSortsByPriority(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {
