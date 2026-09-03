@@ -202,20 +202,14 @@ func isFreeCredentialAccountAt(account appaccount.Account, now time.Time) bool {
 	if typeValue == "free" || strings.HasSuffix(typeValue, ":free") {
 		return true
 	}
-	plan := appaccount.NormalizePlanType(account.Credentials["plan_type"])
-	if plan == "free" {
-		return true
-	}
-	// 订阅过期的 OAuth 账号在调度/用量估算中按 Free 处理，概览保持同一口径。
-	if plan == "" || typeValue != "oauth" {
+	if typeValue != "oauth" {
 		return false
 	}
-	rawExpiry := strings.TrimSpace(account.Credentials["subscription_active_until"])
-	if rawExpiry == "" {
-		return false
-	}
-	expiresAt, err := time.Parse(time.RFC3339, rawExpiry)
-	return err == nil && !expiresAt.After(now)
+	return appaccount.EffectivePlanType(
+		account.Credentials["plan_type"],
+		account.Credentials["subscription_active_until"],
+		now,
+	) == "free"
 }
 
 func buildFreeAccountsSummary(accounts []appaccount.Account) dto.CredentialFreeAccountsResp {

@@ -2,6 +2,7 @@ package account
 
 import (
 	"strings"
+	"time"
 )
 
 // NormalizePlanType 将插件返回的套餐描述规范化为对外稳定的套餐标识。
@@ -28,4 +29,19 @@ func NormalizePlanType(value string) string {
 	}
 
 	return strings.ToLower(value)
+}
+
+// EffectivePlanType 返回账号当前参与容量和用量估算的套餐类型。
+// subscription_active_until 只对 Plus / Pro 有套餐失效语义；其它套餐始终以
+// plan_type 为准，不根据该时间降级为 Free。
+func EffectivePlanType(value, subscriptionActiveUntil string, now time.Time) string {
+	plan := NormalizePlanType(value)
+	if plan != "plus" && plan != "pro" {
+		return plan
+	}
+	expiresAt, err := time.Parse(time.RFC3339, strings.TrimSpace(subscriptionActiveUntil))
+	if err == nil && !expiresAt.After(now) {
+		return "free"
+	}
+	return plan
 }

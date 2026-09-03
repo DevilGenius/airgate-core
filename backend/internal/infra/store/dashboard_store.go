@@ -455,16 +455,11 @@ func (s *DashboardStore) loadDashboardUsageEstimates(
 }
 
 func dashboardEstimatePlan(credentials map[string]string, now time.Time) string {
-	plan := appaccount.NormalizePlanType(credentials["plan_type"])
-	if plan == "" || plan == "free" {
-		return plan
-	}
-	if raw := strings.TrimSpace(credentials["subscription_active_until"]); raw != "" {
-		if expiresAt, err := time.Parse(time.RFC3339, raw); err == nil && !expiresAt.After(now) {
-			return "free"
-		}
-	}
-	return plan
+	return appaccount.EffectivePlanType(
+		credentials["plan_type"],
+		credentials["subscription_active_until"],
+		now,
+	)
 }
 
 func queryTodayUsageSnapshot(ctx context.Context, query *ent.UsageLogQuery, todayStart time.Time) (usageTodaySnapshot, error) {

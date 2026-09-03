@@ -14,11 +14,19 @@ const oauthAccount = {
   credentials: { plan_type: 'ChatGPT Plus' },
 };
 const adjustedPlans = parseAccountPoolAdjustmentPlans('plus');
+const proLiteAccount = {
+  ...oauthAccount,
+  name: '0904-ProLite-1',
+  credentials: {
+    plan_type: 'Self_serve_business_prolite',
+    subscription_active_until: '2020-01-01T00:00:00Z',
+  },
+};
 
 describe('account pool adjustment', () => {
   it('parses the selected adjustment plans', () => {
-    expect([...parseAccountPoolAdjustmentPlans('plus, team,invalid,k12')]).toEqual(['plus', 'team', 'k12']);
-    expect([...parseAccountPoolAdjustmentPlans('oauth_pro')]).toEqual(['plus', 'team', 'k12', 'free']);
+    expect([...parseAccountPoolAdjustmentPlans('plus, team,invalid,k12,prolite')]).toEqual(['plus', 'team', 'k12', 'prolite']);
+    expect([...parseAccountPoolAdjustmentPlans('oauth_pro')]).toEqual(['plus', 'team', 'k12', 'prolite', 'free']);
     expect([...parseAccountPoolAdjustmentPlans('')]).toEqual([]);
   });
 
@@ -42,11 +50,33 @@ describe('account pool adjustment', () => {
       { ...oauthAccount, credentials: { email: 'free@example.com' } },
       parseAccountPoolAdjustmentPlans('free'),
     )).toBe(true);
+    expect(isAccountPoolProAdjusted(
+      proLiteAccount,
+      parseAccountPoolAdjustmentPlans('prolite'),
+    )).toBe(true);
+    expect(isAccountPoolProAdjusted(
+      proLiteAccount,
+      parseAccountPoolAdjustmentPlans('free'),
+    )).toBe(false);
+    expect(isAccountPoolProAdjusted(
+      { ...oauthAccount, credentials: { plan_type: 'team', subscription_active_until: '2020-01-01T00:00:00Z' } },
+      parseAccountPoolAdjustmentPlans('free'),
+    )).toBe(false);
+    expect(isAccountPoolProAdjusted(
+      { ...oauthAccount, credentials: { plan_type: 'pro', subscription_active_until: '2099-01-01T00:00:00Z' } },
+      parseAccountPoolAdjustmentPlans('free'),
+    )).toBe(false);
+    expect(isAccountPoolProAdjusted(
+      { ...oauthAccount, credentials: { plan_type: 'pro', subscription_active_until: '2020-01-01T00:00:00Z' } },
+      parseAccountPoolAdjustmentPlans('free'),
+    )).toBe(true);
   });
 
   it('moves the Pro marker to the front of the displayed account name', () => {
     expect(accountPoolDisplayName(oauthAccount, adjustedPlans)).toBe('Pro-0819-1');
     expect(accountPoolDisplayName(oauthAccount, parseAccountPoolAdjustmentPlans(''))).toBe('0819-Plus-1');
+    expect(accountPoolDisplayName(proLiteAccount, parseAccountPoolAdjustmentPlans('prolite'))).toBe('Pro-0904-1');
+    expect(accountPoolDisplayName(proLiteAccount, parseAccountPoolAdjustmentPlans('free'))).toBe('0904-ProLite-1');
   });
 
   it('adds zero-percent Spark windows while reusing the base reset times', () => {

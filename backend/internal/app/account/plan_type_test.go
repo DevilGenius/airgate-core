@@ -1,6 +1,9 @@
 package account
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestNormalizePlanType(t *testing.T) {
 	tests := []struct {
@@ -27,5 +30,26 @@ func TestNormalizePlanType(t *testing.T) {
 				t.Fatalf("NormalizePlanType(%q) = %q, want %q", tt.raw, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEffectivePlanType(t *testing.T) {
+	now := time.Date(2026, 9, 4, 0, 0, 0, 0, time.UTC)
+	if got := EffectivePlanType("plus", "2026-09-03T00:00:00Z", now); got != "free" {
+		t.Fatalf("expired Plus effective plan = %q, want free", got)
+	}
+	if got := EffectivePlanType("Self_serve_business_prolite", "2026-09-03T00:00:00Z", now); got != "prolite" {
+		t.Fatalf("expired ProLite effective plan = %q, want prolite", got)
+	}
+	for _, plan := range []string{"team", "k12"} {
+		if got := EffectivePlanType(plan, "2026-09-03T00:00:00Z", now); got != plan {
+			t.Fatalf("%s effective plan = %q, want unchanged", plan, got)
+		}
+	}
+	if got := EffectivePlanType("pro", "2026-09-03T00:00:00Z", now); got != "free" {
+		t.Fatalf("expired Pro effective plan = %q, want free", got)
+	}
+	if got := EffectivePlanType("team", "not-a-time", now); got != "team" {
+		t.Fatalf("Team with invalid expiry effective plan = %q, want team", got)
 	}
 }

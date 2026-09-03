@@ -5,17 +5,19 @@ import { getWindowSlot } from './accountUsageRows';
 export const OPENAI_PLUGIN_ID = 'gateway-openai';
 export const ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY = 'account_pool_adjustment_plans';
 export const LEGACY_ACCOUNT_POOL_ADJUSTMENT_CONFIG_KEY = 'account_pool_adjustment';
-export const ALL_ACCOUNT_POOL_ADJUSTMENT_PLANS = 'plus,team,k12,free';
+export const ALL_ACCOUNT_POOL_ADJUSTMENT_PLANS = 'plus,team,k12,prolite,free';
 export const ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_CONFIG_KEY = 'account_pool_adjustment_show_5h';
 export const ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_LABEL = '显示';
 export const ADJUSTED_USAGE_MODEL = 'gpt-5.3-codex-spark';
 
-export type AccountPoolAdjustmentPlan = 'plus' | 'team' | 'k12' | 'free';
+export type AccountPoolAdjustmentPlan = 'plus' | 'team' | 'k12' | 'prolite' | 'free';
+type AccountPlan = AccountPoolAdjustmentPlan | 'pro';
 
 type AccountDisplaySource = Pick<AccountResp, 'name' | 'platform' | 'type' | 'credentials'>;
 
-const PLAN_NAME_TOKENS = new Set(['free', 'plus', 'pro', 'team', 'k12', 'oauth']);
-const ADJUSTABLE_PLANS = new Set<AccountPoolAdjustmentPlan>(['plus', 'team', 'k12', 'free']);
+const PLAN_NAME_TOKENS = new Set(['free', 'plus', 'pro', 'team', 'k12', 'prolite', 'oauth']);
+const ADJUSTABLE_PLANS = new Set<AccountPoolAdjustmentPlan>(['plus', 'team', 'k12', 'prolite', 'free']);
+const KNOWN_PLANS = new Set<AccountPlan>(['plus', 'team', 'k12', 'prolite', 'pro', 'free']);
 const RESET_MODULO_SECONDS = 7 * 24 * 60 * 60;
 
 export function parseAccountPoolAdjustmentPlans(value: unknown): ReadonlySet<AccountPoolAdjustmentPlan> {
@@ -34,18 +36,18 @@ export function shouldShowAccountPoolAdjustedBaseFiveHour(value: unknown) {
   return typeof value === 'string' && value.trim().toLowerCase() === 'true';
 }
 
-function accountPlan(account: AccountDisplaySource): AccountPoolAdjustmentPlan | '' {
+function accountPlan(account: AccountDisplaySource): AccountPlan | '' {
   const tokens = (account.credentials.plan_type || '')
     .trim()
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
-  const plan = tokens.find((token): token is AccountPoolAdjustmentPlan => (
-    ADJUSTABLE_PLANS.has(token as AccountPoolAdjustmentPlan)
+  const plan = tokens.find((token): token is AccountPlan => (
+    KNOWN_PLANS.has(token as AccountPlan)
   ));
   const subscriptionUntil = account.credentials.subscription_active_until;
   const subscriptionExpired = subscriptionUntil ? new Date(subscriptionUntil) < new Date() : false;
-  if (plan && subscriptionExpired && plan !== 'free') return 'free';
+  if (plan && subscriptionExpired && (plan === 'plus' || plan === 'pro')) return 'free';
   if (plan) return plan;
   const hasQuotaMetadata = account.credentials.plan_type !== undefined
     || account.credentials.email !== undefined
@@ -59,7 +61,7 @@ export function isAccountPoolProAdjusted(
 ) {
   if (account.platform !== 'openai' || account.type !== 'oauth') return false;
   const plan = accountPlan(account);
-  return plan !== '' && plans.has(plan);
+  return plan !== '' && plan !== 'pro' && plans.has(plan);
 }
 
 function proDisplayName(name: string) {

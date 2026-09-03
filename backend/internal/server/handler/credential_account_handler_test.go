@@ -310,6 +310,26 @@ func TestCredentialOverviewFreePlanClassification(t *testing.T) {
 	}, now) {
 		t.Fatal("active oauth subscription was incorrectly classified as free")
 	}
+	if isFreeCredentialAccountAt(appaccount.Account{
+		Type: "oauth",
+		Credentials: map[string]string{
+			"plan_type":                 "Self_serve_business_prolite",
+			"subscription_active_until": "2026-08-29T12:00:00Z",
+		},
+	}, now) {
+		t.Fatal("ProLite was incorrectly downgraded to free by subscription_active_until")
+	}
+	for _, plan := range []string{"team", "k12"} {
+		if isFreeCredentialAccountAt(appaccount.Account{
+			Type: "oauth",
+			Credentials: map[string]string{
+				"plan_type":                 plan,
+				"subscription_active_until": "2026-08-29T12:00:00Z",
+			},
+		}, now) {
+			t.Fatalf("%s was incorrectly downgraded to free by subscription_active_until", plan)
+		}
+	}
 }
 
 func TestCredentialUsageEstimateRespMapsAllWindows(t *testing.T) {
