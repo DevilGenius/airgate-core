@@ -207,9 +207,6 @@ func (h *CredentialImportHandler) BanAccount(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	// StateWriter 在生产环境已经刷新路由；这里额外刷新可覆盖无状态写入的
-	// 测试/降级实现，且与现有账号状态接口保持一致。
-	h.accounts.refreshRouteGraphAccount(c.Request.Context(), req.ID)
 	response.Success(c, nil)
 }
 

@@ -78,7 +78,7 @@ func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 		}
 	}
 
-	err := upd.Exec(dbCtx)
+	err := accountscope.NormalizeNotFoundError(upd.Exec(dbCtx))
 	if err == nil {
 		s.state.resolveAccountEvents(ctx, accountID)
 		s.stateCache.Store(accountID, account.StateActive, nil, nil)
@@ -92,11 +92,11 @@ func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 func (s *Scheduler) ManualDisable(ctx context.Context, accountID int, reason string) error {
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
 	defer cancel()
-	err := accountscope.UpdateOneID(s.db, accountID).
+	err := accountscope.NormalizeNotFoundError(accountscope.UpdateOneID(s.db, accountID).
 		SetState(account.StateDisabled).
 		ClearStateUntil().
 		SetErrorMsg(truncateReason(reason)).
-		Exec(dbCtx)
+		Exec(dbCtx))
 	if err == nil {
 		s.stateCache.Store(accountID, account.StateDisabled, nil, nil)
 		s.RefreshRouteGraphAccount(ctx, accountID)

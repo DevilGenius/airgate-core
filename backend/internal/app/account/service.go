@@ -718,47 +718,34 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 
 // Ban 将未删除账号永久置为 disabled，并记录统一的封禁原因。
 //
-// 生产环境通过 StateWriter 写入，确保状态缓存和调度路由同步刷新。
-// 没有注入 StateWriter 的轻量测试/降级场景则直接走仓储更新，仍保持
-// "仅允许未删除账号" 的 accountscope 约束。
+// Ban 必须通过 StateWriter 写入，确保数据库状态、状态事件、调度缓存和
+// RouteGraph 使用同一条状态转换路径。
 func (s *Service) Ban(ctx context.Context, id int) error {
 	logger := sdk.LoggerFromContext(ctx)
-	// StateWriter 的直接更新会返回底层 Ent not-found 错误；先通过领域
-	// 仓储确认账号仍在未删除作用域内，保证 API 对不存在/已删除账号返回
-	// 统一的 ErrAccountNotFound。
-	if _, err := s.repo.FindByID(ctx, id, LoadOptions{}); err != nil {
+	if s.stateWriter == nil {
+		logger.Error("account_ban_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldError, ErrStateWriterUnavailable)
+		return ErrStateWriterUnavailable
+	}
+
+	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
+	if err != nil {
 		return err
 	}
-	if s.stateWriter != nil {
-		if err := s.stateWriter.ManualDisable(ctx, id, bannedAccountReason); err != nil {
-			logger.Error("account_ban_failed",
-				sdk.LogFieldAccountID, id,
-				sdk.LogFieldError, err)
-			return err
-		}
-	} else {
-		state := "disabled"
-		reason := bannedAccountReason
-		if _, err := s.repo.Update(ctx, id, UpdateInput{State: &state, ErrorMsg: &reason}); err != nil {
-			logger.Error("account_ban_failed",
-				sdk.LogFieldAccountID, id,
-				sdk.LogFieldError, err)
-			return err
-		}
+	if err := s.stateWriter.ManualDisable(ctx, id, bannedAccountReason); err != nil {
+		logger.Error("account_ban_failed",
+			sdk.LogFieldAccountID, id,
+			sdk.LogFieldError, err)
+		return err
 	}
 
 	// 状态会影响账号用量缓存中的可用账号集合。
-	s.InvalidateUsageCache("")
-	// profile cache 还保存 state/error_msg，不能只清理 usage 快照；更新后
-	// 尽力回写最新账号资料，避免后台探测继续使用旧的 active 状态。
+	s.InvalidateUsageCache(item.Platform)
+	// profile cache 还保存 state/error_msg；删除单账号资料，让下一次读取从
+	// 数据库回填最新状态，避免为了重建缓存再次读取账号。
 	if s.usage != nil {
-		if updated, err := s.repo.FindByID(ctx, id, LoadOptions{WithGroups: true, WithProxy: true}); err == nil {
-			s.usage.cacheAccountProfiles(ctx, []Account{updated})
-		} else {
-			logger.Warn("account_ban_profile_cache_refresh_failed",
-				sdk.LogFieldAccountID, id,
-				sdk.LogFieldError, err)
-		}
+		s.usage.invalidateAccountProfile(id)
 	}
 	logger.Info("account_banned", sdk.LogFieldAccountID, id)
 	return nil

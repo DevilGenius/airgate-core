@@ -1253,6 +1253,15 @@ func (s *accountUsageCache) cacheAccountProfiles(ctx context.Context, accounts [
 	}
 }
 
+func (s *accountUsageCache) invalidateAccountProfile(accountID int) {
+	if s == nil || s.rdb == nil || accountID <= 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_ = s.rdb.Del(ctx, accountcache.ProfileKey(accountID)).Err()
+}
+
 func decodeAccountProfileCache(raw []byte, accountID int) (accountProfileCachePayload, bool) {
 	var payload accountProfileCachePayload
 	if err := json.Unmarshal(raw, &payload); err != nil || payload.ID != accountID {

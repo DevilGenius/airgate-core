@@ -157,8 +157,9 @@ func TestCredentialImportBanAccountUpdatesOnlyUndeletedAccount(t *testing.T) {
 		t.Fatalf("create deleted account: %v", err)
 	}
 
-	accountService := appaccount.NewService(store.NewAccountStore(db), nil, scheduler.NewConcurrencyManager(nil), nil)
-	accountHandler := NewAccountHandler(accountService, nil)
+	accountScheduler := scheduler.NewScheduler(db, nil)
+	accountService := appaccount.NewService(store.NewAccountStore(db), nil, scheduler.NewConcurrencyManager(nil), accountScheduler)
+	accountHandler := NewAccountHandler(accountService, accountScheduler)
 	handler := NewCredentialImportHandler(accountHandler, nil)
 
 	invalid := invokeHandlerForValidation(

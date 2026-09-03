@@ -55,6 +55,87 @@ func (s *failingManualStateWriter) ManualDisable(ctx context.Context, accountID 
 	return s.stubStateWriter.ManualDisable(ctx, accountID, reason)
 }
 
+func TestBanUsesStateWriterAndPlatformScopedCacheInvalidation(t *testing.T) {
+	now := time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)
+	findCalls := 0
+	updateCalls := 0
+	repo := stubRepository{
+		findByID: func(_ context.Context, id int, opts LoadOptions) (Account, error) {
+			findCalls++
+			if id != 7 || opts.WithGroups || opts.WithProxy {
+				t.Fatalf("FindByID(%d, %+v), want one minimal lookup", id, opts)
+			}
+			return Account{ID: id, Platform: "openai", State: "active"}, nil
+		},
+		update: func(context.Context, int, UpdateInput) (Account, error) {
+			updateCalls++
+			return Account{}, nil
+		},
+	}
+	writer := newStubStateWriter()
+	service := NewService(repo, nil, nil, writer)
+	service.now = func() time.Time { return now }
+	service.usage.setUsageInfoMemoryCache(7, "openai", AccountUsageInfo{
+		Credits: &AccountUsageCredits{Balance: 1},
+	}, now, now.Add(time.Hour))
+	service.usage.setUsageInfoMemoryCache(8, "claude", AccountUsageInfo{
+		Credits: &AccountUsageCredits{Balance: 1},
+	}, now, now.Add(time.Hour))
+
+	rdb, mock := redismock.NewClientMock()
+	service.SetUsageCacheRedis(rdb)
+	mock.ExpectSMembers(accountcache.PlatformKey("openai")).SetVal([]string{"7"})
+	mock.ExpectDel(accountcache.UsageKey(7)).SetVal(1)
+	mock.ExpectDel(accountcache.ProfileKey(7)).SetVal(1)
+
+	if err := service.Ban(t.Context(), 7); err != nil {
+		t.Fatalf("Ban() error = %v", err)
+	}
+	if findCalls != 1 || updateCalls != 0 {
+		t.Fatalf("repository calls: find=%d update=%d, want find=1 update=0", findCalls, updateCalls)
+	}
+	if got := writer.disabled[7]; got != bannedAccountReason {
+		t.Fatalf("ManualDisable reason = %q, want %q", got, bannedAccountReason)
+	}
+	if _, _, ok := service.usage.getUsageInfoMemoryCache(7); ok {
+		t.Fatal("OpenAI usage cache was not invalidated")
+	}
+	if _, _, ok := service.usage.getUsageInfoMemoryCache(8); !ok {
+		t.Fatal("unrelated Claude usage cache was invalidated")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("redis expectations: %v", err)
+	}
+}
+
+func TestBanRequiresStateWriterAndPropagatesConcurrentNotFound(t *testing.T) {
+	lookupCalls := 0
+	service := NewService(stubRepository{
+		findByID: func(context.Context, int, LoadOptions) (Account, error) {
+			lookupCalls++
+			return Account{ID: 7, Platform: "openai"}, nil
+		},
+	}, nil, nil, nil)
+	if err := service.Ban(t.Context(), 7); !errors.Is(err, ErrStateWriterUnavailable) {
+		t.Fatalf("Ban() without StateWriter error = %v, want ErrStateWriterUnavailable", err)
+	}
+	if lookupCalls != 0 {
+		t.Fatalf("Ban() without StateWriter performed %d lookups, want 0", lookupCalls)
+	}
+
+	service = NewService(stubRepository{
+		findByID: func(context.Context, int, LoadOptions) (Account, error) {
+			return Account{ID: 7, Platform: "openai"}, nil
+		},
+	}, nil, nil, &failingManualStateWriter{
+		stubStateWriter: newStubStateWriter(),
+		disableErr:      ErrAccountNotFound,
+	})
+	if err := service.Ban(t.Context(), 7); !errors.Is(err, ErrAccountNotFound) {
+		t.Fatalf("Ban() concurrent deletion error = %v, want ErrAccountNotFound", err)
+	}
+}
+
 func TestMonitorRecorderHelpersRecordAndResolve(t *testing.T) {
 	var nilService *Service
 	nilService.SetMonitorRecorder(&captureMonitorRecorder{})

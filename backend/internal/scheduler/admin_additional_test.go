@@ -2,11 +2,13 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/DevilGenius/airgate-core/ent/account"
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
@@ -61,8 +63,8 @@ func TestSchedulerAdminStateWriteEntrypoints(t *testing.T) {
 		t.Fatalf("manual recover extra = %+v", fresh.Extra)
 	}
 
-	if err := s.ManualRecover(ctx, 999999); err == nil {
-		t.Fatal("ManualRecover(missing) error = nil")
+	if err := s.ManualRecover(ctx, 999999); !errors.Is(err, accountscope.ErrAccountNotFound) {
+		t.Fatalf("ManualRecover(missing) error = %v, want ErrAccountNotFound", err)
 	}
 
 	disableAccount := db.Account.Create().
@@ -79,8 +81,8 @@ func TestSchedulerAdminStateWriteEntrypoints(t *testing.T) {
 	if fresh.State != account.StateDisabled || fresh.StateUntil != nil || fresh.ErrorMsg == "" || len(fresh.ErrorMsg) > 500 {
 		t.Fatalf("manual disabled account = state %s until %v err len %d", fresh.State, fresh.StateUntil, len(fresh.ErrorMsg))
 	}
-	if err := s.ManualDisable(ctx, 999998, "missing"); err == nil {
-		t.Fatal("ManualDisable(missing) error = nil")
+	if err := s.ManualDisable(ctx, 999998, "missing"); !errors.Is(err, accountscope.ErrAccountNotFound) {
+		t.Fatalf("ManualDisable(missing) error = %v, want ErrAccountNotFound", err)
 	}
 
 	limited := db.Account.Create().
@@ -145,11 +147,11 @@ func TestSchedulerAdminStateWriteEntrypoints(t *testing.T) {
 		SetState(account.StateDisabled).
 		SetDeletedAt(time.Now()).
 		SaveX(ctx)
-	if err := s.ManualRecover(ctx, deleted.ID); err == nil {
-		t.Fatal("ManualRecover(soft-deleted) error = nil")
+	if err := s.ManualRecover(ctx, deleted.ID); !errors.Is(err, accountscope.ErrAccountNotFound) {
+		t.Fatalf("ManualRecover(soft-deleted) error = %v, want ErrAccountNotFound", err)
 	}
-	if err := s.ManualDisable(ctx, deleted.ID, "ignored"); err == nil {
-		t.Fatal("ManualDisable(soft-deleted) error = nil")
+	if err := s.ManualDisable(ctx, deleted.ID, "ignored"); !errors.Is(err, accountscope.ErrAccountNotFound) {
+		t.Fatalf("ManualDisable(soft-deleted) error = %v, want ErrAccountNotFound", err)
 	}
 	s.MarkRateLimited(ctx, deleted.ID, time.Now().Add(time.Minute), "ignored")
 	fresh = db.Account.GetX(ctx, deleted.ID)

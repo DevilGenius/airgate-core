@@ -1,10 +1,16 @@
 package account
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/DevilGenius/airgate-core/internal/accountscope"
+)
 
 var (
 	// ErrAccountNotFound 账号不存在。
-	ErrAccountNotFound = errors.New("账号不存在")
+	ErrAccountNotFound = accountscope.ErrAccountNotFound
+	// ErrStateWriterUnavailable 账号状态写入器不可用。
+	ErrStateWriterUnavailable = errors.New("账号状态服务不可用")
 	// ErrAccountEmailExists 账号邮箱已被未删除账号占用。
 	ErrAccountEmailExists = errors.New("账号邮箱已存在")
 	// ErrInvalidAccountEmail 账号邮箱格式非法。
