@@ -172,7 +172,7 @@ func (p usageEstimateWindowPool) estimate(window string, requiredPlans, required
 	weightedConsumed := 0.0
 	rateSum := 0.0
 	remainingCost := 0.0
-	remainingAvailable := true
+	remainingAvailable := false
 	for _, observation := range p.observations {
 		w := observation.window
 		rate, calibrated := planRates[observation.plan]
@@ -190,8 +190,7 @@ func (p usageEstimateWindowPool) estimate(window string, requiredPlans, required
 		}
 		if observationFresh(w.ObservedAt, now, maxAge) && validPercent(w.LastPercent) {
 			remainingCost += rate * math.Max(0, 100-w.LastPercent)
-		} else {
-			remainingAvailable = false
+			remainingAvailable = true
 		}
 	}
 	if rateSum <= 0 {

@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -31,6 +32,111 @@ func TestBuildUsageEstimatesUsesPlanStandardForNewAccounts(t *testing.T) {
 	proWindow := result[1].Windows[0]
 	if proWindow.Status != "ready" || proWindow.FullCost != 150 || proWindow.DailyGrowthPercent != 20 || proWindow.RemainingCost == nil || *proWindow.RemainingCost != 95 || proWindow.RemainingMinutes == nil || *proWindow.RemainingMinutes != 95 {
 		t.Fatalf("Pro window = %+v", proWindow)
+	}
+}
+
+func TestBuildUsageEstimatesAddsRemainingCostAsObservationsArrive(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	calibrated := func(rate float64) accountusage.EstimateMeta {
+		window := accountusage.WindowEstimate{
+			LastPercent: 50, ObservedAt: &now,
+			CostPerPercent: rate, CalibrationWeight: 10, CalibratedAt: &now,
+		}
+		return accountusage.EstimateMeta{FiveHour: window, SevenDay: window}
+	}
+	sources := []UsageEstimateSource{
+		{Plan: "plus", Meta: calibrated(1)},
+		{Plan: "plus"},
+		{Plan: "pro", Meta: calibrated(2)},
+		{Plan: "pro"},
+	}
+	stages := []struct {
+		name          string
+		observed      bool
+		remainingCost map[string]float64
+	}{
+		{name: "partial", remainingCost: map[string]float64{"plus": 50, "pro": 150}},
+		{name: "complete", observed: true, remainingCost: map[string]float64{"plus": 125, "pro": 375}},
+	}
+	for _, stage := range stages {
+		t.Run(stage.name, func(t *testing.T) {
+			if stage.observed {
+				window := accountusage.WindowEstimate{LastPercent: 25, ObservedAt: &now}
+				sources[1].Meta = accountusage.EstimateMeta{FiveHour: window, SevenDay: window}
+				sources[3].Meta = accountusage.EstimateMeta{FiveHour: window, SevenDay: window}
+			}
+			result := BuildUsageEstimates(sources, now, 2)
+			if len(result) != 2 {
+				t.Fatalf("result = %+v", result)
+			}
+			for _, estimate := range result {
+				if len(estimate.Windows) != 2 {
+					t.Fatalf("estimate = %+v", estimate)
+				}
+				for _, window := range estimate.Windows {
+					wantCost := stage.remainingCost[estimate.Plan]
+					if window.Status != "ready" || window.RemainingCost == nil || *window.RemainingCost != wantCost ||
+						window.RemainingMinutes == nil || *window.RemainingMinutes != wantCost/2 {
+						t.Fatalf("%s %s estimate = %+v, want remaining cost %v", estimate.Plan, window.Window, window, wantCost)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestUsageEstimateWindowSkipsUnavailableObservations(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	staleAt := now.Add(-25 * time.Hour)
+	futureAt := now.Add(6 * time.Minute)
+	unavailable := []struct {
+		name   string
+		window accountusage.WindowEstimate
+	}{
+		{name: "missing"},
+		{name: "stale", window: accountusage.WindowEstimate{LastPercent: 25, ObservedAt: &staleAt}},
+		{name: "future", window: accountusage.WindowEstimate{LastPercent: 25, ObservedAt: &futureAt}},
+		{name: "negative", window: accountusage.WindowEstimate{LastPercent: -1, ObservedAt: &now}},
+		{name: "nan", window: accountusage.WindowEstimate{LastPercent: math.NaN(), ObservedAt: &now}},
+		{name: "infinite", window: accountusage.WindowEstimate{LastPercent: math.Inf(1), ObservedAt: &now}},
+	}
+	for _, candidate := range unavailable {
+		t.Run(candidate.name, func(t *testing.T) {
+			known := accountusage.WindowEstimate{
+				LastPercent: 50, ObservedAt: &now,
+				CostPerPercent: 1, CalibrationWeight: 10, CalibratedAt: &now,
+			}
+			pool := usageEstimateWindowPool{observations: []usageEstimateObservation{
+				{plan: "plus", window: known},
+				{plan: "plus", window: candidate.window},
+			}}
+			result := pool.estimate("7d", []string{"plus"}, nil, 2, now, usage7dObservationAge)
+			if result.Status != "ready" || result.FullCost != 200 || result.RemainingCost == nil || *result.RemainingCost != 50 ||
+				result.RemainingMinutes == nil || *result.RemainingMinutes != 25 {
+				t.Fatalf("partial estimate = %+v", result)
+			}
+		})
+	}
+}
+
+func TestUsageEstimateWindowDistinguishesUnknownAndExhaustedRemainingCost(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.Local)
+	pool := usageEstimateWindowPool{observations: []usageEstimateObservation{
+		{plan: "plus", window: accountusage.WindowEstimate{
+			CostPerPercent: 1, CalibrationWeight: 10, CalibratedAt: &now,
+		}},
+		{plan: "plus"},
+	}}
+	result := pool.estimate("7d", []string{"plus"}, nil, 0, now, usage7dObservationAge)
+	if result.RemainingCost != nil || result.RemainingMinutes != nil {
+		t.Fatalf("unknown remaining cost must not be reported as zero: %+v", result)
+	}
+	pool.observations[0].window.ObservedAt = &now
+	pool.observations[0].window.LastPercent = 100
+	result = pool.estimate("7d", []string{"plus"}, nil, 0, now, usage7dObservationAge)
+	if result.Status != "ready" || result.RemainingCost == nil || *result.RemainingCost != 0 ||
+		result.RemainingMinutes == nil || *result.RemainingMinutes != 0 {
+		t.Fatalf("known exhausted account should report zero remaining cost: %+v", result)
 	}
 }
 
