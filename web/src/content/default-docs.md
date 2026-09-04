@@ -35,7 +35,7 @@ curl https://your-airgate.example.com/v1/chat/completions \
   -H "Authorization: Bearer sk-你的key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-5.4",
+    "model": "gpt-5.5",
     "messages": [
       {"role": "user", "content": "你好"}
     ]
@@ -55,7 +55,7 @@ client = OpenAI(
 )
 
 resp = client.chat.completions.create(
-    model="gpt-5.4",
+    model="gpt-5.5",
     messages=[{"role": "user", "content": "你好"}],
 )
 print(resp.choices[0].message.content)
