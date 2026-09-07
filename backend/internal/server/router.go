@@ -92,6 +92,7 @@ func (s *Server) registerRoutes() {
 
 		// 使用记录
 		userGroup.GET("/usage", handlers.Usage.UserUsage)
+		userGroup.GET("/usage/pagination", handlers.Usage.UserUsagePagination)
 		userGroup.GET("/usage/stats", handlers.Usage.UserUsageStats)
 		userGroup.GET("/usage/trend", handlers.Usage.UserUsageTrend)
 
@@ -180,6 +181,7 @@ func (s *Server) registerRoutes() {
 
 		// 使用记录（管理员）
 		adminGroup.GET("/usage", handlers.Usage.AdminUsage)
+		adminGroup.GET("/usage/pagination", handlers.Usage.AdminUsagePagination)
 		adminGroup.GET("/usage/stats", handlers.Usage.AdminUsageStats)
 		adminGroup.GET("/usage/trend", handlers.Usage.AdminUsageTrend)
 

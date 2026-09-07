@@ -93,16 +93,18 @@ type CustomerUsageLogResp struct {
 // UsageQuery 使用记录查询参数
 type UsageQuery struct {
 	PageReq
-	BeforeID  *int64 `form:"before_id"`
-	UserID    *int64 `form:"user_id"`
-	APIKeyID  *int64 `form:"api_key_id"`
-	AccountID *int64 `form:"account_id"`
-	Account   string `form:"account"`
-	GroupID   *int64 `form:"group_id"`
-	Platform  string `form:"platform"`
-	Model     string `form:"model"`
-	StartDate string `form:"start_date"`
-	EndDate   string `form:"end_date"`
+	BeforeID          *int64 `form:"before_id"`
+	Snapshot          string `form:"snapshot" binding:"max=64"`
+	RefreshPagination bool   `form:"refresh_pagination"`
+	UserID            *int64 `form:"user_id"`
+	APIKeyID          *int64 `form:"api_key_id"`
+	AccountID         *int64 `form:"account_id"`
+	Account           string `form:"account"`
+	GroupID           *int64 `form:"group_id"`
+	Platform          string `form:"platform"`
+	Model             string `form:"model"`
+	StartDate         string `form:"start_date"`
+	EndDate           string `form:"end_date"`
 }
 
 // UsageFilterQuery 使用记录筛选参数（不含分页，用于聚合统计）

@@ -499,16 +499,28 @@ func coalesceString(primary, fallback string) string {
 }
 
 func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) *ent.UsageLogQuery {
+	return query.Where(usageListPredicates(filter)...)
+}
+
+func usageListPredicates(filter appusage.ListFilter) []predicate.UsageLog {
+	var predicates []predicate.UsageLog
+	if filter.PageIDs != nil {
+		ids := make([]int, len(filter.PageIDs))
+		for i, id := range filter.PageIDs {
+			ids[i] = int(id)
+		}
+		predicates = append(predicates, entusagelog.IDIn(ids...))
+	}
 	if filter.APIKeyID != nil {
-		query = query.Where(usageLogColumnEQ(entusagelog.APIKeyColumn, int(*filter.APIKeyID)))
+		predicates = append(predicates, usageLogColumnEQ(entusagelog.APIKeyColumn, int(*filter.APIKeyID)))
 	}
 	if filter.AccountID != nil {
-		query = query.Where(entusagelog.HasAccountWith(entaccount.IDEQ(int(*filter.AccountID))))
+		predicates = append(predicates, entusagelog.HasAccountWith(entaccount.IDEQ(int(*filter.AccountID))))
 	}
 	if filter.GroupID != nil {
-		query = query.Where(entusagelog.HasGroupWith(entgroup.IDEQ(int(*filter.GroupID))))
+		predicates = append(predicates, entusagelog.HasGroupWith(entgroup.IDEQ(int(*filter.GroupID))))
 	}
-	return applyUsageStatsFilter(query, appusage.StatsFilter{
+	return append(predicates, usageStatsPredicates(appusage.StatsFilter{
 		AccountSearch: filter.AccountSearch,
 		Platform:      filter.Platform,
 		Model:         filter.Model,
@@ -516,23 +528,28 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 		EndDate:       filter.EndDate,
 		TZ:            filter.TZ,
 		ScopedToKey:   filter.ScopedToKey,
-	})
+	})...)
 }
 
 func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter) *ent.UsageLogQuery {
+	return query.Where(usageStatsPredicates(filter)...)
+}
+
+func usageStatsPredicates(filter appusage.StatsFilter) []predicate.UsageLog {
+	var predicates []predicate.UsageLog
 	if filter.APIKeyID != nil {
-		query = query.Where(usageLogColumnEQ(entusagelog.APIKeyColumn, int(*filter.APIKeyID)))
+		predicates = append(predicates, usageLogColumnEQ(entusagelog.APIKeyColumn, int(*filter.APIKeyID)))
 	}
 	if accountSearch := strings.TrimSpace(filter.AccountSearch); accountSearch != "" {
 		// 账号名称和邮箱只在 accounts 小表中匹配，再通过已有的账号外键索引过滤 usage_logs。
 		// 这里不使用 accountscope.Query，确保软删除账号的历史使用记录仍可搜索。
-		query = query.Where(entusagelog.HasAccountWith(entaccount.Or(
+		predicates = append(predicates, entusagelog.HasAccountWith(entaccount.Or(
 			entaccount.NameContainsFold(accountSearch),
 			entaccount.EmailContainsFold(accountSearch),
 		)))
 	}
 	if filter.Platform != "" {
-		query = query.Where(entusagelog.PlatformEQ(filter.Platform))
+		predicates = append(predicates, entusagelog.PlatformEQ(filter.Platform))
 	}
 	includeModels, excludeModels := appusage.ParseModelFilter(filter.Model)
 	if len(includeModels) > 0 {
@@ -540,27 +557,27 @@ func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter
 		for _, model := range includeModels {
 			includePredicates = append(includePredicates, entusagelog.ModelContains(model))
 		}
-		query = query.Where(entusagelog.Or(includePredicates...))
+		predicates = append(predicates, entusagelog.Or(includePredicates...))
 	}
 	if len(excludeModels) > 0 {
 		excludePredicates := make([]predicate.UsageLog, 0, len(excludeModels))
 		for _, model := range excludeModels {
 			excludePredicates = append(excludePredicates, entusagelog.ModelContains(model))
 		}
-		query = query.Where(entusagelog.Not(entusagelog.Or(excludePredicates...)))
+		predicates = append(predicates, entusagelog.Not(entusagelog.Or(excludePredicates...)))
 	}
 	loc := timezone.Resolve(filter.TZ)
 	if filter.StartDate != "" {
 		if parsed, err := timezone.ParseDate(filter.StartDate, loc); err == nil {
-			query = query.Where(entusagelog.CreatedAtGTE(parsed))
+			predicates = append(predicates, entusagelog.CreatedAtGTE(parsed))
 		}
 	}
 	if filter.EndDate != "" {
 		if parsed, err := timezone.ParseDate(filter.EndDate, loc); err == nil {
-			query = query.Where(entusagelog.CreatedAtLT(parsed.AddDate(0, 0, 1)))
+			predicates = append(predicates, entusagelog.CreatedAtLT(parsed.AddDate(0, 0, 1)))
 		}
 	}
-	return query
+	return predicates
 }
 
 func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summary, error) {

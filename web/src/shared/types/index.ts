@@ -664,6 +664,7 @@ export interface CustomerUsageLogResp {
 
 export interface UsageQuery extends PageReq {
   before_id?: number;
+  snapshot?: string;
   user_id?: number;
   api_key_id?: number;
   account_id?: number;
@@ -673,6 +674,15 @@ export interface UsageQuery extends PageReq {
   model?: string;
   start_date?: string;
   end_date?: string;
+}
+
+export interface UsagePaginationInfo {
+  status: 'preparing' | 'ready' | 'failed';
+  snapshot?: string;
+  total: number;
+  created_at?: string;
+  expires_at?: string;
+  refreshing?: boolean;
 }
 
 export interface UsageStatsResp {

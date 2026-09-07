@@ -38,6 +38,7 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		Page:        query.Page,
 		PageSize:    query.PageSize,
 		BeforeID:    ptrInt64Value(query.BeforeID),
+		Snapshot:    query.Snapshot,
 		APIKeyID:    apiKeyFilter,
 		AccountID:   query.AccountID,
 		GroupID:     query.GroupID,
@@ -49,6 +50,9 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		ScopedToKey: scoped,
 	})
 	if err != nil {
+		if handleUsagePaginationError(c, err) {
+			return
+		}
 		handleUsageError("查询用户使用记录失败", err)
 		response.InternalError(c, "查询失败")
 		return
@@ -239,6 +243,7 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 		Page:          query.Page,
 		PageSize:      query.PageSize,
 		BeforeID:      ptrInt64Value(query.BeforeID),
+		Snapshot:      query.Snapshot,
 		UserID:        query.UserID,
 		APIKeyID:      query.APIKeyID,
 		AccountID:     query.AccountID,
@@ -251,6 +256,9 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 		TZ:            c.Query("tz"),
 	})
 	if err != nil {
+		if handleUsagePaginationError(c, err) {
+			return
+		}
 		handleUsageError("查询管理员使用记录失败", err)
 		response.InternalError(c, "查询失败")
 		return

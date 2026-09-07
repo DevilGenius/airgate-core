@@ -7,11 +7,13 @@ import {
   useRef,
   useState,
   type PointerEvent,
+  type FormEvent,
 } from 'react';
 import { flushSync } from 'react-dom';
 import { Pagination } from '@heroui/react';
 import { SimpleSelect } from './SimpleSelect';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getPaginationItems } from '../utils/pagination';
+import styles from './TablePaginationFooter.module.css';
 
 interface TablePaginationFooterProps {
   hasMore?: boolean;
@@ -25,6 +27,11 @@ interface TablePaginationFooterProps {
   total: number;
   totalExact?: boolean;
   totalPages: number;
+  enablePageJump?: boolean;
+  paginationStatus?: 'preparing' | 'ready' | 'failed';
+  isPaginationRefreshing?: boolean;
+  snapshotAt?: string;
+  onRefreshPagination?: () => void;
 }
 
 function scheduleAfterPaint(callback: () => void) {
@@ -56,9 +63,16 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
   total,
   totalExact = true,
   totalPages,
+  enablePageJump = false,
+  paginationStatus,
+  isPaginationRefreshing = false,
+  snapshotAt,
+  onRefreshPagination,
 }: TablePaginationFooterProps) {
   const [displayPage, setDisplayPage] = useState(page);
   const [displayPageSize, setDisplayPageSize] = useState(pageSize);
+  const [jumpPage, setJumpPage] = useState(String(page));
+  const [jumpError, setJumpError] = useState('');
   const cancelPageCommitRef = useRef<(() => void) | null>(null);
   const cancelPageSizeCommitRef = useRef<(() => void) | null>(null);
   const handledPointerPageRef = useRef(false);
@@ -85,6 +99,8 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
 
   useEffect(() => {
     setDisplayPage(page);
+    setJumpPage(String(page));
+    setJumpError('');
   }, [page]);
 
   useEffect(() => {
@@ -187,9 +203,19 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
   const nextPage = visiblePage + 1;
   const isPreviousDisabled = visiblePage <= 1;
   const isNextDisabled = !canGoNext;
+  const handleJump = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const target = Number(jumpPage.trim());
+    if (!/^\d+$/.test(jumpPage.trim()) || !Number.isSafeInteger(target) || target < 1 || target > safeTotalPages) {
+      setJumpError(`请输入 1 至 ${safeTotalPages} 之间的页码`);
+      return;
+    }
+    setJumpError('');
+    handlePageChange(target);
+  };
 
   return (
-    <Pagination className="ag-table-pagination" size="sm">
+    <Pagination className={`ag-table-pagination${paginationStatus ? ` ${styles.withPageIndex}` : ''}`} size="sm">
       <Pagination.Summary className="ag-table-pagination-summary">
         <span>{visibleTotalExact ? '共' : '至少'}</span>
         <span className="ag-table-pagination-number">{visibleTotal.toLocaleString()}</span>
@@ -217,8 +243,18 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
             <span>条</span>
           </div>
         ) : null}
+        {paginationStatus === 'preparing' ? <span className={styles.status} role="status">正在统计总页数…</span> : null}
+        {isPaginationRefreshing ? <span className={styles.status} role="status">正在更新页数…</span> : null}
+        {paginationStatus === 'failed' ? <span className={styles.status} role="status">页数暂不可用</span> : null}
+        {snapshotAt ? (
+          <time className={styles.status} dateTime={snapshotAt} title="跳页按此时的记录排列，第一页显示最新记录；刷新可更新分页记录。">
+            截至 {new Date(snapshotAt).toLocaleTimeString([], { hour12: false })}
+          </time>
+        ) : null}
+        {onRefreshPagination ? <button type="button" className={styles.refresh} onClick={onRefreshPagination} disabled={paginationStatus === 'preparing' || isPaginationRefreshing}>更新页数</button> : null}
       </Pagination.Summary>
 
+      <div className={styles.controls}>
       <Pagination.Content>
         <Pagination.Item>
           <button
@@ -265,6 +301,18 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
           </button>
         </Pagination.Item>
       </Pagination.Content>
+      {enablePageJump && totalExact ? (
+        <form className={styles.jump} onSubmit={handleJump}>
+          <label className={styles.jumpLabel}>
+            跳至
+            <input className={styles.pageInput} aria-label="跳转页码" aria-invalid={Boolean(jumpError)} inputMode="numeric" value={jumpPage} onChange={(event) => { setJumpPage(event.target.value); setJumpError(''); }} />
+            页
+          </label>
+          <button type="submit" className={styles.go}>跳转</button>
+          {jumpError ? <span className={styles.error} role="alert">{jumpError}</span> : null}
+        </form>
+      ) : null}
+      </div>
     </Pagination>
   );
 });

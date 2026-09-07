@@ -192,6 +192,8 @@ function proxyOptionalPluginCss(
     },
   );
   proxyReq.on('error', () => {
+    if (res.destroyed || res.writableEnded) return;
+    if (res.headersSent) { res.destroy(); return; }
     res.writeHead(502);
     res.end('Backend unavailable');
   });
@@ -235,6 +237,8 @@ export default defineConfig({
               },
             );
             proxyReq.on('error', () => {
+              if (res.destroyed || res.writableEnded) return;
+              if (res.headersSent) { res.destroy(); return; }
               res.writeHead(502);
               res.end('Backend unavailable');
             });

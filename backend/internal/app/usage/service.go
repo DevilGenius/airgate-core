@@ -22,6 +22,7 @@ type Service struct {
 	repo        Repository
 	rdb         *redis.Client
 	cacheFlight singleflight.Group
+	pagination  *paginationCache
 }
 
 // NewService 创建使用记录服务。
@@ -30,7 +31,11 @@ func NewService(repo Repository, rdb ...*redis.Client) *Service {
 	if len(rdb) > 0 {
 		cache = rdb[0]
 	}
-	return &Service{repo: repo, rdb: cache}
+	service := &Service{repo: repo, rdb: cache}
+	if paging, ok := repo.(PaginationRepository); ok {
+		service.pagination = newPaginationCache(paging, cache)
+	}
+	return service
 }
 
 const (
@@ -74,6 +79,9 @@ var usageCachePublishScript = redis.NewScript(`
 
 // ListUser 查询当前用户的使用记录。
 func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter) (ListResult, error) {
+	if filter.Snapshot != "" {
+		return s.snapshotPage(ctx, userID, filter)
+	}
 	page, pageSize := NormalizePage(filter.Page, filter.PageSize)
 	if filter.BeforeID <= 0 {
 		page = 1
@@ -146,6 +154,9 @@ func (s *Service) UserStatsWithModels(ctx context.Context, userID int64, filter 
 
 // ListAdmin 查询管理员使用记录列表。
 func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult, error) {
+	if filter.Snapshot != "" {
+		return s.snapshotPage(ctx, 0, filter)
+	}
 	page, pageSize := NormalizePage(filter.Page, filter.PageSize)
 	if filter.BeforeID <= 0 {
 		page = 1

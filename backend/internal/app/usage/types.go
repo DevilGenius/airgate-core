@@ -1,12 +1,18 @@
 package usage
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // ListFilter 使用记录列表筛选。
 type ListFilter struct {
-	Page      int
-	PageSize  int
-	BeforeID  int64
+	Page     int
+	PageSize int
+	BeforeID int64
+	Snapshot string
+	// PageIDs is set only by the pagination service, never bound from HTTP input.
+	PageIDs   []int64
 	UserID    *int64
 	APIKeyID  *int64
 	AccountID *int64
@@ -104,6 +110,21 @@ type ListResult struct {
 	HasMore    bool
 	NextCursor *int64
 	TotalExact bool
+}
+
+// PaginationInfo describes an exact browsing snapshot, prepared independently
+// from the latest-records request so counting never delays the first table rows.
+type PaginationInfo struct {
+	Status     string    `json:"status"`
+	Snapshot   string    `json:"snapshot,omitempty"`
+	Total      int64     `json:"total"`
+	CreatedAt  time.Time `json:"created_at,omitempty"`
+	ExpiresAt  time.Time `json:"expires_at,omitempty"`
+	Refreshing bool      `json:"refreshing,omitempty"`
+}
+
+type PaginationRepository interface {
+	BuildPageIndex(context.Context, ListFilter) (*PageIndex, error)
 }
 
 // Summary 汇总统计。

@@ -5,6 +5,7 @@ import { Button, Card, Meter } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
+import { isUsagePaginationExpired, useUsagePageIndex } from '../../shared/hooks/useUsagePageIndex';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
@@ -269,7 +270,7 @@ export default function UserUsageContent() {
   const { t } = useTranslation();
   const { user, isAPIKeySession } = useAuth();
   const customerScope = isAPIKeySession || getTokenAPIKeyID() != null || !!user?.api_key_id;
-  const { beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'user.usage');
+  const { activeSnapshot, beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'user.usage');
   const [initialFilterState] = useState(() => readUserUsageFilterState(customerScope));
   const [filters, setFilters] = useState<Partial<UsageQuery>>(() => initialFilterState.filters);
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState(initialFilterState.apiKeyLabel);
@@ -288,8 +289,12 @@ export default function UserUsageContent() {
     page,
     page_size: pageSize,
     before_id: beforeId,
+    snapshot: activeSnapshot?.snapshot,
     ...filters,
-  }), [beforeId, filters, page, pageSize]);
+  }), [activeSnapshot?.snapshot, beforeId, filters, page, pageSize]);
+
+  const { info: pageInfo, error: pageIndexError, refresh: refreshPageIndex } = useUsagePageIndex('user', filters, page === 1 || !activeSnapshot);
+  const paginationView = activeSnapshot ?? (pageInfo?.status === 'ready' ? pageInfo : undefined);
 
   const { platforms, platformName } = usePlatforms();
   const platformOptions = [
@@ -307,6 +312,7 @@ export default function UserUsageContent() {
     isLoading,
     isPlaceholderData,
     refetch: refetchUsage,
+    error: usageError,
   } = useQuery({
     queryKey: queryKeys.userUsage(queryParams),
     queryFn: ({ signal }) => usageApi.list(queryParams, { signal }),
@@ -315,7 +321,20 @@ export default function UserUsageContent() {
     refetchOnWindowFocus: autoRefreshEnabled,
     placeholderData: keepPreviousData,
     structuralSharing: shareUserUsageRows,
+    retry: (count, error) => !isUsagePaginationExpired(error) && count < 2,
   });
+
+  useEffect(() => {
+    if (!isUsagePaginationExpired(usageError)) return;
+    resetCursorPagination();
+    refreshPageIndex();
+  }, [usageError, resetCursorPagination, refreshPageIndex]);
+
+  const refreshPagination = useCallback(() => {
+    resetCursorPagination();
+    refreshPageIndex();
+    if (page === 1) void refetchUsage({ cancelRefetch: false });
+  }, [page, refetchUsage, refreshPageIndex, resetCursorPagination]);
 
   // 聚合统计（跟随筛选条件，独立于分页）
   const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
@@ -330,9 +349,9 @@ export default function UserUsageContent() {
   const isUsageTableRefreshing = isUsageFetching;
 
   const handleManualRefresh = useCallback(() => {
-    void refetchUsage({ cancelRefetch: false });
+    refreshPagination();
     void refetchStats({ cancelRefetch: false });
-  }, [refetchStats, refetchUsage]);
+  }, [refetchStats, refreshPagination]);
 
   const handleAutoRefresh = useCallback(() => {
     void refetchUsage({ cancelRefetch: false });
@@ -361,10 +380,12 @@ export default function UserUsageContent() {
   }, [customerScope, filters.api_key_id, filters.model, filters.platform, selectedAPIKeyLabel]);
 
   const list = data?.list ?? EMPTY_USAGE_ROWS;
-  const total = data?.total ?? 0;
+  const total = paginationView?.total ?? data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-  const summaryTotal = stats?.total_requests;
+  const summaryTotal = paginationView?.total;
   const canUseCursor = !isPlaceholderData;
+  const totalExact = Boolean(paginationView || (canUseCursor && data?.total_exact));
+  const paginationStatus = paginationView ? 'ready' : pageIndexError ? 'failed' : pageInfo?.status ?? 'preparing';
   const visibleActualCost = customerScope ? (stats?.total_billed_cost ?? 0) : (stats?.total_actual_cost ?? 0);
   const highlightResetKey = useMemo(
     () => JSON.stringify({ ...filters, page, pageSize }),
@@ -475,14 +496,19 @@ export default function UserUsageContent() {
             page={page}
             pageSize={pageSize}
             pageSizeOptions={PAGE_SIZE_OPTIONS}
-            setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
+            setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined, pageInfo)}
             setPageSize={setPageSize}
             summaryTotal={summaryTotal}
             summaryTotalExact={summaryTotal != null ? true : undefined}
             total={total}
             hasMore={canUseCursor ? data?.has_more : false}
-            totalExact={canUseCursor ? data?.total_exact : true}
+            totalExact={totalExact}
             totalPages={totalPages}
+            enablePageJump={Boolean(paginationView)}
+            paginationStatus={paginationStatus}
+            isPaginationRefreshing={!activeSnapshot && pageInfo?.refreshing}
+            snapshotAt={paginationView?.created_at}
+            onRefreshPagination={refreshPagination}
           />
         )}
         isFetching={isPlaceholderData && isUsageFetching && !isLoading}
@@ -579,13 +605,13 @@ export default function UserUsageContent() {
           page={page}
           pageSize={pageSize}
           rows={list}
-          setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
+          setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined, pageInfo)}
           setPageSize={setPageSize}
           summaryTotal={summaryTotal}
           summaryTotalExact={summaryTotal != null ? true : undefined}
           suppressHighlight={isPlaceholderData}
           total={total}
-          totalExact={canUseCursor ? data?.total_exact : true}
+          totalExact={totalExact}
         />
       </UsageRichTooltipProvider>
       </TablePage>

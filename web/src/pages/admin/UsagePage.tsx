@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card, Skeleton, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
+import { isUsagePaginationExpired, useUsagePageIndex } from '../../shared/hooks/useUsagePageIndex';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { Activity, ChevronDown, ChevronUp, Columns3, DollarSign, Sigma } from 'lucide-react';
 import { UsageRichTooltipProvider, useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
@@ -585,9 +586,11 @@ function TokenTrendCard({
 
 export default function UsagePage() {
   const { t } = useTranslation();
-  const { beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'admin.usage');
+  const { activeSnapshot, beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'admin.usage');
   const [initialFilterState] = useState<AdminUsageFilterState>(readAdminUsageFilterState);
   const [filters, setFilters] = useState<Partial<UsageQuery>>(() => initialFilterState.filters);
+  const { info: pageInfo, error: pageIndexError, refresh: refreshPageIndex } = useUsagePageIndex('admin', filters, page === 1 || !activeSnapshot);
+  const paginationView = activeSnapshot ?? (pageInfo?.status === 'ready' ? pageInfo : undefined);
   const [selectedUserLabel, setSelectedUserLabel] = useState(initialFilterState.userLabel);
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState(initialFilterState.apiKeyLabel);
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
@@ -619,8 +622,9 @@ export default function UsagePage() {
     page,
     page_size: pageSize,
     before_id: beforeId,
+    snapshot: activeSnapshot?.snapshot,
     ...filters,
-  }), [beforeId, filters, page, pageSize]);
+  }), [activeSnapshot?.snapshot, beforeId, filters, page, pageSize]);
 
   // 使用记录列表
   const {
@@ -630,6 +634,7 @@ export default function UsagePage() {
     isLoading,
     isPlaceholderData,
     refetch: refetchUsage,
+    error: usageError,
   } = useQuery({
     queryKey: ['admin-usage', queryParams],
     queryFn: ({ signal }) => usageApi.adminList(queryParams, { signal }),
@@ -638,7 +643,20 @@ export default function UsagePage() {
     refetchOnWindowFocus: autoRefreshEnabled,
     placeholderData: keepPreviousData,
     structuralSharing: shareAdminUsageRows,
+    retry: (count, error) => !isUsagePaginationExpired(error) && count < 2,
   });
+
+  useEffect(() => {
+    if (!isUsagePaginationExpired(usageError)) return;
+    resetCursorPagination();
+    refreshPageIndex();
+  }, [usageError, resetCursorPagination, refreshPageIndex]);
+
+  const refreshPagination = useCallback(() => {
+    resetCursorPagination();
+    refreshPageIndex();
+    if (page === 1) void refetchUsage({ cancelRefetch: false });
+  }, [page, refetchUsage, refreshPageIndex, resetCursorPagination]);
 
   const statsFilters = useMemo(() => ({
     account: filters.account,
@@ -714,14 +732,14 @@ export default function UsagePage() {
   const isUsageTableRefreshing = isUsageFetching;
 
   const handleManualRefresh = useCallback(() => {
-    void refetchUsage({ cancelRefetch: false });
+    refreshPagination();
     void refetchTrend({ cancelRefetch: false });
     void refetchSummaryStats({ cancelRefetch: false }).then((result) => {
       if (!usageCardsCollapsed && result.isSuccess) {
         void refetchAnalysisStats({ cancelRefetch: false });
       }
     });
-  }, [refetchAnalysisStats, refetchSummaryStats, refetchTrend, refetchUsage, usageCardsCollapsed]);
+  }, [refetchAnalysisStats, refetchSummaryStats, refetchTrend, refreshPagination, usageCardsCollapsed]);
 
   const handleAutoRefresh = useCallback(() => {
     void refetchUsage({ cancelRefetch: false });
@@ -1025,10 +1043,12 @@ export default function UsagePage() {
     });
   }, []);
 
-  const total = data?.total ?? 0;
+  const total = paginationView?.total ?? data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
   const canUseCursor = !isPlaceholderData;
-  const summaryTotal = activeStats && !isSummaryStatsPlaceholderData ? activeStats.total_requests : undefined;
+  const summaryTotal = paginationView?.total;
+  const totalExact = Boolean(paginationView || (canUseCursor && data?.total_exact));
+  const paginationStatus = paginationView ? 'ready' : pageIndexError ? 'failed' : pageInfo?.status ?? 'preparing';
   const highlightResetKey = useMemo(
     () => JSON.stringify({ ...filters, page, pageSize }),
     [filters, page, pageSize],
@@ -1109,14 +1129,19 @@ export default function UsagePage() {
             page={page}
             pageSize={pageSize}
             pageSizeOptions={PAGE_SIZE_OPTIONS}
-            setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
+            setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined, pageInfo)}
             setPageSize={setPageSize}
             summaryTotal={summaryTotal}
             summaryTotalExact={summaryTotal != null ? true : undefined}
             total={total}
             hasMore={canUseCursor ? data?.has_more : false}
-            totalExact={canUseCursor ? data?.total_exact : true}
+            totalExact={totalExact}
             totalPages={totalPages}
+            enablePageJump={Boolean(paginationView)}
+            paginationStatus={paginationStatus}
+            isPaginationRefreshing={!activeSnapshot && pageInfo?.refreshing}
+            snapshotAt={paginationView?.created_at}
+            onRefreshPagination={refreshPagination}
           />
         )}
         isFetching={isPlaceholderData && isUsageFetching && !isLoading}
@@ -1235,13 +1260,13 @@ export default function UsagePage() {
           page={page}
           pageSize={pageSize}
           rows={data?.list ?? EMPTY_USAGE_ROWS}
-          setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
+          setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined, pageInfo)}
           setPageSize={setPageSize}
           summaryTotal={summaryTotal}
           summaryTotalExact={summaryTotal != null ? true : undefined}
           suppressHighlight={isPlaceholderData}
           total={total}
-          totalExact={canUseCursor ? data?.total_exact : true}
+          totalExact={totalExact}
         />
       </UsageRichTooltipProvider>
       </TablePage>
