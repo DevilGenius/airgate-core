@@ -22,12 +22,12 @@ func (r *facadeRPMTracker) IncrementRPM(context.Context, int) (int, error) {
 	return r.incrementCalls, r.err
 }
 
-func (r *facadeRPMTracker) TryIncrementRPM(context.Context, int, int) (bool, error) {
+func (r *facadeRPMTracker) TryIncrementRPM(context.Context, int, int, ...*RPMReservation) (bool, error) {
 	r.tryCalls++
 	return r.tryAllowed, r.err
 }
 
-func (r *facadeRPMTracker) DecrementRPM(context.Context, int) {
+func (r *facadeRPMTracker) DecrementRPM(context.Context, int, ...*RPMReservation) {
 	r.decrementCalls++
 }
 

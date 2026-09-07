@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -20,6 +21,21 @@ const (
 // 基于 Redis STRING + 分钟粒度 key 实现
 type RPMCounter struct {
 	rdb *redis.Client
+}
+
+// RPMReservation belongs to one attempt and retains the exact admitted window.
+// It must not be reused for a retry or another account.
+type RPMReservation struct {
+	key       string
+	accountID int
+	refund    sync.Once
+}
+
+func rememberRPM(reservations []*RPMReservation, key string, accountID int) {
+	if len(reservations) > 0 && reservations[0] != nil {
+		reservations[0].key = key
+		reservations[0].accountID = accountID
+	}
 }
 
 // NewRPMCounter 创建 RPM 计数器
@@ -55,6 +71,10 @@ func (r *RPMCounter) IncrementRPM(ctx context.Context, accountID int) (int, erro
 	}
 
 	key := r.getMinuteKey(ctx, accountID)
+	return r.incrementKey(ctx, key)
+}
+
+func (r *RPMCounter) incrementKey(ctx context.Context, key string) (int, error) {
 	pipe := r.rdb.TxPipeline()
 	incrCmd := pipe.Incr(ctx, key)
 	pipe.Expire(ctx, key, rpmKeyTTL)
@@ -78,9 +98,9 @@ func (r *RPMCounter) GetRPM(ctx context.Context, accountID int) (int, error) {
 	return val, err
 }
 
-// decrementRPMScript 仅当 key 存在时递减，避免创建无 TTL 的 key
+// Expired windows are never recreated; repeated refunds cannot go negative.
 var decrementRPMScript = redis.NewScript(`
-	if redis.call('EXISTS', KEYS[1]) == 1 then
+	if tonumber(redis.call('GET', KEYS[1]) or '0') > 0 then
 		return redis.call('DECR', KEYS[1])
 	end
 	return 0
@@ -88,12 +108,19 @@ var decrementRPMScript = redis.NewScript(`
 
 // DecrementRPM 回退 RPM 计数（请求失败时撤销预递增）
 // 仅当 key 存在时递减，避免分钟窗口切换后创建值为 -1 的无 TTL key
-func (r *RPMCounter) DecrementRPM(ctx context.Context, accountID int) {
-	if r.rdb == nil {
+func (r *RPMCounter) DecrementRPM(ctx context.Context, accountID int, reservations ...*RPMReservation) {
+	if r.rdb == nil || len(reservations) == 0 || reservations[0] == nil {
 		return
 	}
-	key := r.getMinuteKey(ctx, accountID)
-	decrementRPMScript.Run(ctx, r.rdb, []string{key})
+	reservation := reservations[0]
+	if reservation.key == "" || reservation.accountID != accountID {
+		return
+	}
+	reservation.refund.Do(func() {
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		defer cancel()
+		decrementRPMScript.Run(cleanup, r.rdb, []string{reservation.key})
+	})
 }
 
 // tryIncrementScript 原子检查 RPM 限制并递增
@@ -116,23 +143,31 @@ var tryIncrementScript = redis.NewScript(`
 // TryIncrementRPM 原子检查 RPM 限制并递增
 // 如果当前 RPM 已达 maxRPM，返回 false 不递增；否则递增并返回 true
 // maxRPM <= 0 表示不限制，直接递增
-func (r *RPMCounter) TryIncrementRPM(ctx context.Context, accountID int, maxRPM int) (bool, error) {
+func (r *RPMCounter) TryIncrementRPM(ctx context.Context, accountID int, maxRPM int, reservations ...*RPMReservation) (bool, error) {
 	if r.rdb == nil {
 		return true, nil
 	}
 
+	key := r.getMinuteKey(ctx, accountID)
 	// 不限制时直接递增
 	if maxRPM <= 0 {
-		_, err := r.IncrementRPM(ctx, accountID)
+		_, err := r.incrementKey(ctx, key)
+		if err == nil {
+			rememberRPM(reservations, key, accountID)
+		}
 		return true, err
 	}
 
-	key := r.getMinuteKey(ctx, accountID)
 	result, err := tryIncrementScript.Run(ctx, r.rdb, []string{key}, maxRPM).Int()
 	if err != nil {
 		// fail-open：Redis 不可用时允许通过并尝试普通递增
-		_, _ = r.IncrementRPM(ctx, accountID)
+		if _, err := r.incrementKey(ctx, key); err == nil {
+			rememberRPM(reservations, key, accountID)
+		}
 		return true, nil
+	}
+	if result >= 0 {
+		rememberRPM(reservations, key, accountID)
 	}
 	return result >= 0, nil
 }

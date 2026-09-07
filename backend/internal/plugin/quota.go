@@ -199,7 +199,8 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 
 	// 1. RPM 原子检查并递增
 	maxRPM := scheduler.ExtraInt(state.account.Extra, "max_rpm")
-	if !f.scheduler.TryIncrementRPM(ctx, state.account.ID, maxRPM) {
+	state.rpmReservation = &scheduler.RPMReservation{}
+	if !f.scheduler.TryIncrementRPM(ctx, state.account.ID, maxRPM, state.rpmReservation) {
 		slog.Info("账号 RPM 已达上限，尝试 failover",
 			"account_id", state.account.ID, "max_rpm", maxRPM)
 		return nil, accountSlotAcquireRPM
@@ -213,7 +214,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	slotTTL := time.Duration(scheduler.ExtraInt(state.account.Extra, "slot_ttl_seconds")) * time.Second
 
 	if err := f.concurrency.AcquireSlot(ctx, state.account.ID, state.requestID, maxConc, slotTTL); err != nil {
-		f.scheduler.DecrementRPM(releaseCtx, state.account.ID)
+		f.scheduler.DecrementRPM(releaseCtx, state.account.ID, state.rpmReservation)
 		slog.Info("账号并发已满，尝试 failover",
 			"account_id", state.account.ID, "max_concurrency", maxConc)
 		return nil, accountSlotAcquireConcurrency
@@ -231,7 +232,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 		acquired, err := f.scheduler.AcquireMessageLock(ctx, state.account.ID, state.requestID, state.account.Extra)
 		if err != nil {
 			releaseAccountSlot()
-			f.scheduler.DecrementRPM(releaseCtx, state.account.ID)
+			f.scheduler.DecrementRPM(releaseCtx, state.account.ID, state.rpmReservation)
 			slog.Info("账号消息锁获取失败，尝试 failover",
 				"account_id", state.account.ID,
 				"error", err,
@@ -240,7 +241,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 		}
 		if !acquired {
 			releaseAccountSlot()
-			f.scheduler.DecrementRPM(releaseCtx, state.account.ID)
+			f.scheduler.DecrementRPM(releaseCtx, state.account.ID, state.rpmReservation)
 			slog.Info("账号消息锁排队已满，尝试 failover",
 				"account_id", state.account.ID,
 				"max_waiters", scheduler.MessageLockMaxWaiters(state.account.Extra),

@@ -345,7 +345,7 @@ func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execu
 		// 时账号上 chat 模型仍可调用，避免单模型限流误伤整账号。
 		Family: scheduler.ModelFamily(state.requestedPlatform, outcomeModel),
 	}
-	f.scheduler.Apply(ctx, state.account.ID, j)
+	f.scheduler.Apply(ctx, state.account.ID, j, state.rpmReservation)
 
 	// Success 额外刷新会话；last_used_at 由真实 usage_log 落库时更新。
 	if execution.outcome.Kind == sdk.OutcomeSuccess {

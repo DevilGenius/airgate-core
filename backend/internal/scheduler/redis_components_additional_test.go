@@ -180,9 +180,8 @@ func TestRPMCounterRedisPaths(t *testing.T) {
 		t.Fatal("GetRPM error = nil")
 	}
 
-	mock.ExpectTime().SetVal(minuteTime)
 	mock.ExpectEvalSha(decrementRPMScript.Hash(), []string{key}).SetVal(int64(1))
-	rpm.DecrementRPM(ctx, 7)
+	rpm.DecrementRPM(ctx, 7, &RPMReservation{key: key, accountID: 7})
 
 	mock.ExpectTime().SetVal(minuteTime)
 	mock.ExpectEvalSha(tryIncrementScript.Hash(), []string{key}, 10).SetVal(int64(-1))
@@ -205,7 +204,6 @@ func TestRPMCounterRedisPaths(t *testing.T) {
 
 	mock.ExpectTime().SetVal(minuteTime)
 	mock.ExpectEvalSha(tryIncrementScript.Hash(), []string{key}, 10).SetErr(errors.New("eval failed"))
-	mock.ExpectTime().SetVal(minuteTime)
 	mock.ExpectTxPipeline()
 	mock.ExpectIncr(key).SetErr(errors.New("incr failed"))
 	if ok, err := rpm.TryIncrementRPM(ctx, 7, 10); err != nil || !ok {

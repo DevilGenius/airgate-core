@@ -375,7 +375,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				allowed, bag := f.runForwardBeginChain(c, state)
 				beginCalled = true
 				if !allowed {
-					f.scheduler.DecrementRPM(ctx, accountID)
+					f.scheduler.DecrementRPM(ctx, accountID, state.rpmReservation)
 					releaseAccountSlot()
 					return
 				}
@@ -398,7 +398,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			if requestCanceled != 0 {
 				if !hasForwardResult(execution) {
 					releaseAccountSlot()
-					f.scheduler.DecrementRPM(context.Background(), accountID)
+					f.scheduler.DecrementRPM(context.Background(), accountID, state.rpmReservation)
 					c.Set(ginCtxKeyAccountID, accountID)
 					c.Set(ginCtxKeyAttempts, totalAttempts)
 					markCanceledRequest(c, requestCanceled)
@@ -430,7 +430,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				attemptLogger.Info("forward_dispatch_candidate_failed", attrs...)
 				f.recordPluginExecutionRetry(ctx, state, execution, totalAttempts)
 				releaseAccountSlot()
-				f.scheduler.DecrementRPM(context.Background(), accountID)
+				f.scheduler.DecrementRPM(context.Background(), accountID, state.rpmReservation)
 				softExclude = softExclude[:0]
 				continue
 			}
@@ -447,7 +447,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					)
 					f.recordPluginExecutionRetry(ctx, state, execution, totalAttempts)
 					releaseAccountSlot()
-					f.scheduler.DecrementRPM(context.Background(), accountID)
+					f.scheduler.DecrementRPM(context.Background(), accountID, state.rpmReservation)
 					applyModelReroute(state, plans, requirements)
 					softExclude = softExclude[:0]
 					lastAttemptAccount = nil

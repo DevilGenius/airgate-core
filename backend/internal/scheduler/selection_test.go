@@ -874,11 +874,11 @@ func (s *stubRPMTracker) IncrementRPM(context.Context, int) (int, error) {
 	return 0, nil
 }
 
-func (s *stubRPMTracker) TryIncrementRPM(context.Context, int, int) (bool, error) {
+func (s *stubRPMTracker) TryIncrementRPM(context.Context, int, int, ...*RPMReservation) (bool, error) {
 	return true, nil
 }
 
-func (s *stubRPMTracker) DecrementRPM(context.Context, int) {}
+func (s *stubRPMTracker) DecrementRPM(context.Context, int, ...*RPMReservation) {}
 
 func (s *stubRPMTracker) GetSchedulability(context.Context, int, int) Schedulability {
 	return s.sched

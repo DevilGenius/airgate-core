@@ -36,8 +36,8 @@ type windowCostTracker interface {
 
 type rpmTracker interface {
 	IncrementRPM(ctx context.Context, accountID int) (int, error)
-	TryIncrementRPM(ctx context.Context, accountID int, maxRPM int) (bool, error)
-	DecrementRPM(ctx context.Context, accountID int)
+	TryIncrementRPM(ctx context.Context, accountID int, maxRPM int, reservations ...*RPMReservation) (bool, error)
+	DecrementRPM(ctx context.Context, accountID int, reservations ...*RPMReservation)
 	GetSchedulability(ctx context.Context, accountID int, maxRPM int) Schedulability
 }
 
@@ -249,9 +249,9 @@ func (s *Scheduler) RemoveRouteGraphAPIKey(keyID int) {
 
 // Apply 把 forwarder 的判决交给状态机。是 forwarder 与 scheduler 的唯一接触面。
 // 非 Success 判决先回退 RPM 配额（上游没真正消耗），再施加状态转移。
-func (s *Scheduler) Apply(ctx context.Context, accountID int, j Judgment) {
+func (s *Scheduler) Apply(ctx context.Context, accountID int, j Judgment, reservations ...*RPMReservation) {
 	if !j.Kind.IsSuccess() {
-		s.DecrementRPM(ctx, accountID)
+		s.DecrementRPM(ctx, accountID, reservations...)
 	}
 	s.state.Apply(ctx, accountID, j)
 }
@@ -264,8 +264,8 @@ func (s *Scheduler) IncrementRPM(ctx context.Context, accountID int) {
 }
 
 // TryIncrementRPM 原子检查上限并递增。已达上限返回 false（未递增）。
-func (s *Scheduler) TryIncrementRPM(ctx context.Context, accountID int, maxRPM int) bool {
-	allowed, err := s.rpm.TryIncrementRPM(ctx, accountID, maxRPM)
+func (s *Scheduler) TryIncrementRPM(ctx context.Context, accountID int, maxRPM int, reservations ...*RPMReservation) bool {
+	allowed, err := s.rpm.TryIncrementRPM(ctx, accountID, maxRPM, reservations...)
 	if err != nil {
 		slog.Debug("原子递增 RPM 失败", "account_id", accountID, "error", err)
 		return true // fail-open
@@ -274,8 +274,8 @@ func (s *Scheduler) TryIncrementRPM(ctx context.Context, accountID int, maxRPM i
 }
 
 // DecrementRPM 回退 RPM 计数（请求未实际消耗上游配额时调用）。
-func (s *Scheduler) DecrementRPM(ctx context.Context, accountID int) {
-	s.rpm.DecrementRPM(ctx, accountID)
+func (s *Scheduler) DecrementRPM(ctx context.Context, accountID int, reservations ...*RPMReservation) {
+	s.rpm.DecrementRPM(ctx, accountID, reservations...)
 }
 
 // RefreshSession 刷新会话时间戳（成功时调用）。

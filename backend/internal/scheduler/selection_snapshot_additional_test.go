@@ -53,11 +53,11 @@ func (b *batchSchedTracker) AddCost(context.Context, int, float64) {}
 
 func (b *batchSchedTracker) IncrementRPM(context.Context, int) (int, error) { return 0, nil }
 
-func (b *batchSchedTracker) TryIncrementRPM(context.Context, int, int) (bool, error) {
+func (b *batchSchedTracker) TryIncrementRPM(context.Context, int, int, ...*RPMReservation) (bool, error) {
 	return true, nil
 }
 
-func (b *batchSchedTracker) DecrementRPM(context.Context, int) {}
+func (b *batchSchedTracker) DecrementRPM(context.Context, int, ...*RPMReservation) {}
 
 func (b *batchSchedTracker) RefreshSession(context.Context, int, string, time.Duration) error {
 	return nil
@@ -88,11 +88,11 @@ type batchRPMSchedTracker struct {
 
 func (b *batchRPMSchedTracker) IncrementRPM(context.Context, int) (int, error) { return 0, nil }
 
-func (b *batchRPMSchedTracker) TryIncrementRPM(context.Context, int, int) (bool, error) {
+func (b *batchRPMSchedTracker) TryIncrementRPM(context.Context, int, int, ...*RPMReservation) (bool, error) {
 	return true, nil
 }
 
-func (b *batchRPMSchedTracker) DecrementRPM(context.Context, int) {}
+func (b *batchRPMSchedTracker) DecrementRPM(context.Context, int, ...*RPMReservation) {}
 
 func (b *batchRPMSchedTracker) GetSchedulability(context.Context, int, int) Schedulability {
 	return Normal

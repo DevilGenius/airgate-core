@@ -8,15 +8,17 @@ import (
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/routing"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 // forwardState 一次转发请求在 Core 内的上下文。
 // 跨 failover attempt 稳定的字段（body / model / keyInfo / plugin）+ 每次 attempt 会被覆盖的字段（account / requestID）。
 type forwardState struct {
-	startedAt   time.Time
-	requestPath string
-	requestID   string
+	startedAt      time.Time
+	requestPath    string
+	requestID      string
+	rpmReservation *scheduler.RPMReservation
 
 	body  []byte
 	model string
