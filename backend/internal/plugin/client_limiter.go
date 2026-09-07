@@ -14,6 +14,7 @@ type clientLimiter struct {
 	userConcurrency map[int]int
 	keyConcurrency  map[int]int
 	keyRPM          map[int]clientRPMWindow
+	rpmMinute       int64
 }
 
 type clientRPMWindow struct {
@@ -66,13 +67,20 @@ func (l *clientLimiter) acquire(userID, keyID, userMax, keyMax int) (release fun
 }
 
 func (l *clientLimiter) allowRPM(keyID, totalMax, nonResponsesMax int, countNonResponses bool) bool {
+	return l.allowRPMAt(keyID, totalMax, nonResponsesMax, countNonResponses, time.Now().Unix()/60)
+}
+
+func (l *clientLimiter) allowRPMAt(keyID, totalMax, nonResponsesMax int, countNonResponses bool, minute int64) bool {
 	if l == nil || keyID <= 0 || (totalMax <= 0 && (!countNonResponses || nonResponsesMax <= 0)) {
 		return true
 	}
 
-	minute := time.Now().Unix() / 60
 	l.rpmMu.Lock()
 	defer l.rpmMu.Unlock()
+	if l.rpmMinute != minute {
+		l.rpmMinute = minute
+		l.keyRPM = make(map[int]clientRPMWindow)
+	}
 
 	window := l.keyRPM[keyID]
 	if window.minute != minute {
@@ -91,13 +99,6 @@ func (l *clientLimiter) allowRPM(keyID, totalMax, nonResponsesMax int, countNonR
 		window.nonResponses++
 	}
 	l.keyRPM[keyID] = window
-	if len(l.keyRPM) > 4096 {
-		for id, item := range l.keyRPM {
-			if item.minute != minute {
-				delete(l.keyRPM, id)
-			}
-		}
-	}
 	return true
 }
 

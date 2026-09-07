@@ -2,6 +2,23 @@ package plugin
 
 import "testing"
 
+func TestClientRPMGenerationPreservesAllActiveKeysAndDropsOldWindow(t *testing.T) {
+	l := newClientLimiter()
+	for key := 1; key <= 5000; key++ {
+		if !l.allowRPMAt(key, 1, 0, false, 10) {
+			t.Fatal("first request rejected")
+		}
+	}
+	for key := 1; key <= 5000; key++ {
+		if l.allowRPMAt(key, 1, 0, false, 10) {
+			t.Fatal("active counter was evicted")
+		}
+	}
+	if !l.allowRPMAt(1, 1, 0, false, 11) || len(l.keyRPM) != 1 {
+		t.Fatal("new minute retained old generation")
+	}
+}
+
 func TestClientLimiterRPMDimensions(t *testing.T) {
 	limiter := newClientLimiter()
 	if !limiter.allowRPM(7, 2, 1, true) {
