@@ -36,7 +36,7 @@ const (
 //	KEYS[1] = 槽位 key
 //	KEYS[2] = count key
 //	KEYS[3] = 可选：账号工作中索引 key（仅账号级并发）
-//	ARGV[1] = 当前 unix 秒
+//	ARGV[1] = 兼容保留的客户端时间；租约时钟由 Redis TIME 提供
 //	ARGV[2] = max_concurrency
 //	ARGV[3] = requestID
 //	ARGV[4] = slotTTL 秒（既是单个 slot 的存活上限，也是整 key 的兜底 TTL）
@@ -45,33 +45,30 @@ const (
 // 注：三类槽用不同前缀的 key 隔离（ag:concurrency:account:<id> /
 // ag:concurrency:apikey:<id> / ag:concurrency:user:<id>），
 // 所以同一个脚本可以服务三方而不互相干扰。
-var acquireSlotScript = redis.NewScript(`
+var acquireSlotScript = redis.NewScript(slotLeaseHelpers + `
 	local slotKey = KEYS[1]
 	local countKey = KEYS[2]
-	local now = tonumber(ARGV[1])
+	local now = leaseNow()
 	local max = tonumber(ARGV[2])
 	local requestID = ARGV[3]
 	local ttl = tonumber(ARGV[4])
 	local indexKey = KEYS[3]
 	local accountID = ARGV[5]
-	local staleBefore = now - ttl
-
-	-- 清理僵尸 slot：score 早于 (now - ttl) 视为泄漏
-	local staleRemoved = redis.call('ZREMRANGEBYSCORE', slotKey, '-inf', staleBefore)
+	local staleRemoved = cleanSlotLeases(slotKey,now,ttl)
 
 	local current = redis.call('ZCARD', slotKey)
-	if current < max then
+	if current < max or redis.call('ZSCORE',slotKey,requestID) then
 		redis.call('ZADD', slotKey, now, requestID)
-		redis.call('EXPIRE', slotKey, ttl)
+		redis.call('ZADD',slotKey..':leases',now+ttl,requestID)
 		current = redis.call('ZCARD', slotKey)
-		redis.call('SET', countKey, current, 'EX', ttl)
+		refreshSlotLeaseKeys(slotKey,countKey,now,current)
 		if indexKey and accountID then
 			redis.call('ZADD', indexKey, current, accountID)
 		end
 		return {1, current}
 	end
 	if current > 0 then
-		redis.call('SET', countKey, current, 'EX', ttl)
+		refreshSlotLeaseKeys(slotKey,countKey,now,current)
 		if staleRemoved > 0 and indexKey and accountID then
 			redis.call('ZADD', indexKey, current, accountID)
 		end
@@ -84,7 +81,7 @@ var acquireSlotScript = redis.NewScript(`
 	return {0, current}
 `)
 
-var releaseSlotScript = redis.NewScript(`
+var releaseSlotScript = redis.NewScript(slotLeaseHelpers + `
 	local slotKey = KEYS[1]
 	local countKey = KEYS[2]
 	local indexKey = KEYS[3]
@@ -93,14 +90,13 @@ var releaseSlotScript = redis.NewScript(`
 	local zeroTTL = tonumber(ARGV[3])
 	local accountID = ARGV[4]
 
+	local now=leaseNow()
+	cleanSlotLeases(slotKey,now,fallbackTTL)
 	local removed = redis.call('ZREM', slotKey, requestID)
+	redis.call('ZREM',slotKey..':leases',requestID)
 	local current = redis.call('ZCARD', slotKey)
 	if current > 0 then
-		local ttl = redis.call('TTL', slotKey)
-		if ttl == false or ttl <= 0 then
-			ttl = fallbackTTL
-		end
-		redis.call('SET', countKey, current, 'EX', ttl)
+		refreshSlotLeaseKeys(slotKey,countKey,now,current)
 		if removed > 0 and indexKey and accountID then
 			redis.call('ZADD', indexKey, current, accountID)
 		end
@@ -113,24 +109,19 @@ var releaseSlotScript = redis.NewScript(`
 	return {removed, current}
 `)
 
-var backfillConcurrencyCountsScript = redis.NewScript(`
-	local now = tonumber(ARGV[1])
+var backfillConcurrencyCountsScript = redis.NewScript(slotLeaseHelpers + `
+	local now = leaseNow()
 	local slotTTL = tonumber(ARGV[2])
 	local zeroTTL = tonumber(ARGV[3])
-	local staleBefore = now - slotTTL
 	local out = {}
 
 	for index = 1, #KEYS, 2 do
 		local slotKey = KEYS[index]
 		local countKey = KEYS[index + 1]
-		redis.call('ZREMRANGEBYSCORE', slotKey, '-inf', staleBefore)
+		cleanSlotLeases(slotKey,now,slotTTL)
 		local current = redis.call('ZCARD', slotKey)
 		if current > 0 then
-			local ttl = redis.call('TTL', slotKey)
-			if ttl == false or ttl <= 0 then
-				ttl = slotTTL
-			end
-			redis.call('SET', countKey, current, 'EX', ttl)
+			refreshSlotLeaseKeys(slotKey,countKey,now,current)
 		else
 			redis.call('SET', countKey, 0, 'EX', zeroTTL)
 		end
@@ -206,9 +197,7 @@ func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKe
 	if cm.rdb == nil || maxConcurrency <= 0 {
 		return 0, false, nil
 	}
-	if slotTTL <= 0 {
-		slotTTL = defaultSlotTTL
-	}
+	slotTTL = SlotTTL(slotTTL)
 	ctx, cancel := context.WithTimeout(ctx, redisAdmissionTimeout)
 	defer cancel()
 

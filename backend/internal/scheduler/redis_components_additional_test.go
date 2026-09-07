@@ -246,8 +246,8 @@ func TestMessageQueueRedisPaths(t *testing.T) {
 		t.Fatalf("TryAcquire busy = %v, %v", ok, err)
 	}
 	mock.ExpectEvalSha(acquireLockScript.Hash(), []string{lockKey}, "fail", int64(1000)).SetErr(errors.New("eval failed"))
-	if ok, err := queue.TryAcquire(ctx, 7, "fail", time.Second); err != nil || !ok {
-		t.Fatalf("TryAcquire fail open = %v, %v", ok, err)
+	if ok, err := queue.TryAcquire(ctx, 7, "fail", time.Second); !errors.Is(err, ErrSchedulingUnavailable) || ok {
+		t.Fatalf("TryAcquire unavailable = %v, %v", ok, err)
 	}
 
 	mock.ExpectEvalSha(acquireLockScript.Hash(), []string{lockKey}, "nowait", int64(1000)).SetVal(int64(1))

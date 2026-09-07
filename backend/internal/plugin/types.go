@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ type forwardState struct {
 	requestPath    string
 	requestID      string
 	rpmReservation *scheduler.RPMReservation
+	leaseContext   context.Context
 
 	body  []byte
 	model string

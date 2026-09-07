@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -217,6 +218,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 		maxConc = scheduler.DefaultAccountMaxConcurrency
 	}
 	slotTTL := time.Duration(scheduler.ExtraInt(state.account.Extra, "slot_ttl_seconds")) * time.Second
+	slotTTL = scheduler.SlotTTL(slotTTL)
 
 	if err := f.concurrency.AcquireSlot(ctx, state.account.ID, state.requestID, maxConc, slotTTL); err != nil {
 		f.scheduler.DecrementRPM(releaseCtx, state.account.ID, state.rpmReservation)
@@ -227,11 +229,25 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 			"account_id", state.account.ID, "max_concurrency", maxConc)
 		return nil, accountSlotAcquireConcurrency
 	}
+	parentCtx := ctx
+	stopSlotRenewal := func() {}
+	if f.concurrency.Distributed() {
+		ctx, stopSlotRenewal = scheduler.MaintainLease(ctx, slotTTL, func(renewCtx context.Context) (bool, error) {
+			return f.concurrency.RenewSlot(renewCtx, accountID, requestID, slotTTL)
+		})
+	}
+	state.leaseContext = ctx
+	c.Request = c.Request.WithContext(ctx)
+	var releaseOnce sync.Once
 	releaseAccountSlot := func() {
-		f.concurrency.ReleaseSlot(releaseCtx, accountID, requestID)
-		if f.capacityQueue != nil {
-			f.capacityQueue.Notify(poolKey)
-		}
+		releaseOnce.Do(func() {
+			stopSlotRenewal()
+			f.concurrency.ReleaseSlot(releaseCtx, accountID, requestID)
+			c.Request = c.Request.WithContext(parentCtx)
+			if f.capacityQueue != nil {
+				f.capacityQueue.Notify(poolKey)
+			}
+		})
 	}
 
 	// 3. 可选消息锁 + 均摊延迟（仅显式启用且为真实用户消息）
@@ -239,8 +255,12 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	if scheduler.MessageLockEnabled(state.account.Extra) && scheduler.IsRealUserMessage(state.body) {
 		acquired, err := f.scheduler.AcquireMessageLock(ctx, state.account.ID, state.requestID, state.account.Extra)
 		if err != nil {
+			unavailable := errors.Is(err, scheduler.ErrSchedulingUnavailable) || errors.Is(context.Cause(ctx), scheduler.ErrLeaseLost)
 			releaseAccountSlot()
 			f.scheduler.DecrementRPM(releaseCtx, state.account.ID, state.rpmReservation)
+			if unavailable {
+				return nil, accountSlotAcquireUnavailable
+			}
 			slog.Info("账号消息锁获取失败，尝试 failover",
 				"account_id", state.account.ID,
 				"error", err,
@@ -256,7 +276,17 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 			)
 			return nil, accountSlotAcquireMessageLock
 		}
+		stopMessageRenewal := func() {}
+		if f.concurrency.Distributed() {
+			ttl := scheduler.MessageLockTTL(state.account.Extra)
+			ctx, stopMessageRenewal = scheduler.MaintainLease(ctx, ttl, func(renewCtx context.Context) (bool, error) {
+				return f.scheduler.RenewMessageLock(renewCtx, accountID, requestID, ttl)
+			})
+			state.leaseContext = ctx
+			c.Request = c.Request.WithContext(ctx)
+		}
 		releaseMsgLock = func() {
+			stopMessageRenewal()
 			f.scheduler.ReleaseMessageLock(releaseCtx, accountID, requestID)
 		}
 		f.scheduler.EnforceMessageDelay(ctx, state.account.ID, state.account.Extra)
@@ -264,9 +294,9 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 
 	// 反向释放：msg lock → slot。RPM 不在 release 里回退——正常完成流程会通过
 	// scheduler.Apply 决定是否 DecrementRPM（非 Success 判决都会回退）。
+	var finishOnce sync.Once
 	return func() {
-		releaseMsgLock()
-		releaseAccountSlot()
+		finishOnce.Do(func() { releaseMsgLock(); releaseAccountSlot() })
 	}, accountSlotAcquireSuccess
 }
 

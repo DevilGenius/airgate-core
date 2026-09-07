@@ -155,6 +155,8 @@ func (m *MessageQueue) TryAcquire(ctx context.Context, accountID int, requestID 
 	if m.rdb == nil {
 		return true, nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, redisAdmissionTimeout)
+	defer cancel()
 	if lockTTL <= 0 {
 		lockTTL = defaultLockTTL
 	}
@@ -166,7 +168,7 @@ func (m *MessageQueue) TryAcquire(ctx context.Context, accountID int, requestID 
 	).Int()
 
 	if err != nil {
-		return true, nil // fail-open
+		return false, fmt.Errorf("%w: message lock: %w", ErrSchedulingUnavailable, err)
 	}
 	return result == 1, nil
 }
@@ -195,13 +197,15 @@ func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID
 	waiterRegistered := false
 	defer func() {
 		if waiterRegistered {
-			_, _ = releaseWaiterScript.Run(context.Background(), m.rdb, []string{waiterKey, waitersIndexKey()}, waiterTTL.Milliseconds(), accountID).Result()
+			cleanup, cancel := context.WithTimeout(context.Background(), redisAdmissionTimeout)
+			defer cancel()
+			_, _ = releaseWaiterScript.Run(cleanup, m.rdb, []string{waiterKey, waitersIndexKey()}, waiterTTL.Milliseconds(), accountID).Result()
 		}
 	}()
 	for {
 		acquired, err := m.TryAcquire(ctx, accountID, requestID, lockTTL)
 		if err != nil {
-			return true, nil // fail-open
+			return false, err
 		}
 		if acquired {
 			return true, nil
@@ -210,11 +214,11 @@ func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID
 		if !waiterRegistered {
 			raw, err := registerWaiterScript.Run(ctx, m.rdb, []string{waiterKey, waitersIndexKey()}, waiterLimit, waiterTTL.Milliseconds(), accountID).Result()
 			if err != nil {
-				return true, nil // fail-open
+				return false, fmt.Errorf("%w: message wait: %w", ErrSchedulingUnavailable, err)
 			}
 			registered, _, ok := parseSlotScriptResult(raw)
 			if !ok {
-				return true, nil // fail-open
+				return false, ErrSchedulingUnavailable
 			}
 			if registered != 1 {
 				m.waiterRejectTotal.Add(1)
@@ -351,6 +355,8 @@ func (m *MessageQueue) ForceRelease(ctx context.Context, accountID int) error {
 
 // Release 释放锁并记录完成时间
 func (m *MessageQueue) Release(ctx context.Context, accountID int, requestID string) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), redisAdmissionTimeout)
+	defer cancel()
 	if m.rdb == nil {
 		return nil
 	}

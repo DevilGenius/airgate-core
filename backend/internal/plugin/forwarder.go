@@ -392,6 +392,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			}
 			capacityCollisionSeen = false
 			capacityProbeReady = false
+			defer releaseAccountSlot() // Also release on a recovered plugin panic.
 
 			if !beginCalled {
 				allowed, bag := f.runForwardBeginChain(c, state)
@@ -405,6 +406,16 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			}
 
 			execution := f.callPlugin(c, state)
+			if state.leaseContext != nil && errors.Is(context.Cause(state.leaseContext), scheduler.ErrLeaseLost) {
+				releaseAccountSlot()
+				f.runForwardEndChain(c, state, execution, mwBag)
+				if hasForwardResult(execution) {
+					f.writeResult(c, state, execution)
+				} else if !c.Writer.Written() {
+					openAIRateLimitError(c, http.StatusServiceUnavailable, "lease_lost", "执行租约已丢失，请稍后重试", time.Second)
+				}
+				return
+			}
 			lastAttemptAccount = state.account
 			finalAttemptAccount = state.account
 			executionSnapshot := execution
