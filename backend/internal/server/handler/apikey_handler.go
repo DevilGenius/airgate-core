@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
+	"github.com/DevilGenius/airgate-core/internal/reporting"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
@@ -27,6 +28,8 @@ func parseKeyID(raw string) (int, error) {
 
 func (h *APIKeyHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {
+	case errors.Is(err, reporting.ErrHistoryNotReady):
+		return 503, err.Error()
 	case errors.Is(err, appapikey.ErrKeyNotFound):
 		return 404, err.Error()
 	case errors.Is(err, appapikey.ErrGroupNotFound):

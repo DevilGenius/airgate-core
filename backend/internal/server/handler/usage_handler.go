@@ -42,7 +42,7 @@ func handleReportingError(c *gin.Context, err error) bool {
 	switch {
 	case errors.Is(err, reporting.ErrInvalidRange), errors.Is(err, reporting.ErrTooManyGroups):
 		response.BadRequest(c, err.Error())
-	case errors.Is(err, reporting.ErrBusy):
+	case errors.Is(err, reporting.ErrBusy), errors.Is(err, reporting.ErrHistoryNotReady):
 		c.Header("Retry-After", "1")
 		response.Error(c, http.StatusServiceUnavailable, 503, err.Error())
 	default:

@@ -148,6 +148,9 @@ func (s *DashboardStore) ListAPIKeyTrendLogs(ctx context.Context, startTime, end
 	if !s.canQueryDashboardRollups() {
 		return []appdashboard.APIKeyTrendLog{}, nil
 	}
+	if err := requireUsageRollupCoverage(ctx, s.db, usageAPIKeyHourlyRollupTable, startTime); err != nil {
+		return nil, err
+	}
 	const query = `
 SELECT
 	r.api_key_id,
@@ -218,6 +221,9 @@ func (s *DashboardStore) fillTrendLogEmails(ctx context.Context, logs []appdashb
 func (s *DashboardStore) listTrendLogsFromRollups(ctx context.Context, startTime, endTime time.Time, userID int) ([]appdashboard.TrendLog, bool, error) {
 	if !s.canQueryDashboardRollups() {
 		return nil, false, nil
+	}
+	if err := requireUsageRollupCoverage(ctx, s.db, "usage_hourly_rollups", startTime); err != nil {
+		return nil, true, err
 	}
 	const query = `
 SELECT
@@ -318,6 +324,9 @@ type rollupUsageSnapshot struct {
 func (s *DashboardStore) loadStatsUsageFromRollups(ctx context.Context, todayStart time.Time, userID int) (rollupUsageSnapshot, bool, error) {
 	if !s.canQueryDashboardRollups() {
 		return rollupUsageSnapshot{}, false, nil
+	}
+	if err := requireUsageRollupCoverage(ctx, s.db, "usage_hourly_rollups", time.Time{}); err != nil {
+		return rollupUsageSnapshot{}, true, err
 	}
 	const query = `
 SELECT

@@ -61,8 +61,10 @@ func (s *UsageStore) summaryAdminFromAPIKeyRollups(ctx context.Context, filter a
 		)`)
 	}
 	loc := timezone.Resolve(filter.TZ)
+	var coveredFrom time.Time
 	if filter.StartDate != "" {
 		if start, err := timezone.ParseDate(filter.StartDate, loc); err == nil {
+			coveredFrom = start
 			if !hourBoundary(start) {
 				return appusage.Summary{}, false, nil
 			}
@@ -78,6 +80,9 @@ func (s *UsageStore) summaryAdminFromAPIKeyRollups(ctx context.Context, filter a
 		}
 	}
 
+	if err := requireUsageRollupCoverage(ctx, s.db, usageAPIKeyHourlyRollupTable, coveredFrom); err != nil {
+		return appusage.Summary{}, true, err
+	}
 	query := `SELECT
 	COUNT(*)::bigint,
 	COALESCE(SUM(r.requests), 0)::bigint,
@@ -123,6 +128,7 @@ FROM ` + usageAPIKeyHourlyRollupTable + ` r`
 }
 
 func hourBoundary(value time.Time) bool {
+	value = value.UTC()
 	return value.Minute() == 0 && value.Second() == 0 && value.Nanosecond() == 0
 }
 

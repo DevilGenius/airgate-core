@@ -397,8 +397,8 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 		result[g.ID] = stats
 	}
 
-	// 2. PostgreSQL 只读取 API-Key 小时汇总。汇总表为空时返回 0；不再
-	// 回退到 usage_logs，避免旧明细查询重新成为分组页的全表扫描入口。
+	// 2. PostgreSQL reads verified API-key rollups. Unverified history returns
+	// an explicit synchronization state instead of zero or a full-detail scan.
 	var usageByGroup map[int]groupUsageSummary
 	if s.db.Driver().Dialect() == dialect.Postgres {
 		usageByGroup, err = s.groupUsageFromAPIKeyRollups(ctx, groupIDs, todayStart)
@@ -425,6 +425,9 @@ type groupUsageSummary struct {
 }
 
 func (s *GroupStore) groupUsageFromAPIKeyRollups(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]groupUsageSummary, error) {
+	if err := requireUsageRollupCoverage(ctx, s.db, usageAPIKeyHourlyRollupTable, time.Time{}); err != nil {
+		return nil, err
+	}
 	args := make([]any, 0, len(groupIDs)+1)
 	placeholders := make([]string, 0, len(groupIDs))
 	for _, groupID := range groupIDs {

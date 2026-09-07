@@ -217,7 +217,7 @@ func parseIDList(raw string) []int {
 
 func (h *AccountHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {
-	case errors.Is(err, reporting.ErrBusy):
+	case errors.Is(err, reporting.ErrBusy), errors.Is(err, reporting.ErrHistoryNotReady):
 		return 503, err.Error()
 	case errors.Is(err, reporting.ErrInvalidRange), errors.Is(err, reporting.ErrTooManyGroups):
 		return 400, err.Error()

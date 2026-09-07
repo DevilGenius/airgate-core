@@ -85,6 +85,9 @@ func queryAPIKeyUsageFromRollups(ctx context.Context, db *ent.Client, keyIDs []i
 	}
 	usageMap := make(map[int]appapikey.UsageCosts, len(keyIDs))
 	thirtyDaysAgo := todayStart.AddDate(0, 0, -29)
+	if err := requireUsageRollupCoverage(ctx, db, usageAPIKeyHourlyRollupTable, thirtyDaysAgo); err != nil {
+		return nil, true, err
+	}
 	const query = `
 SELECT
 	api_key_id,

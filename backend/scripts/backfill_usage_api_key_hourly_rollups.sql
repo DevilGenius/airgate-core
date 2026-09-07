@@ -4,6 +4,12 @@
 
 BEGIN;
 
+SELECT pg_advisory_xact_lock(20260908070000);
+
+UPDATE public.usage_rollup_coverage
+SET state = 'pending', covered_from = NULL, verified_at = NULL, updated_at = now()
+WHERE projection = 'usage_api_key_hourly_rollups';
+
 TRUNCATE TABLE public.usage_api_key_hourly_rollups;
 
 INSERT INTO public.usage_api_key_hourly_rollups (
@@ -33,5 +39,9 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7
 ON CONFLICT DO NOTHING;
 
 ANALYZE public.usage_api_key_hourly_rollups;
+
+UPDATE public.usage_rollup_coverage
+SET state = 'ready', covered_from = NULL, verified_at = now(), updated_at = now()
+WHERE projection = 'usage_api_key_hourly_rollups';
 
 COMMIT;

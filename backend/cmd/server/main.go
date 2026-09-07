@@ -30,6 +30,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/redisconfig"
 	"github.com/DevilGenius/airgate-core/internal/server"
 	"github.com/DevilGenius/airgate-core/internal/setup"
+	"github.com/DevilGenius/airgate-core/internal/usageprojection"
 	"github.com/DevilGenius/airgate-core/internal/version"
 	webfs "github.com/DevilGenius/airgate-core/internal/web"
 )
@@ -264,7 +265,11 @@ func startMainServer(cfg *config.Config) {
 		}
 	}()
 
+	verificationCtx, stopVerification := context.WithCancel(context.Background())
+	defer stopVerification()
+	usageprojection.StartVerification(verificationCtx, drv.DB())
 	<-quit
+	stopVerification()
 	slog.Info("收到关闭信号，开始优雅关闭...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

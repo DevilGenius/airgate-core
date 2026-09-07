@@ -11,10 +11,17 @@ import (
 )
 
 var (
-	ErrInvalidRange  = errors.New("日期或时区无效，或查询范围过大")
-	ErrTooManyGroups = errors.New("统计结果分组过多，请缩小查询范围")
-	ErrBusy          = errors.New("统计查询繁忙，请稍后重试")
+	ErrInvalidRange               = errors.New("日期或时区无效，或查询范围过大")
+	ErrTooManyGroups              = errors.New("统计结果分组过多，请缩小查询范围")
+	ErrBusy                       = errors.New("统计查询繁忙，请稍后重试")
+	ErrHistoryNotReady            = errors.New("历史统计尚未完成同步，请稍后重试")
+	ErrHistoryNeedsBackfill error = historyNeedsBackfill{}
 )
+
+type historyNeedsBackfill struct{}
+
+func (historyNeedsBackfill) Error() string { return "历史统计不完整，需要执行回填" }
+func (historyNeedsBackfill) Unwrap() error { return ErrHistoryNotReady }
 
 const MaxGroups = 8192
 
