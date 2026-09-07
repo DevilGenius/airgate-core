@@ -218,6 +218,12 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		f.forwardMetadataOnly(c, state)
 		return
 	}
+	releaseBilling, billingErr := f.recorder.Reserve()
+	if billingErr != nil {
+		openAIRateLimitError(c, http.StatusServiceUnavailable, "billing_busy", billingErr.Error(), time.Second)
+		return
+	}
+	defer releaseBilling()
 
 	routes := routesForAPIKey(state)
 	if len(routes) == 0 {

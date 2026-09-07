@@ -152,6 +152,12 @@ type Recorder struct {
 	journalWake        chan struct{}
 	journalDone        chan struct{}
 	journalCancel      context.CancelFunc
+	admissionMu        sync.Mutex
+	accepting          bool
+	producers          int
+	producerIdle       chan struct{}
+	syncWrites         chan struct{}
+	syncWaiters        chan struct{}
 }
 
 // RecorderStats exposes queue counters for runtime monitoring.
@@ -173,6 +179,8 @@ func NewRecorder(db *ent.Client, bufferSize int, rdb ...*redis.Client) *Recorder
 	if len(rdb) > 0 {
 		cache = rdb[0]
 	}
+	idle := make(chan struct{})
+	close(idle)
 	return &Recorder{
 		db:           db,
 		rdb:          cache,
@@ -181,6 +189,7 @@ func NewRecorder(db *ent.Client, bufferSize int, rdb ...*redis.Client) *Recorder
 		stopCh:       make(chan struct{}),
 		stopped:      make(chan struct{}),
 		retryStopped: make(chan struct{}),
+		accepting:    true, producerIdle: idle, syncWrites: make(chan struct{}, 4), syncWaiters: make(chan struct{}, 64),
 	}
 }
 
@@ -234,6 +243,8 @@ func (r *Recorder) Record(record UsageRecord) error {
 // RecordSync 同步写入一条使用记录并返回 usage_log.id。
 // 需要立即把 usage_id 关联到任务时使用；普通转发仍走异步 Record。
 func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, syncFallbackTimeout)
+	defer cancel()
 	record = ensureUsageOccurredAt(ensureBillingEventID(record), time.Now())
 	if r.journal != nil {
 		var err error
@@ -242,6 +253,14 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 			return 0, err
 		}
 	}
+	release, err := r.acquireSyncWrite(ctx)
+	if err != nil {
+		if r.journal != nil {
+			r.notifyJournal()
+		}
+		return 0, err
+	}
+	defer release()
 	id, err := r.recordSyncDatabase(ctx, record)
 	if r.journal != nil {
 		if err == nil {

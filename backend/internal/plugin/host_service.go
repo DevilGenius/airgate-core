@@ -700,6 +700,11 @@ func (h *HostService) reportAccountResult(ctx context.Context, req hostReportAcc
 // 与 probeForward 的区别：走完整计费管线，不跳过 usage_log / 余额扣款。
 // 账号级故障自动 failover，最多 maxHostForwardAttempts 次。
 func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[string]interface{}, error) {
+	releaseBilling, err := h.recorder.Reserve()
+	if err != nil {
+		return nil, status.Error(codes.Unavailable, err.Error())
+	}
+	defer releaseBilling()
 	if req.UserID <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
@@ -909,6 +914,11 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 // 账号级故障自动 failover：通过 failoverStreamWriter 延迟提交，
 // 成功（< 400）时立即切换到真流式，失败时缓冲数据后丢弃重试。
 func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest, stream pb.CoreInvokeService_InvokeStreamServer) error {
+	releaseBilling, err := h.recorder.Reserve()
+	if err != nil {
+		return status.Error(codes.Unavailable, err.Error())
+	}
+	defer releaseBilling()
 	if req.UserID <= 0 {
 		return status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
