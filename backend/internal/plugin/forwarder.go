@@ -133,6 +133,10 @@ const maxFailoverAttempts = 3
 // models without consuming the normal failover budget.
 const maxModelReroutes = 1
 
+// Shared across routes and attempts. Local collisions must not turn an A-sized
+// pool into A repeated full eligibility scans in one HTTP request.
+const maxLocalCapacityProbes = 8
+
 func preferredDifferentAccountTypeForAttempt(attempt, maxAttempts int, previousAccount *ent.Account) string {
 	if maxAttempts <= 1 || attempt != maxAttempts-1 {
 		return ""
@@ -234,6 +238,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	ctx := c.Request.Context()
 	startedAt := state.startedAt
 	totalAttempts := 0
+	localCapacityProbes := 0
 	var finalAttemptAccount *ent.Account
 	var finalExecution *forwardExecution
 
@@ -268,6 +273,12 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				capacityProbeGeneration = f.capacityQueue.Generation(capacityPoolKeyForState(state))
 				capacityProbeReady = true
 			}
+			if localCapacityProbes >= maxLocalCapacityProbes {
+				logger.Info("forward_capacity_probe_budget_exhausted", "probes", localCapacityProbes)
+				openAIRateLimitError(c, http.StatusTooManyRequests, "account_capacity_exhausted", "账号容量繁忙，请稍后重试", time.Second)
+				return
+			}
+			localCapacityProbes++
 
 			exclude := make([]int, 0, len(hardExclude)+len(softExclude))
 			exclude = append(exclude, hardExclude...)

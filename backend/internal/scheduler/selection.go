@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"math/rand"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -213,22 +212,28 @@ func ensureNormalCandidatesInSticky(normalCandidates, stickyCandidates []*ent.Ac
 	if len(normalCandidates) == 0 {
 		return stickyCandidates
 	}
-	missing := 0
+	seen := make(map[int]struct{}, len(stickyCandidates)+len(normalCandidates))
+	for _, account := range stickyCandidates {
+		if account != nil {
+			seen[account.ID] = struct{}{}
+		}
+	}
+	var merged []*ent.Account
 	for _, normal := range normalCandidates {
-		if normal == nil || findAccountByID(stickyCandidates, normal.ID) != nil {
+		if normal == nil {
 			continue
 		}
-		missing++
-	}
-	if missing == 0 {
-		return stickyCandidates
-	}
-	merged := make([]*ent.Account, 0, len(stickyCandidates)+missing)
-	merged = append(merged, stickyCandidates...)
-	for _, normal := range normalCandidates {
-		if normal != nil && findAccountByID(merged, normal.ID) == nil {
-			merged = append(merged, normal)
+		if _, exists := seen[normal.ID]; exists {
+			continue
 		}
+		if merged == nil {
+			merged = append(make([]*ent.Account, 0, len(stickyCandidates)+len(normalCandidates)), stickyCandidates...)
+		}
+		merged = append(merged, normal)
+		seen[normal.ID] = struct{}{}
+	}
+	if merged == nil {
+		return stickyCandidates
 	}
 	return merged
 }
@@ -810,24 +815,12 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 			maxPriority = acc.Priority
 		}
 	}
-	tier := make([]*ent.Account, 0, len(candidates))
-	for _, acc := range candidates {
-		if acc.Priority == maxPriority {
-			tier = append(tier, acc)
-		}
-	}
-	if len(tier) == 1 {
-		return tier[0]
-	}
-
 	// 同优先级内按负载 + LRU 打分
-	type scored struct {
-		acc   *ent.Account
-		score float64
-	}
-	items := make([]scored, 0, len(tier))
-
-	for _, acc := range tier {
+	items := make(bestAccounts, 0, maxLoadBalanceCandidates)
+	for _, acc := range candidates {
+		if acc.Priority != maxPriority {
+			continue
+		}
 		maxConc := acc.MaxConcurrency
 		if maxConc <= 0 {
 			maxConc = DefaultAccountMaxConcurrency
@@ -843,20 +836,9 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 				lruScore = elapsed
 			}
 		}
-		items = append(items, scored{
-			acc:   acc,
-			score: (1-loadRate)*100 + lruScore,
-		})
+		items.consider(acc, (1-loadRate)*100+lruScore)
 	}
-
-	sort.Slice(items, func(i, j int) bool { return items[i].score > items[j].score })
-
-	const maxTopN = 32
-	topN := len(items)
-	if topN > maxTopN {
-		topN = maxTopN
-	}
-	return items[rand.Intn(topN)].acc
+	return items[rand.Intn(len(items))].account
 }
 
 // getCurrentLoad 读取 acquire/release 维护的账号并发 count key。
