@@ -1,88 +1,318 @@
-.withPageIndex {
-  flex-wrap: wrap;
-}
-
-.withPageIndex :global(.ag-table-pagination-summary) {
+.pagination {
+  --control-height: 1.875rem;
+  --control-radius: 0.4375rem;
+  container: table-pagination / inline-size;
+  width: 100%;
   min-width: 0;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
-.controls {
+.bar,
+.summary,
+.controls,
+.navigation,
+.metadata,
+.snapshot {
   display: flex;
+  min-width: 0;
   align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  max-width: 100%;
-  margin-left: auto;
 }
 
-.jump,
-.jumpLabel {
+.bar {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.625rem 1rem;
+}
+
+.summary {
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.total,
+.pageSize,
+.jump {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
+  white-space: nowrap;
+}
+
+.number {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.625rem 0.875rem;
+  max-width: 100%;
+  margin-inline-start: auto;
+}
+
+.navigation {
+  gap: 0.25rem;
+  max-width: 100%;
+}
+
+.pages {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pages > li {
+  display: flex;
+  flex: none;
+}
+
+.button,
+.select,
+.pageInput {
+  box-sizing: border-box;
+  height: var(--control-height);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.button {
+  display: inline-flex;
+  flex: none;
+  min-width: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.button svg,
+.selectControl svg,
+.refresh svg {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.button:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--accent) 32%, var(--border));
+  background: var(--default);
+}
+
+.button:active:not(:disabled) {
+  background: var(--surface-secondary);
+}
+
+.button:focus-visible,
+.select:focus-visible,
+.pageInput:focus-visible,
+.refresh:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button:disabled,
+.refresh:disabled {
   color: var(--muted);
-  font-size: 0.75rem;
+  cursor: default;
+  opacity: 0.45;
+}
+
+.pageButton {
+  border-color: transparent;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.pageButton[aria-current="page"] {
+  border-color: color-mix(in oklab, var(--accent) 28%, var(--border));
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ellipsis {
+  display: inline-flex;
+  width: 1.25rem;
+  justify-content: center;
+  user-select: none;
+}
+
+.position {
+  display: none;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem 0.375rem;
+  padding-inline: 0.375rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.pageCount {
+  white-space: nowrap;
+}
+
+.pagination[data-long-pages] .pages {
+  display: none;
+}
+
+.pagination[data-long-pages] .position {
+  display: inline-flex;
+}
+
+.selectControl {
+  position: relative;
+  display: inline-flex;
+}
+
+.select {
+  appearance: none;
+  min-width: 3.5rem;
+  padding-inline: 0.5rem 1.5rem;
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.selectControl svg {
+  position: absolute;
+  inset-inline-end: 0.375rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .jump {
   position: relative;
+  max-width: 100%;
 }
 
 .pageInput {
-  box-sizing: border-box;
-  width: 7ch;
-  min-width: 4rem;
-  height: 1.75rem;
-  padding: 0.125rem 0.375rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--foreground);
+  width: auto;
+  min-width: 3.25rem;
+  padding-inline: 0.375rem;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
-.pageInput:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.pageInput[aria-invalid="true"] {
+  border-color: var(--danger);
 }
 
-.go,
+.go {
+  background: var(--surface-secondary);
+}
+
+.metadata {
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
+.snapshot {
+  flex: none;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
 .refresh {
-  padding: 0.25rem 0.375rem;
-  border-radius: var(--radius);
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.25rem;
+  border: 0;
+  border-radius: var(--control-radius);
+  background: transparent;
   color: var(--accent);
-  font-size: 0.75rem;
-  white-space: nowrap;
   cursor: pointer;
-}
-
-.go:hover,
-.refresh:hover {
-  background: color-mix(in oklab, var(--accent) 10%, transparent);
-}
-
-.refresh:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-
-.status {
-  margin-left: 0.25rem;
-  color: var(--muted);
-  font-size: 0.7rem;
+  font: inherit;
   white-space: nowrap;
+}
+
+.refresh:hover:not(:disabled) {
+  background: var(--default);
+}
+
+.failed,
+.error {
+  color: var(--danger);
 }
 
 .error {
   position: absolute;
-  right: 0;
-  bottom: 100%;
-  padding: 0.25rem 0.5rem;
+  z-index: 1;
+  inset-inline-end: 0;
+  bottom: calc(100% + 0.375rem);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(22rem, 100cqi);
+  padding: 0.5rem 0.625rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--danger);
-  white-space: nowrap;
+  border-radius: var(--control-radius);
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
+  white-space: normal;
+}
+
+@container table-pagination (max-width: 44rem) {
+  .pages {
+    display: none;
+  }
+
+  .position {
+    display: inline-flex;
+  }
+
+  .directionLabel {
+    display: none;
+  }
+
+  .direction {
+    padding-inline: 0.375rem;
+  }
+}
+
+@container table-pagination (max-width: 30rem) {
+  .summary,
+  .controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .navigation {
+    flex: 1 1 auto;
+  }
+
+  .position {
+    flex: 1;
+  }
+
+  .jump {
+    margin-inline-start: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
 }

@@ -171,20 +171,4 @@
     min-width: 100% !important;
   }
 
-  .ag-table-pagination {
-    align-items: stretch !important;
-    flex-wrap: wrap;
-  }
-
-  .ag-table-pagination-summary {
-    width: 100%;
-  }
-
-  .ag-table-page-size {
-    margin-left: 0;
-  }
-
-  .ag-table-pagination .pagination__content {
-    margin-left: 0;
-  }
 }

@@ -3,6 +3,7 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -10,8 +11,7 @@ import {
   type FormEvent,
 } from 'react';
 import { flushSync } from 'react-dom';
-import { Pagination } from '@heroui/react';
-import { SimpleSelect } from './SimpleSelect';
+import { ChevronDown, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getPaginationItems } from '../utils/pagination';
 import styles from './TablePaginationFooter.module.css';
 
@@ -69,6 +69,7 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
   snapshotAt,
   onRefreshPagination,
 }: TablePaginationFooterProps) {
+  const jumpInputId = useId();
   const [displayPage, setDisplayPage] = useState(page);
   const [displayPageSize, setDisplayPageSize] = useState(pageSize);
   const [jumpPage, setJumpPage] = useState(String(page));
@@ -88,10 +89,6 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
   const selectedPageSize = displayPageSize == null ? '' : String(displayPageSize);
   const visibleTotal = summaryTotal ?? total;
   const visibleTotalExact = summaryTotalExact ?? totalExact;
-  const pageSizeItems = useMemo(
-    () => pageSizeOptions.map((size) => ({ id: String(size), label: String(size) })),
-    [pageSizeOptions],
-  );
   const paginationItems = useMemo(
     () => getPaginationItems(visiblePage, safeTotalPages),
     [visiblePage, safeTotalPages],
@@ -215,104 +212,138 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
   };
 
   return (
-    <Pagination className={`ag-table-pagination${paginationStatus ? ` ${styles.withPageIndex}` : ''}`} size="sm">
-      <Pagination.Summary className="ag-table-pagination-summary">
-        <span>{visibleTotalExact ? '共' : '至少'}</span>
-        <span className="ag-table-pagination-number">{visibleTotal.toLocaleString()}</span>
-        <span>条</span>
-        <span className="ag-table-pagination-separator" aria-hidden="true" />
-        <span>第</span>
-        <span className="ag-table-pagination-number">{visiblePage}</span>
-        <span>/</span>
-        <span className="ag-table-pagination-number">{safeTotalPages}</span>
-        <span>{totalExact ? '页' : '页+'}</span>
-        {showPageSize ? (
-          <div className="ag-table-page-size">
-            <span>每页</span>
-            <SimpleSelect
-              ariaLabel="每页数量"
-              className="ag-table-page-size-select"
-              items={pageSizeItems.map((item) => ({ key: item.id, label: item.label }))}
-              selectedKey={selectedPageSize}
-              selectedLabel={selectedPageSize}
-              triggerClassName="ag-table-page-size-trigger"
-              popoverClassName="ag-table-page-size-list"
-              itemClassName="ag-table-page-size-option"
-              onSelectionChange={handlePageSizeChange}
-            />
-            <span>条</span>
-          </div>
-        ) : null}
-        {paginationStatus === 'preparing' ? <span className={styles.status} role="status">正在统计总页数…</span> : null}
-        {isPaginationRefreshing ? <span className={styles.status} role="status">正在更新页数…</span> : null}
-        {paginationStatus === 'failed' ? <span className={styles.status} role="status">页数暂不可用</span> : null}
-        {snapshotAt ? (
-          <time className={styles.status} dateTime={snapshotAt} title="跳页按此时的记录排列，第一页显示最新记录；刷新可更新分页记录。">
-            截至 {new Date(snapshotAt).toLocaleTimeString([], { hour12: false })}
-          </time>
-        ) : null}
-        {onRefreshPagination ? <button type="button" className={styles.refresh} onClick={onRefreshPagination} disabled={paginationStatus === 'preparing' || isPaginationRefreshing}>更新页数</button> : null}
-      </Pagination.Summary>
+    <nav
+      aria-label="分页"
+      className={styles.pagination}
+      data-long-pages={String(safeTotalPages).length > 6 || undefined}
+    >
+      <div className={styles.bar}>
+        <div className={styles.summary}>
+          <span className={styles.total}>
+            {visibleTotalExact ? '共' : '至少'}
+            <strong className={styles.number}>{visibleTotal.toLocaleString()}</strong>
+            条
+          </span>
+          {showPageSize ? (
+            <label className={styles.pageSize}>
+              每页
+              <span className={styles.selectControl}>
+                <select
+                  aria-label="每页数量"
+                  className={styles.select}
+                  value={selectedPageSize}
+                  onChange={(event) => handlePageSizeChange(event.target.value)}
+                >
+                  {pageSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}
+                </select>
+                <ChevronDown aria-hidden="true" />
+              </span>
+              条
+            </label>
+          ) : null}
+          {paginationStatus === 'preparing' || paginationStatus === 'failed' || isPaginationRefreshing || snapshotAt || onRefreshPagination ? (
+            <div className={styles.metadata}>
+              {paginationStatus === 'preparing' ? <span role="status">正在统计总页数…</span> : null}
+              {isPaginationRefreshing ? <span role="status">正在更新页数…</span> : null}
+              {paginationStatus === 'failed' ? <span className={styles.failed} role="status">页数暂不可用</span> : null}
+              {snapshotAt || onRefreshPagination ? (
+                <span className={styles.snapshot}>
+                  {snapshotAt ? (
+                    <time dateTime={snapshotAt} title="跳页按此时的记录排列，第一页显示最新记录；刷新可更新分页记录。">
+                      截至 {new Date(snapshotAt).toLocaleTimeString([], { hour12: false })}
+                    </time>
+                  ) : null}
+                  {onRefreshPagination ? (
+                    <button
+                      type="button"
+                      className={styles.refresh}
+                      onClick={onRefreshPagination}
+                      disabled={paginationStatus === 'preparing' || isPaginationRefreshing}
+                    >
+                      <RotateCw aria-hidden="true" />
+                      更新页数
+                    </button>
+                  ) : null}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
-      <div className={styles.controls}>
-      <Pagination.Content>
-        <Pagination.Item>
-          <button
-            type="button"
-            aria-disabled={isPreviousDisabled}
-            className="pagination__link pagination__link--nav ag-table-pagination-nav"
-            onClick={() => handleNavClick(previousPage, isPreviousDisabled)}
-            onPointerDown={(event) => handleNavPointerDown(event, previousPage, isPreviousDisabled)}
-          >
-            <Pagination.PreviousIcon />
-            <span>上一页</span>
-          </button>
-        </Pagination.Item>
-        {paginationItems.map((item, index) =>
-          item === '...' ? (
-            <Pagination.Item key={`ellipsis-${index}`}>
-              <Pagination.Ellipsis />
-            </Pagination.Item>
-          ) : (
-            <Pagination.Item key={item}>
-              <button
-                type="button"
-                aria-current={item === visiblePage ? 'page' : undefined}
-                className="pagination__link ag-table-pagination-page-link"
-                data-active={item === visiblePage ? 'true' : undefined}
-                onClick={() => handleLinkClick(item)}
-                onPointerDown={(event) => handleLinkPointerDown(event, item)}
-              >
-                {item}
-              </button>
-            </Pagination.Item>
-          ),
-        )}
-        <Pagination.Item>
-          <button
-            type="button"
-            aria-disabled={isNextDisabled}
-            className="pagination__link pagination__link--nav ag-table-pagination-nav"
-            onClick={() => handleNavClick(nextPage, isNextDisabled)}
-            onPointerDown={(event) => handleNavPointerDown(event, nextPage, isNextDisabled)}
-          >
-            <span>下一页</span>
-            <Pagination.NextIcon />
-          </button>
-        </Pagination.Item>
-      </Pagination.Content>
-      {enablePageJump && totalExact ? (
-        <form className={styles.jump} onSubmit={handleJump}>
-          <label className={styles.jumpLabel}>
-            跳至
-            <input className={styles.pageInput} aria-label="跳转页码" aria-invalid={Boolean(jumpError)} inputMode="numeric" value={jumpPage} onChange={(event) => { setJumpPage(event.target.value); setJumpError(''); }} />
-            页
-          </label>
-          <button type="submit" className={styles.go}>跳转</button>
-          {jumpError ? <span className={styles.error} role="alert">{jumpError}</span> : null}
-        </form>
-      ) : null}
+        <div className={styles.controls}>
+          <div className={styles.navigation}>
+            <button
+              type="button"
+              aria-label="上一页"
+              aria-disabled={isPreviousDisabled}
+              disabled={isPreviousDisabled}
+              className={`${styles.button} ${styles.direction}`}
+              onClick={() => handleNavClick(previousPage, isPreviousDisabled)}
+              onPointerDown={(event) => handleNavPointerDown(event, previousPage, isPreviousDisabled)}
+            >
+              <ChevronLeft aria-hidden="true" />
+              <span className={styles.directionLabel}>上一页</span>
+            </button>
+            <ol className={styles.pages} aria-label="页码">
+              {paginationItems.map((item, index) => (
+                <li key={item === '...' ? `ellipsis-${index}` : item}>
+                  {item === '...' ? (
+                    <span className={styles.ellipsis} aria-hidden="true">…</span>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label={`第 ${item} 页`}
+                      aria-current={item === visiblePage ? 'page' : undefined}
+                      className={`${styles.button} ${styles.pageButton}`}
+                      onClick={() => handleLinkClick(item)}
+                      onPointerDown={(event) => handleLinkPointerDown(event, item)}
+                    >
+                      {item}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ol>
+            <span className={styles.position} aria-label={`第 ${visiblePage} 页，共${totalExact ? '' : '至少'} ${safeTotalPages} 页`}>
+              <strong className={styles.number}>{visiblePage}</strong>
+              <span className={styles.pageCount}>/ {safeTotalPages}{totalExact ? '' : '+'}</span>
+            </span>
+            <button
+              type="button"
+              aria-label="下一页"
+              aria-disabled={isNextDisabled}
+              disabled={isNextDisabled}
+              className={`${styles.button} ${styles.direction}`}
+              onClick={() => handleNavClick(nextPage, isNextDisabled)}
+              onPointerDown={(event) => handleNavPointerDown(event, nextPage, isNextDisabled)}
+            >
+              <span className={styles.directionLabel}>下一页</span>
+              <ChevronRight aria-hidden="true" />
+            </button>
+          </div>
+          {enablePageJump && totalExact ? (
+            <form className={styles.jump} onSubmit={handleJump}>
+              <label htmlFor={jumpInputId}>跳至</label>
+              <input
+                id={jumpInputId}
+                className={styles.pageInput}
+                aria-label="跳转页码"
+                aria-invalid={Boolean(jumpError)}
+                aria-describedby={jumpError ? `${jumpInputId}-error` : undefined}
+                inputMode="numeric"
+                autoComplete="off"
+                size={Math.max(3, String(safeTotalPages).length)}
+                value={jumpPage}
+                onChange={(event) => { setJumpPage(event.target.value); setJumpError(''); }}
+              />
+              <span>页</span>
+              <button type="submit" className={`${styles.button} ${styles.go}`}>跳转</button>
+              {jumpError ? <span id={`${jumpInputId}-error`} className={styles.error} role="alert">{jumpError}</span> : null}
+            </form>
+          ) : null}
+        </div>
       </div>
-    </Pagination>
+
+    </nav>
   );
 });
