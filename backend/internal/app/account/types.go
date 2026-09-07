@@ -91,6 +91,7 @@ type UsageGrowthObservation struct {
 
 // UsageLog 使用记录聚合输入。
 type UsageLog struct {
+	Count        int // Zero denotes one legacy/raw record; SQL aggregates set the actual count.
 	Model        string
 	InputTokens  int64
 	OutputTokens int64

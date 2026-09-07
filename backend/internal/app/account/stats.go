@@ -64,6 +64,9 @@ func ResolveStatsRange(now time.Time, query StatsQuery) (time.Time, time.Time, e
 	if endDate.Before(startDate) {
 		return time.Time{}, time.Time{}, ErrInvalidDateRange
 	}
+	if endDate.After(startDate.AddDate(0, 0, 366)) {
+		return time.Time{}, time.Time{}, ErrInvalidDateRange
+	}
 
 	return startDate, endDate, nil
 }
@@ -90,11 +93,15 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 	var totalDurationMs int64
 
 	for _, log := range logs {
+		count := log.Count
+		if count <= 0 {
+			count = 1
+		}
 		// 按用户时区对齐日期 key，避免 UTC 切换导致跨日错位
 		dateKey := log.CreatedAt.In(location).Format("2006-01-02")
 		isImage := isImageModel(log.Model)
 
-		result.Range.Count++
+		result.Range.Count += count
 		result.Range.InputTokens += log.InputTokens
 		result.Range.OutputTokens += log.OutputTokens
 		result.Range.TotalCost += log.TotalCost
@@ -102,32 +109,32 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 		result.Range.ActualCost += log.ActualCost
 		totalDurationMs += log.DurationMs
 		if isImage {
-			result.Range.ImageCount++
+			result.Range.ImageCount += count
 			result.Range.ImageCost += log.AccountCost
 		}
 
 		if !log.CreatedAt.Before(today) {
-			result.Today.Count++
+			result.Today.Count += count
 			result.Today.InputTokens += log.InputTokens
 			result.Today.OutputTokens += log.OutputTokens
 			result.Today.TotalCost += log.TotalCost
 			result.Today.AccountCost += log.AccountCost
 			result.Today.ActualCost += log.ActualCost
 			if isImage {
-				result.Today.ImageCount++
+				result.Today.ImageCount += count
 				result.Today.ImageCost += log.AccountCost
 			}
 		}
 
 		if stats, ok := dailyMap[dateKey]; ok {
-			stats.Count++
+			stats.Count += count
 			stats.TotalCost += log.TotalCost
 			stats.AccountCost += log.AccountCost
 			stats.ActualCost += log.ActualCost
 		} else {
 			dailyMap[dateKey] = &DailyStats{
 				Date:        dateKey,
-				Count:       1,
+				Count:       count,
 				TotalCost:   log.TotalCost,
 				AccountCost: log.AccountCost,
 				ActualCost:  log.ActualCost,
@@ -135,7 +142,7 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 		}
 
 		if stats, ok := modelMap[log.Model]; ok {
-			stats.Count++
+			stats.Count += count
 			stats.InputTokens += log.InputTokens
 			stats.OutputTokens += log.OutputTokens
 			stats.TotalCost += log.TotalCost
@@ -144,7 +151,7 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 		} else {
 			modelMap[log.Model] = &ModelStats{
 				Model:        log.Model,
-				Count:        1,
+				Count:        count,
 				InputTokens:  log.InputTokens,
 				OutputTokens: log.OutputTokens,
 				TotalCost:    log.TotalCost,
@@ -165,6 +172,7 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 	}
 
 	result.Models = make([]ModelStats, 0, len(modelMap))
+	result.TotalDays = len(result.DailyTrend)
 	for _, model := range modelMap {
 		result.Models = append(result.Models, *model)
 	}

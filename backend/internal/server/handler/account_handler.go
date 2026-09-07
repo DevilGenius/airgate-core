@@ -13,6 +13,7 @@ import (
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	appsettings "github.com/DevilGenius/airgate-core/internal/app/settings"
+	"github.com/DevilGenius/airgate-core/internal/reporting"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 )
@@ -216,6 +217,10 @@ func parseIDList(raw string) []int {
 
 func (h *AccountHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {
+	case errors.Is(err, reporting.ErrBusy):
+		return 503, err.Error()
+	case errors.Is(err, reporting.ErrInvalidRange), errors.Is(err, reporting.ErrTooManyGroups):
+		return 400, err.Error()
 	case errors.Is(err, appaccount.ErrAccountNotFound):
 		return 404, err.Error()
 	case errors.Is(err, appaccount.ErrAccountEmailExists):

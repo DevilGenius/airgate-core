@@ -13,6 +13,7 @@ import (
 	appapikey "github.com/DevilGenius/airgate-core/internal/app/apikey"
 	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
+	"github.com/DevilGenius/airgate-core/internal/reporting"
 )
 
 func TestAccountStoreCRUDListsAndAggregates(t *testing.T) {
@@ -699,19 +700,16 @@ func TestUsageStoreSummariesStatsAndCursorFilters(t *testing.T) {
 	if len(groups) == 0 || groups[0].GroupID != int64(group.ID) || groups[0].Name != group.Name {
 		t.Fatalf("group stats = %+v", groups)
 	}
-	trend, err := store.TrendEntries(ctx, appusage.TrendFilter{StatsFilter: appusage.StatsFilter{UserID: storePtr(int64(user.ID))}})
+	trend, err := store.TrendEntries(ctx, appusage.TrendFilter{StatsFilter: appusage.StatsFilter{UserID: storePtr(int64(user.ID)), StartDate: "2026-06-20", EndDate: "2026-06-20", TZ: "UTC"}})
 	if err != nil {
 		t.Fatalf("TrendEntries returned error: %v", err)
 	}
-	if len(trend) != 2 || trend[0].CreatedAt == "" {
+	if len(trend) != 1 || trend[0].CreatedAt == "" || trend[0].InputTokens != 13 || trend[0].OutputTokens != 27 {
 		t.Fatalf("trend entries = %+v", trend)
 	}
-	recent, err := store.TrendEntries(ctx, appusage.TrendFilter{DefaultRecentHours: 24 * 365 * 100})
-	if err != nil {
-		t.Fatalf("TrendEntries recent returned error: %v", err)
-	}
-	if len(recent) != 3 {
-		t.Fatalf("recent trend entries = %+v, want all three rows in the wide recent window", recent)
+	_, err = store.TrendEntries(ctx, appusage.TrendFilter{DefaultRecentHours: 24 * 365 * 100})
+	if !errors.Is(err, reporting.ErrInvalidRange) {
+		t.Fatalf("unbounded recent range error = %v", err)
 	}
 }
 

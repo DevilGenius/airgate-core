@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DevilGenius/airgate-core/internal/reporting"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
@@ -111,6 +112,9 @@ func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter)
 
 // UserStats 查询当前用户汇总统计。
 func (s *Service) UserStats(ctx context.Context, userID int64, filter StatsFilter) (Summary, error) {
+	if err := reporting.ValidateDates(filter.StartDate, filter.EndDate, filter.TZ); err != nil {
+		return Summary{}, err
+	}
 	summary, err := s.repo.SummaryUser(ctx, userID, filter)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
@@ -123,6 +127,9 @@ func (s *Service) UserStats(ctx context.Context, userID int64, filter StatsFilte
 
 // UserStatsWithModels 查询当前用户统计页的完整数据，并用 Redis 短 TTL 缓存热点筛选结果。
 func (s *Service) UserStatsWithModels(ctx context.Context, userID int64, filter StatsFilter) (UserStatsResult, error) {
+	if err := reporting.ValidateDates(filter.StartDate, filter.EndDate, filter.TZ); err != nil {
+		return UserStatsResult{}, err
+	}
 	key := usageCacheKey("user-stats", struct {
 		UserID int64
 		Filter StatsFilter
@@ -199,6 +206,9 @@ func usageListTotal(page, pageSize, listLen int, hasMore bool) int64 {
 
 // StatsByModel 按模型分组统计。
 func (s *Service) StatsByModel(ctx context.Context, filter StatsFilter) ([]ModelStats, error) {
+	if err := reporting.ValidateDates(filter.StartDate, filter.EndDate, filter.TZ); err != nil {
+		return nil, err
+	}
 	stats, err := s.repo.StatsByModel(ctx, filter)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
@@ -210,6 +220,9 @@ func (s *Service) StatsByModel(ctx context.Context, filter StatsFilter) ([]Model
 
 // AdminStats 查询管理员聚合统计。
 func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy string, includeSummary bool) (StatsResult, error) {
+	if err := reporting.ValidateDates(filter.StartDate, filter.EndDate, filter.TZ); err != nil {
+		return StatsResult{}, err
+	}
 	groupBy = normalizeStatsGroupBy(groupBy)
 	key := usageCacheKey("admin-stats", struct {
 		Filter         StatsFilter
@@ -260,6 +273,19 @@ func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy st
 // AdminTrend 查询管理员趋势统计。
 func (s *Service) AdminTrend(ctx context.Context, filter TrendFilter) ([]TrendBucket, error) {
 	filter = normalizeTrendFilter(filter)
+	if filter.Granularity != "" && filter.Granularity != "hour" && filter.Granularity != "day" {
+		return nil, reporting.ErrInvalidRange
+	}
+	if filter.DefaultRecentHours > 24*366 || filter.DefaultRecentHours < 0 {
+		return nil, reporting.ErrInvalidRange
+	}
+	maxDays := 366
+	if filter.Granularity == "hour" {
+		maxDays = 31
+	}
+	if _, _, err := reporting.Range(filter.StartDate, filter.EndDate, filter.TZ, time.Now(), time.Duration(filter.DefaultRecentHours)*time.Hour, maxDays); err != nil {
+		return nil, err
+	}
 	key := usageCacheKey("trend", filter)
 
 	return usageCachedResultWithFlight(ctx, &s.cacheFlight, s.rdb, key, usageTrendCacheTTL, func(loadCtx context.Context) ([]TrendBucket, error) {

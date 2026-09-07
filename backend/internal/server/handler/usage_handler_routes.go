@@ -53,6 +53,9 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		if handleUsagePaginationError(c, err) {
 			return
 		}
+		if handleReportingError(c, err) {
+			return
+		}
 		handleUsageError("查询用户使用记录失败", err)
 		response.InternalError(c, "查询失败")
 		return
@@ -115,6 +118,9 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 		ScopedToKey: scoped,
 	})
 	if err != nil {
+		if handleReportingError(c, err) {
+			return
+		}
 		handleUsageError("统计用户使用记录失败", err)
 		response.InternalError(c, "统计失败")
 		return
@@ -202,6 +208,9 @@ func (h *UsageHandler) UserUsageTrend(c *gin.Context) {
 		Granularity: granularity,
 	})
 	if err != nil {
+		if handleReportingError(c, err) {
+			return
+		}
 		handleUsageError("查询用户趋势失败", err)
 		response.InternalError(c, "查询失败")
 		return
@@ -259,6 +268,9 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 		if handleUsagePaginationError(c, err) {
 			return
 		}
+		if handleReportingError(c, err) {
+			return
+		}
 		handleUsageError("查询管理员使用记录失败", err)
 		response.InternalError(c, "查询失败")
 		return
@@ -301,6 +313,9 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 		TZ:            c.Query("tz"),
 	}, query.GroupBy, includeSummary)
 	if err != nil {
+		if handleReportingError(c, err) {
+			return
+		}
 		handleUsageError("查询管理员聚合统计失败", err)
 		response.InternalError(c, "统计失败")
 		return
@@ -334,6 +349,9 @@ func (h *UsageHandler) AdminUsageTrend(c *gin.Context) {
 		Granularity: query.Granularity,
 	})
 	if err != nil {
+		if handleReportingError(c, err) {
+			return
+		}
 		handleUsageError("查询管理员趋势统计失败", err)
 		response.InternalError(c, "查询失败")
 		return

@@ -170,7 +170,7 @@ func TestUsageStoreModelFilterIncludeExclude(t *testing.T) {
 		}
 	}
 
-	statsFilter := appusage.StatsFilter{UserID: storePtr(int64(user.ID)), Model: excludeFilter}
+	statsFilter := appusage.StatsFilter{UserID: storePtr(int64(user.ID)), Model: excludeFilter, StartDate: "2026-07-12", EndDate: "2026-07-12", TZ: "UTC"}
 	summary, err := store.SummaryAdmin(ctx, statsFilter)
 	if err != nil {
 		t.Fatalf("SummaryAdmin exclude returned error: %v", err)
@@ -185,7 +185,7 @@ func TestUsageStoreModelFilterIncludeExclude(t *testing.T) {
 	if len(byModel) != 4 {
 		t.Fatalf("exclude model stats = %+v, want 4", byModel)
 	}
-	trend, err := store.TrendEntries(ctx, appusage.TrendFilter{StatsFilter: statsFilter})
+	trend, err := store.TrendEntries(ctx, appusage.TrendFilter{StatsFilter: statsFilter, Granularity: "hour"})
 	if err != nil {
 		t.Fatalf("TrendEntries exclude returned error: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestUsageStoreAdminAccountSearchIncludesSoftDeletedAccounts(t *testing.T) {
 		t.Fatalf("ListAdmin by deleted account name = %+v hasMore=%v next=%v", records, hasMore, nextCursor)
 	}
 
-	filter := appusage.StatsFilter{AccountSearch: "RETIRED-CREDENTIAL@EXAMPLE.COM"}
+	filter := appusage.StatsFilter{AccountSearch: "RETIRED-CREDENTIAL@EXAMPLE.COM", StartDate: "2026-07-12", EndDate: "2026-07-12", TZ: "UTC"}
 	summary, err := store.SummaryAdmin(ctx, filter)
 	if err != nil {
 		t.Fatalf("SummaryAdmin by account email returned error: %v", err)

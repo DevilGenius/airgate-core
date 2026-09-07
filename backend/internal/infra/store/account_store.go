@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	rand "math/rand/v2"
 	"strings"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 	"github.com/DevilGenius/airgate-core/internal/plantype"
+	"github.com/DevilGenius/airgate-core/internal/reporting"
 )
 
 // AccountStore 使用 Ent 实现账号仓储。
@@ -848,32 +850,66 @@ func (s *AccountStore) ListByPlatform(ctx context.Context, platform string) ([]a
 
 // FindUsageLogs 查询账号在指定时间范围内的使用记录。
 func (s *AccountStore) FindUsageLogs(ctx context.Context, id int, startDate, endDate time.Time) ([]appaccount.UsageLog, error) {
-	predicates := []predicate.UsageLog{
-		entusagelog.HasAccountWith(entaccount.IDEQ(id)),
-		entusagelog.CreatedAtGTE(startDate),
-		entusagelog.CreatedAtLTE(endDate),
+	if startDate.IsZero() || endDate.Before(startDate) || endDate.After(startDate.AddDate(0, 0, 366)) {
+		return nil, appaccount.ErrInvalidDateRange
 	}
-
-	logs, err := s.db.UsageLog.Query().
-		Where(predicates...).
-		Select(
-			entusagelog.FieldModel,
-			entusagelog.FieldInputTokens,
-			entusagelog.FieldOutputTokens,
-			entusagelog.FieldTotalCost,
-			entusagelog.FieldAccountCost,
-			entusagelog.FieldActualCost,
-			entusagelog.FieldDurationMs,
-			entusagelog.FieldCreatedAt,
-		).
-		All(ctx)
+	ctx, release, err := reporting.Acquire(ctx, fmt.Sprintf("account:%d", id))
 	if err != nil {
 		return nil, err
+	}
+	defer release()
+	precision := time.Microsecond
+	if s.db.Driver().Dialect() != dialect.Postgres {
+		precision = time.Millisecond
+	}
+	// Preserve the inclusive endpoint at database/date-function precision.
+	until := endDate.Truncate(precision).Add(precision)
+	predicates := []predicate.UsageLog{
+		entusagelog.HasAccountWith(entaccount.IDEQ(id)),
+		usageTimeRange(s.db.Driver().Dialect(), startDate, until),
+	}
+
+	var logs []struct {
+		CreatedAt    string  `json:"created_at"`
+		Model        string  `json:"model"`
+		Count        int     `json:"count"`
+		InputTokens  int64   `json:"input_tokens"`
+		OutputTokens int64   `json:"output_tokens"`
+		TotalCost    float64 `json:"total_cost"`
+		AccountCost  float64 `json:"account_cost"`
+		ActualCost   float64 `json:"actual_cost"`
+		DurationMs   int64   `json:"duration_ms"`
+	}
+	err = s.db.UsageLog.Query().
+		Where(predicates...).
+		Limit(reporting.MaxGroups+1).
+		Aggregate(
+			usageBucketTimestamp(s.db.Driver().Dialect(), "day", startDate, until, startDate.Location(), entusagelog.FieldModel),
+			func(q *sql.Selector) string { return q.C(entusagelog.FieldModel) },
+			ent.As(ent.Count(), "count"),
+			ent.As(usageLogSum(entusagelog.FieldInputTokens), "input_tokens"),
+			ent.As(usageLogSum(entusagelog.FieldOutputTokens), "output_tokens"),
+			ent.As(usageLogSum(entusagelog.FieldTotalCost), "total_cost"),
+			ent.As(usageLogSum(entusagelog.FieldAccountCost), "account_cost"),
+			ent.As(usageLogSum(entusagelog.FieldActualCost), "actual_cost"),
+			ent.As(usageLogSum(entusagelog.FieldDurationMs), "duration_ms"),
+		).
+		Scan(ctx, &logs)
+	if err != nil {
+		return nil, err
+	}
+	if len(logs) > reporting.MaxGroups {
+		return nil, reporting.ErrTooManyGroups
 	}
 
 	result := make([]appaccount.UsageLog, 0, len(logs))
 	for _, item := range logs {
+		createdAt, err := time.Parse(time.RFC3339Nano, item.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
 		result = append(result, appaccount.UsageLog{
+			Count:        item.Count,
 			Model:        item.Model,
 			InputTokens:  int64(item.InputTokens),
 			OutputTokens: int64(item.OutputTokens),
@@ -881,7 +917,7 @@ func (s *AccountStore) FindUsageLogs(ctx context.Context, id int, startDate, end
 			AccountCost:  item.AccountCost,
 			ActualCost:   item.ActualCost,
 			DurationMs:   item.DurationMs,
-			CreatedAt:    item.CreatedAt,
+			CreatedAt:    createdAt,
 		})
 	}
 	return result, nil

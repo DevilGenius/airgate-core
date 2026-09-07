@@ -198,14 +198,14 @@ type UserStatsResult struct {
 
 // TrendEntry 趋势聚合的原始项。
 type TrendEntry struct {
-	CreatedAt           string
-	InputTokens         int64
-	OutputTokens        int64
-	CachedInputTokens   int64
-	CacheCreationTokens int64
-	ActualCost          float64
-	StandardCost        float64
-	BilledCost          float64
+	CreatedAt           string  `json:"created_at"`
+	InputTokens         int64   `json:"input_tokens"`
+	OutputTokens        int64   `json:"output_tokens"`
+	CachedInputTokens   int64   `json:"cached_input_tokens"`
+	CacheCreationTokens int64   `json:"cache_creation_tokens"`
+	ActualCost          float64 `json:"actual_cost"`
+	StandardCost        float64 `json:"standard_cost"`
+	BilledCost          float64 `json:"billed_cost"`
 }
 
 // TrendBucket 趋势时间桶。

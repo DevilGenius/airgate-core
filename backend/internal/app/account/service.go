@@ -26,6 +26,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
+	"github.com/DevilGenius/airgate-core/internal/reporting"
 	"github.com/DevilGenius/airgate-core/internal/safego"
 )
 
@@ -1823,6 +1824,9 @@ func (s *Service) triggerUsageProbe(ctx context.Context, inst *plugin.PluginInst
 
 // GetStats 获取单个账号统计。
 func (s *Service) GetStats(ctx context.Context, id int, query StatsQuery) (StatsResult, error) {
+	if err := reporting.ValidateDates(query.StartDate, query.EndDate, query.TZ); err != nil {
+		return StatsResult{}, ErrInvalidDateRange
+	}
 	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{})
 	if err != nil {

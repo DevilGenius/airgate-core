@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	entuser "github.com/DevilGenius/airgate-core/ent/user"
 	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
+	"github.com/DevilGenius/airgate-core/internal/reporting"
 )
 
 // UsageStore 使用 Ent 实现使用记录仓储。
@@ -429,45 +431,59 @@ func (s *UsageStore) StatsByGroup(ctx context.Context, filter appusage.StatsFilt
 	return result, nil
 }
 
-// TrendEntries 查询趋势原始记录。
+// TrendEntries returns SQL-aggregated buckets, never raw usage entities.
 func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilter) ([]appusage.TrendEntry, error) {
+	if filter.DefaultRecentHours > 24*366 || filter.DefaultRecentHours < 0 {
+		return nil, reporting.ErrInvalidRange
+	}
+	granularity := filter.Granularity
+	if granularity == "" {
+		granularity = "day"
+	}
+	if granularity != "day" && granularity != "hour" {
+		return nil, reporting.ErrInvalidRange
+	}
+	maxDays := 366
+	if granularity == "hour" {
+		maxDays = 31
+	}
+	from, until, err := reporting.Range(filter.StartDate, filter.EndDate, filter.TZ, time.Now(), time.Duration(filter.DefaultRecentHours)*time.Hour, maxDays)
+	if err != nil {
+		return nil, err
+	}
+	owner := "admin"
+	if filter.UserID != nil {
+		owner = fmt.Sprintf("user:%d", *filter.UserID)
+	}
+	ctx, release, err := reporting.Acquire(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
 		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
-	query = applyUsageStatsFilter(query, filter.StatsFilter)
-	if filter.StartDate == "" && filter.EndDate == "" && filter.DefaultRecentHours > 0 {
-		query = query.Where(entusagelog.CreatedAtGTE(time.Now().Add(-time.Duration(filter.DefaultRecentHours) * time.Hour)))
-	}
-
-	logs, err := query.
-		Select(
-			entusagelog.FieldInputTokens,
-			entusagelog.FieldOutputTokens,
-			entusagelog.FieldCachedInputTokens,
-			entusagelog.FieldCacheCreationTokens,
-			entusagelog.FieldActualCost,
-			entusagelog.FieldBilledCost,
-			entusagelog.FieldTotalCost,
-			entusagelog.FieldCreatedAt,
-		).
-		All(ctx)
+	statsFilter := filter.StatsFilter
+	statsFilter.StartDate, statsFilter.EndDate = "", ""
+	query = applyUsageStatsFilter(query, statsFilter)
+	query = query.Where(usageTimeRange(s.db.Driver().Dialect(), from, until))
+	var result []appusage.TrendEntry
+	err = query.Limit(1025).Aggregate(
+		usageBucketTimestamp(s.db.Driver().Dialect(), granularity, from, until, timezone.Resolve(filter.TZ)),
+		ent.As(usageLogSum(entusagelog.FieldInputTokens), "input_tokens"),
+		ent.As(usageLogSum(entusagelog.FieldOutputTokens), "output_tokens"),
+		ent.As(usageLogSum(entusagelog.FieldCachedInputTokens), "cached_input_tokens"),
+		ent.As(usageLogSum(entusagelog.FieldCacheCreationTokens), "cache_creation_tokens"),
+		ent.As(usageLogSum(entusagelog.FieldActualCost), "actual_cost"),
+		ent.As(usageLogSum(entusagelog.FieldBilledCost), "billed_cost"),
+		ent.As(usageLogSum(entusagelog.FieldTotalCost), "standard_cost"),
+	).Scan(ctx, &result)
 	if err != nil {
 		return nil, err
 	}
-
-	result := make([]appusage.TrendEntry, 0, len(logs))
-	for _, item := range logs {
-		result = append(result, appusage.TrendEntry{
-			CreatedAt:           item.CreatedAt.Format(time.RFC3339),
-			InputTokens:         int64(item.InputTokens),
-			OutputTokens:        int64(item.OutputTokens),
-			CachedInputTokens:   int64(item.CachedInputTokens),
-			CacheCreationTokens: int64(item.CacheCreationTokens),
-			ActualCost:          item.ActualCost,
-			StandardCost:        item.TotalCost,
-			BilledCost:          item.BilledCost,
-		})
+	if len(result) > 1024 {
+		return nil, reporting.ErrTooManyGroups
 	}
 	return result, nil
 }
