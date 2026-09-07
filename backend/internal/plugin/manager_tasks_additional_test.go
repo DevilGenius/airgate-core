@@ -209,6 +209,11 @@ func TestDispatchPluginTasksProcessesSupportedTasksWithSQLite(t *testing.T) {
 	manager.hostFactory = &HostService{db: db}
 	manager.instances["plugin-a"] = &PluginInstance{Name: "plugin-a", Extension: client}
 	manager.dispatchPendingTasks(ctx)
+	waitCtx, cancelWait := context.WithTimeout(ctx, time.Second)
+	defer cancelWait()
+	if err := manager.taskWorkers().wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
 
 	updated, err := db.Task.Get(ctx, task.ID)
 	if err != nil {

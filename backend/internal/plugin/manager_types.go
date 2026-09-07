@@ -140,12 +140,15 @@ type Manager struct {
 	// 实现是 mtime 轮询（不是 fsnotify），原因见 dev_watcher.go 顶部注释。
 	devWatcher *devWatcher
 
-	mu        sync.RWMutex
-	instances map[string]*PluginInstance
-	stopping  map[string]chan struct{}
-	loading   bool
-	aliases   map[string]string
-	devPaths  map[string]string
+	mu             sync.RWMutex
+	instances      map[string]*PluginInstance
+	stopping       map[string]chan struct{}
+	loading        bool
+	taskPoolOnce   sync.Once
+	taskPool       *taskWorkerPool
+	taskDispatchMu sync.Mutex
+	aliases        map[string]string
+	devPaths       map[string]string
 
 	modelCache        map[string][]sdk.ModelInfo
 	routeCache        map[string][]sdk.RouteDefinition

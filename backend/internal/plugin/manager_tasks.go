@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
@@ -21,7 +22,6 @@ const (
 	taskProcessTimeout   = 10 * time.Minute
 	taskStaleThreshold   = 10 * time.Minute
 	taskRecoverInterval  = 30 * time.Second
-	taskBatchSize        = 10
 	taskRecoverLimit     = 100
 	maxPluginConcurrency = 5
 )
@@ -51,10 +51,22 @@ func (c *taskTypesCache) set(pluginID string, types []string) {
 // StartTaskDispatcher 启动任务分发循环。在 Manager 启动时调用。
 // 启动前先将所有遗留的 processing 任务重置为 retrying，确保服务重启后立即恢复。
 func (m *Manager) StartTaskDispatcher(ctx context.Context) {
-	m.resetProcessingTasks(ctx)
-	safego.Go("task_dispatch_loop", func() { m.taskDispatchLoop(ctx) })
-	safego.Go("task_recover_loop", func() { m.taskRecoverLoop(ctx) })
-	slog.Info("task_dispatcher_started")
+	p := m.taskWorkers()
+	p.startOnce.Do(func() {
+		ctx, cancel := context.WithCancel(ctx)
+		p.mu.Lock()
+		p.cancel = cancel
+		stopping := p.stopping
+		p.mu.Unlock()
+		if stopping {
+			cancel()
+			return
+		}
+		m.resetProcessingTasks(ctx)
+		safego.Go("task_dispatch_loop", func() { m.taskDispatchLoop(ctx) })
+		safego.Go("task_recover_loop", func() { m.taskRecoverLoop(ctx) })
+		slog.Info("task_dispatcher_started")
+	})
 }
 
 // resetProcessingTasks 将服务重启前残留的 processing 任务重置为 retrying/failed，
@@ -106,12 +118,15 @@ func (m *Manager) resetProcessingTasks(ctx context.Context) {
 func (m *Manager) taskDispatchLoop(ctx context.Context) {
 	ticker := time.NewTicker(taskDispatchInterval)
 	defer ticker.Stop()
+	wake := m.taskWorkers().wake
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			m.dispatchPendingTasks(ctx)
+		case <-wake:
 			m.dispatchPendingTasks(ctx)
 		}
 	}
@@ -123,38 +138,43 @@ func (m *Manager) dispatchPendingTasks(ctx context.Context) {
 	if m.hostFactory == nil || m.hostFactory.db == nil {
 		return
 	}
+	if !m.taskDispatchMu.TryLock() {
+		return
+	}
+	defer m.taskDispatchMu.Unlock()
 	db := m.hostFactory.db
-
-	tasks, err := db.Task.Query().
-		Where(enttask.StatusIn(enttask.StatusPending, enttask.StatusRetrying)).
-		Order(ent.Desc(enttask.FieldPriority), ent.Asc(enttask.FieldCreatedAt)).
-		Limit(taskBatchSize).
-		All(ctx)
-	if err != nil {
-		slog.Error("task_dispatch_query_failed", sdk.LogFieldError, err)
+	p := m.taskWorkers()
+	m.mu.RLock()
+	plugins := make([]string, 0, len(m.instances))
+	for id, inst := range m.instances {
+		if inst != nil && inst.Extension != nil {
+			plugins = append(plugins, id)
+		}
+	}
+	m.mu.RUnlock()
+	if len(plugins) == 0 {
 		return
 	}
-	if len(tasks) == 0 {
-		return
+	sort.Strings(plugins)
+	p.mu.Lock()
+	start := p.cursor % len(plugins)
+	p.cursor++
+	p.mu.Unlock()
+	for i := range plugins {
+		pluginID := plugins[(start+i)%len(plugins)]
+		free := p.available(pluginID)
+		if free <= 0 {
+			continue
+		}
+		queryCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		tasks, err := db.Task.Query().Where(enttask.PluginIDEQ(pluginID), enttask.Or(enttask.StatusEQ(enttask.StatusPending), enttask.And(enttask.StatusEQ(enttask.StatusRetrying), enttask.UpdatedAtLTE(time.Now().Add(-taskDispatchInterval))))).Order(ent.Desc(enttask.FieldPriority), ent.Asc(enttask.FieldCreatedAt), ent.Asc(enttask.FieldID)).Limit(free).All(queryCtx)
+		cancel()
+		if err != nil {
+			slog.Warn("task_dispatch_query_failed", sdk.LogFieldPluginID, pluginID, sdk.LogFieldError, err)
+			continue
+		}
+		m.dispatchPluginTasks(ctx, pluginID, tasks)
 	}
-
-	// Group by plugin_id
-	byPlugin := make(map[string][]*ent.Task)
-	for _, t := range tasks {
-		byPlugin[t.PluginID] = append(byPlugin[t.PluginID], t)
-	}
-
-	var wg sync.WaitGroup
-	for pluginID, pluginTasks := range byPlugin {
-		wg.Add(1)
-		pid := pluginID
-		pts := pluginTasks
-		safego.Go("task_dispatch_plugin:"+pid, func() {
-			defer wg.Done()
-			m.dispatchPluginTasks(ctx, pid, pts)
-		})
-	}
-	wg.Wait()
 }
 
 func (m *Manager) getPluginTaskTypes(ctx context.Context, pluginID string, ext *sdkgrpc.ExtensionGRPCClient) (map[string]bool, error) {
@@ -167,6 +187,8 @@ func (m *Manager) getPluginTaskTypes(ctx context.Context, pluginID string, ext *
 		return result, nil
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
 	types, err := ext.GetTaskTypes(ctx)
 	if err != nil {
 		return nil, err
@@ -196,8 +218,7 @@ func (m *Manager) dispatchPluginTasks(ctx context.Context, pluginID string, task
 	}
 
 	db := m.hostFactory.db
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, maxPluginConcurrency)
+	pool := m.taskWorkers()
 
 	for _, t := range tasks {
 		if !typeSet[t.TaskType] {
@@ -215,14 +236,16 @@ func (m *Manager) dispatchPluginTasks(ctx context.Context, pluginID string, task
 		}
 
 		// Mark as processing
-		now := time.Now()
-		if _, err := db.Task.UpdateOneID(t.ID).
-			Where(enttask.StatusIn(enttask.StatusPending, enttask.StatusRetrying)).
-			SetStatus(enttask.StatusProcessing).
-			SetStage("dispatching").
-			SetStartedAt(now).
-			SetAttempts(t.Attempts + 1).
-			Save(ctx); err != nil {
+		if !pool.begin(pluginID) {
+			return
+		}
+		if !inst.acquireRequest() {
+			pool.finish(pluginID, false)
+			return
+		}
+		if err := claimDispatchTask(ctx, db, t); err != nil {
+			inst.releaseRequest()
+			pool.finish(pluginID, false)
 			if ent.IsNotFound(err) {
 				continue
 			}
@@ -230,16 +253,20 @@ func (m *Manager) dispatchPluginTasks(ctx context.Context, pluginID string, task
 			continue
 		}
 
-		wg.Add(1)
-		sem <- struct{}{}
 		task := t
 		safego.Go("task_process", func() {
-			defer wg.Done()
-			defer func() { <-sem }()
+			defer pool.finish(pluginID, true)
+			defer inst.releaseRequest()
 			m.processOneTask(ctx, inst, task)
 		})
 	}
-	wg.Wait()
+}
+
+func claimDispatchTask(ctx context.Context, db *ent.Client, task *ent.Task) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	_, err := db.Task.UpdateOneID(task.ID).Where(enttask.StatusIn(enttask.StatusPending, enttask.StatusRetrying)).SetStatus(enttask.StatusProcessing).SetStage("dispatching").SetStartedAt(time.Now()).SetAttempts(task.Attempts + 1).Save(ctx)
+	return err
 }
 
 func (m *Manager) processOneTask(ctx context.Context, inst *PluginInstance, t *ent.Task) {

@@ -193,6 +193,12 @@ func (h *HostService) createTask(ctx context.Context, pluginID string, req hostC
 	}
 
 	// 把 input 里内嵌的 data:image/* base64 大图落盘换成 /assets-runtime/... URL。
+	preflight, cancelPreflight := context.WithTimeout(ctx, 2*time.Second)
+	capacityErr := checkTaskQueueCapacity(preflight, h.db, pluginID, int(req.UserID))
+	cancelPreflight()
+	if capacityErr != nil {
+		return nil, capacityErr
+	}
 	// 这一步必须在持久化和后续 dispatch 之前完成 —— 任何 base64 大图留在 input 里
 	// 都会让 task.list/get/idempotency 查询以及 ProcessTask 派发 RPC 撞 64MB gRPC 上限。
 	if len(req.Input) > 0 {
@@ -212,7 +218,31 @@ func (h *HostService) createTask(ctx context.Context, pluginID string, req hostC
 		}
 	}
 
-	create := h.db.Task.Create().
+	admissionCtx, cancelAdmission := context.WithTimeout(ctx, 3*time.Second)
+	defer cancelAdmission()
+	tx, err := h.db.Tx(admissionCtx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	unlock, err := lockTaskAdmission(admissionCtx, tx)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	if req.IdempotencyKey != "" {
+		existing, err := tx.Task.Query().Where(enttask.PluginIDEQ(pluginID), enttask.UserIDEQ(int(req.UserID)), enttask.TaskTypeEQ(taskType), enttask.IdempotencyKeyEQ(req.IdempotencyKey)).Only(admissionCtx)
+		if err == nil {
+			return map[string]interface{}{"task": taskToPayload(existing)}, nil
+		}
+		if !ent.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	if err := checkTaskQueueCapacity(admissionCtx, tx.Client(), pluginID, int(req.UserID)); err != nil {
+		return nil, err
+	}
+	create := tx.Task.Create().
 		SetPluginID(pluginID).
 		SetTaskType(taskType).
 		SetUserID(int(req.UserID)).
@@ -231,9 +261,12 @@ func (h *HostService) createTask(ctx context.Context, pluginID string, req hostC
 	if req.Execution != nil {
 		create.SetExecution(req.Execution)
 	}
-	t, err := create.Save(ctx)
+	t, err := create.Save(admissionCtx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "create task: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 
 	slog.Info("task_created",
