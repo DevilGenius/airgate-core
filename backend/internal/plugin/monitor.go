@@ -411,6 +411,10 @@ func (f *Forwarder) recordClientClosedRequest(c *gin.Context, state *forwardStat
 	if f == nil || f.requestMonitor == nil || state == nil || state.keyInfo == nil || status == 0 {
 		return
 	}
+	if status == http.StatusServiceUnavailable {
+		f.recordAPIRequestError(c, state, status, "lease_lost", "执行租约已丢失，请稍后重试")
+		return
+	}
 	input := requestmonitoring.EventInput{
 		Type:        requestmonitoring.TypeClientClosed,
 		Severity:    requestmonitoring.SeverityInfo,

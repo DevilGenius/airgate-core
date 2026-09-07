@@ -54,7 +54,18 @@ func (f *Forwarder) checkAPIKeyRPM(c *gin.Context, state *forwardState) bool {
 	if totalRPM <= 0 && !countNonResponses {
 		return true
 	}
-	if f.getClientLimiter().allowRPM(state.keyInfo.KeyID, totalRPM, nonResponsesRPM, countNonResponses) {
+	allowed := false
+	if f.concurrency.Distributed() {
+		var err error
+		allowed, err = f.scheduler.AllowAPIKeyRPM(c.Request.Context(), state.keyInfo.KeyID, totalRPM, nonResponsesRPM, countNonResponses)
+		if err != nil {
+			openAIRateLimitError(c, http.StatusServiceUnavailable, "scheduler_unavailable", "调度服务暂不可用，请稍后重试", time.Second)
+			return false
+		}
+	} else {
+		allowed = f.getClientLimiter().allowRPM(state.keyInfo.KeyID, totalRPM, nonResponsesRPM, countNonResponses)
+	}
+	if allowed {
 		return true
 	}
 	openAIRateLimitError(c, http.StatusTooManyRequests, "apikey_rpm_limit", "当前API-Key已达RPM限制，请稍后重试", time.Second)
@@ -92,13 +103,16 @@ func isMetadataOnlyPath(path string) bool {
 	return false
 }
 
-// acquireClientQuota 获取用户级 + API Key 级两层内存并发槽。返回 release 回调；
+// acquireClientQuota 获取用户级 + API Key 级集群并发槽。返回 release 回调；
 // 任意一层超限都直接写 429 并返回 nil（调用方看到 nil 立即 return）。
 func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func() {
 	userID, keyID := state.keyInfo.UserID, state.keyInfo.KeyID
 	userMax, keyMax := state.keyInfo.UserMaxConcurrency, state.keyInfo.KeyMaxConcurrency
 	if userMax <= 0 && keyMax <= 0 {
 		return func() {}
+	}
+	if f.concurrency.Distributed() {
+		return f.acquireDistributedClientQuota(c, state)
 	}
 
 	release, userLimited, keyLimited := f.getClientLimiter().acquire(

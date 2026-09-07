@@ -259,7 +259,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		capacityProbeReady := false
 
 		for canStartForwardAttempt(state, attempt) {
-			if status := canceledRequestStatus(ctx.Err()); status != 0 {
+			if status := canceledForwardStatus(ctx); status != 0 {
 				markCanceledRequest(c, status)
 				f.recordClientClosedRequest(c, state, status, totalAttempts)
 				logger.Debug("forward_request_canceled",
@@ -290,7 +290,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 					openAIRateLimitError(c, http.StatusServiceUnavailable, "scheduler_unavailable", "调度服务暂不可用，请稍后重试", time.Second)
 					return
 				}
-				if status := canceledRequestStatus(ctx.Err()); status != 0 {
+				if status := canceledForwardStatus(ctx); status != 0 {
 					markCanceledRequest(c, status)
 					f.recordClientClosedRequest(c, state, status, totalAttempts)
 					logger.Debug("forward_request_canceled",
@@ -344,7 +344,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 						capacityProbeReady = false
 						continue
 					}
-					if status := canceledRequestStatus(ctx.Err()); status != 0 {
+					if status := canceledForwardStatus(ctx); status != 0 {
 						markCanceledRequest(c, status)
 						f.recordClientClosedRequest(c, state, status, totalAttempts)
 						logger.Debug("forward_request_canceled",
@@ -427,7 +427,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				trace.addFailedAttempt(totalAttempts, state, execution)
 			}
 
-			requestCanceled := canceledRequestStatus(ctx.Err())
+			requestCanceled := canceledForwardStatus(ctx)
 			if requestCanceled != 0 {
 				if !hasForwardResult(execution) {
 					releaseAccountSlot()
@@ -597,6 +597,13 @@ func canceledRequestStatus(err error) int {
 	}
 }
 
+func canceledForwardStatus(ctx context.Context) int {
+	if errors.Is(context.Cause(ctx), scheduler.ErrLeaseLost) {
+		return http.StatusServiceUnavailable
+	}
+	return canceledRequestStatus(ctx.Err())
+}
+
 func recoverContinuationPickAccountError(state *forwardState, err error) (handled bool, recovered bool, recoverErr error) {
 	return recoverContinuationPickAccountErrorWithManager(nil, state, err)
 }
@@ -625,6 +632,10 @@ func isRecoverableContinuationPickAccountError(err error) bool {
 
 func markCanceledRequest(c *gin.Context, status int) {
 	if c == nil || status == 0 || c.Writer.Written() {
+		return
+	}
+	if status == http.StatusServiceUnavailable {
+		openAIRateLimitError(c, status, "lease_lost", "执行租约已丢失，请稍后重试", time.Second)
 		return
 	}
 	c.Status(status)
