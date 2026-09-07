@@ -113,6 +113,10 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	if pluginDir == "" {
 		pluginDir = "data/plugins"
 	}
+	journalDir := billing.JournalDirectory(pluginDir, cfg.Server.BillingJournalDir)
+	if err := recorder.EnableJournal(journalDir); err != nil {
+		return nil, fmt.Errorf("初始化持久计费日志失败: %w", err)
+	}
 	pluginMgr := plugin.NewManager(pluginDir, cfg.Log.Level, cfg.Database.DSN(), db)
 	if err := pluginMgr.SetRuntimeHashState(context.Background(), plugin.RuntimeHashState{
 		TextEnabled:  runtimeFeatureState.TextHashEnabled,

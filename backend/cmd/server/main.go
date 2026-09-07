@@ -24,6 +24,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/migrate"
+	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/bootstrap"
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/i18n"
@@ -42,11 +43,13 @@ func main() {
 	// 仅声明少量必要 flag，避免 cobra 之类的额外依赖；其余配置项继续走
 	// 配置文件 + 环境变量两条腿。
 	var (
-		showVersion bool
-		configPath  string
+		showVersion         bool
+		configPath          string
+		requeueBillingEvent string
 	)
 	flag.BoolVar(&showVersion, "version", false, "打印版本号并退出")
 	flag.StringVar(&configPath, "config", "", "配置文件路径，默认为环境变量 CONFIG_PATH 或 ./config.yaml")
+	flag.StringVar(&requeueBillingEvent, "billing-journal-requeue", "", "修复原因后将指定 billing_event_id 的死信重新入队并退出")
 	flag.Parse()
 
 	if showVersion {
@@ -68,6 +71,10 @@ func main() {
 
 	// 检查是否需要安装
 	if setup.NeedsSetup() {
+		if requeueBillingEvent != "" {
+			slog.Error("billing_requeue_requires_config")
+			os.Exit(1)
+		}
 		slog.Info("系统未安装，启动安装向导...")
 		startSetupServer()
 		// 安装完成后继续往下执行，启动正常服务
@@ -89,6 +96,18 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("config_loaded", "path", cfgPath, "log_level", cfg.Log.Level, "log_format", cfg.Log.Format)
+	if requeueBillingEvent != "" {
+		journal, err := billing.OpenJournal(billing.JournalDirectory(cfg.Plugins.Dir, cfg.Server.BillingJournalDir))
+		if err == nil {
+			err = journal.Requeue(requeueBillingEvent)
+		}
+		if err != nil {
+			slog.Error("billing_requeue_failed", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("billing_event_requeued", "billing_event_id", requeueBillingEvent)
+		return
+	}
 
 	// 启动正常服务
 	startMainServer(cfg)

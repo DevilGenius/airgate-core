@@ -1,0 +1,17 @@
+# 持久计费事件
+
+默认目录为 `${PLUGINS_DIR}/.billing-journal`。现有 Docker 模板已经持久挂载 PLUGINS_DIR，因此无需新表、SQL 或手动回填；也可用 `server.billing_journal_dir` / `BILLING_JOURNAL_DIR` 指定另一个持久目录。目录不会作为插件加载，也不通过 HTTP 文件路由公开。
+
+完整 UsageRecord 先编码为带版本和 SHA-256 校验的事件文件，fsync 后用同卷原子硬链接发布；Linux 同时 fsync 目录，再确认接收。文件保留原 billing_event_id、OccurredAt、身份快照、价格、费用、token 和元数据。Windows 开发环境刷新文件内容并原子发布，生产 Linux 路径额外持久化目录项。
+
+后台批次提交数据库成功后才删除事件文件。删除确认丢失只会重放同一 event ID，数据库原有幂等事务阻止重复扣费。数据库临时故障持续重试，进程重启自动恢复 pending；不同实例同目录的发布使用不可覆盖链接，数据库仍作为最终去重边界。
+
+永久校验/外键错误通过拆分批次定位，完整事件移至 dead-letter，并写原因说明；有效记录继续结算。文件使用二进制编码以完整保留数值字段，校验失败的文件也被隔离，不会用于扣费。未完成发布的 `.writing-*` 文件没有被确认接收，不会作为有效事件读取。
+
+修复永久错误的原因后，用服务二进制显式重新入队，运行中的后台 worker 会发现并重放，无需执行 SQL 回填：
+
+```text
+airgate-core --config config.yaml --billing-journal-requeue bill_原事件ID
+```
+
+重放保留原始财务字段，不能用同一事件 ID 表示另一笔消费。不要清空 pending/dead-letter 目录，备份应包含整个持久目录。此机制保障已确认事件的交付；上游已消费但进程在取得/确认用量前崩溃的外部不确定窗口，仍需要从上游事实核对，不能据此声称端到端 exactly-once。

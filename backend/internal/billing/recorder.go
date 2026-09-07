@@ -148,6 +148,10 @@ type Recorder struct {
 	apiKeyAlertMu      sync.RWMutex
 	apiKeyBalanceAlert APIKeyBalanceAlertFunc
 	deadLetterTotal    atomic.Int64
+	journal            *Journal
+	journalWake        chan struct{}
+	journalDone        chan struct{}
+	journalCancel      context.CancelFunc
 }
 
 // RecorderStats exposes queue counters for runtime monitoring.
@@ -157,6 +161,7 @@ type RecorderStats struct {
 	RetryQueueLen   int   `json:"retry_queue_len"`
 	RetryQueueCap   int   `json:"retry_queue_cap"`
 	DeadLetterTotal int64 `json:"dead_letter_total"`
+	PendingBytes    int64 `json:"pending_bytes"`
 }
 
 // NewRecorder 创建使用量记录器
@@ -193,9 +198,18 @@ func (r *Recorder) apiKeyBalanceAlertCallback() APIKeyBalanceAlertFunc {
 }
 
 // Record 提交使用记录（非阻塞）
-func (r *Recorder) Record(record UsageRecord) {
+func (r *Recorder) Record(record UsageRecord) error {
 	record = ensureBillingEventID(record)
 	record = ensureUsageOccurredAt(record, time.Now())
+	if r.journal != nil {
+		_, err := r.journal.Append(record)
+		if err == nil {
+			if count, _, _ := r.journal.Stats(); count >= batchSize {
+				r.notifyJournal()
+			}
+		}
+		return err
+	}
 	select {
 	case r.ch <- record:
 	default:
@@ -211,13 +225,37 @@ func (r *Recorder) Record(record UsageRecord) {
 				"model", record.Model,
 				"error", err,
 			)
+			return err
 		}
 	}
+	return nil
 }
 
 // RecordSync 同步写入一条使用记录并返回 usage_log.id。
 // 需要立即把 usage_id 关联到任务时使用；普通转发仍走异步 Record。
 func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, error) {
+	record = ensureUsageOccurredAt(ensureBillingEventID(record), time.Now())
+	if r.journal != nil {
+		var err error
+		record, err = r.journal.Append(record)
+		if err != nil {
+			return 0, err
+		}
+	}
+	id, err := r.recordSyncDatabase(ctx, record)
+	if r.journal != nil {
+		if err == nil {
+			if ackErr := r.journal.Ack(record.BillingEventID); ackErr != nil {
+				slog.Warn("billing_journal_ack_pending", "error", ackErr)
+			}
+		} else {
+			r.notifyJournal()
+		}
+	}
+	return id, err
+}
+
+func (r *Recorder) recordSyncDatabase(ctx context.Context, record UsageRecord) (int, error) {
 	record = ensureBillingEventID(record)
 	record = ensureUsageOccurredAt(record, time.Now())
 	tx, err := r.db.Tx(ctx)
@@ -266,6 +304,12 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 
 // Start 启动后台写入 goroutine
 func (r *Recorder) Start() {
+	if r.journal != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		r.journalCancel = cancel
+		recorderGo("billing_journal", func() { r.runJournal(ctx) })
+		return
+	}
 	recorderGo("billing_recorder", r.run)
 	recorderGo("billing_recorder_retry", r.runRetries)
 }
@@ -273,6 +317,13 @@ func (r *Recorder) Start() {
 // Stop 停止写入，等待缓冲区清空
 func (r *Recorder) Stop() {
 	r.once.Do(func() {
+		if r.journal != nil {
+			if r.journalCancel != nil {
+				r.journalCancel()
+				<-r.journalDone
+			}
+			return
+		}
 		close(r.stopCh)
 		<-r.stopped
 		close(r.retryCh)
@@ -284,6 +335,10 @@ func (r *Recorder) Stop() {
 func (r *Recorder) Stats() RecorderStats {
 	if r == nil {
 		return RecorderStats{}
+	}
+	if r.journal != nil {
+		count, bytes, _ := r.journal.Stats()
+		return RecorderStats{QueueLen: count, QueueCap: journalHighWaterRecords, PendingBytes: bytes, DeadLetterTotal: r.deadLetterTotal.Load()}
 	}
 	return RecorderStats{
 		QueueLen:        len(r.ch),
@@ -943,13 +998,16 @@ func usageHourlyRollupBatchFields(item insertedUsageLog) []usageHourlyRollupBatc
 
 func validateUsageRecordForInsert(rec UsageRecord) error {
 	if rec.BillingEventID == "" {
-		return fmt.Errorf("billing_event_id 不能为空")
+		return fmt.Errorf("%w: billing_event_id 不能为空", ErrInvalidUsageRecord)
 	}
 	if rec.Platform == "" {
-		return fmt.Errorf("platform 不能为空 billing_event_id=%s", rec.BillingEventID)
+		return fmt.Errorf("%w: platform 不能为空 billing_event_id=%s", ErrInvalidUsageRecord, rec.BillingEventID)
 	}
 	if rec.Model == "" {
-		return fmt.Errorf("model 不能为空 billing_event_id=%s", rec.BillingEventID)
+		return fmt.Errorf("%w: model 不能为空 billing_event_id=%s", ErrInvalidUsageRecord, rec.BillingEventID)
+	}
+	if !finiteBillingRecord(rec) {
+		return fmt.Errorf("%w: non-finite charge", ErrInvalidUsageRecord)
 	}
 	return nil
 }

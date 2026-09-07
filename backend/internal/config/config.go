@@ -101,8 +101,9 @@ type ServerConfig struct {
 	Port int    `yaml:"port"`
 	Mode string `yaml:"mode"` // debug / release
 	// Instance HTTP admission, defaults: 1024 handlers and 128 MiB retained body bytes.
-	MaxInFlightRequests  int   `yaml:"max_in_flight_requests"`
-	MaxBufferedBodyBytes int64 `yaml:"max_buffered_body_bytes"`
+	MaxInFlightRequests  int    `yaml:"max_in_flight_requests"`
+	MaxBufferedBodyBytes int64  `yaml:"max_buffered_body_bytes"`
+	BillingJournalDir    string `yaml:"billing_journal_dir"`
 	// TrustedProxies 显式可信反向代理 IP/CIDR。为空表示不信任任何代理头。
 	TrustedProxies []string `yaml:"trusted_proxies"`
 }
@@ -275,6 +276,7 @@ func applyEnvOverrides(cfg *Config) {
 
 	// 插件
 	envStr("PLUGINS_DIR", &cfg.Plugins.Dir)
+	envStr("BILLING_JOURNAL_DIR", &cfg.Server.BillingJournalDir)
 	envStr("PLUGINS_MARKETPLACE_GITHUB_TOKEN", &cfg.Plugins.Marketplace.GithubToken)
 }
 

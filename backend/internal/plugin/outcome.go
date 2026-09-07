@@ -428,7 +428,7 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 	// 窗口费用沿用 account_cost（= total × account_rate），与用户账单解耦。
 	f.scheduler.AddWindowCost(ctx, state.account.ID, calc.AccountCost)
 
-	f.recorder.Record(billing.UsageRecord{
+	if err := f.recorder.Record(billing.UsageRecord{
 		UserID:                state.keyInfo.UserID,
 		UserEmail:             state.keyInfo.UserEmail,
 		APIKeyID:              state.keyInfo.KeyID,
@@ -467,7 +467,9 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		Endpoint:              state.requestPath,
 		ReasoningEffort:       reasoningEffort,
 		UsageMetadata:         usageMetadata,
-	})
+	}); err != nil {
+		slog.Error("billing_record_not_confirmed", "account_id", state.account.ID, "error", err)
+	}
 }
 
 func resolveReasoningEffort(fromRequest string, usage *sdk.Usage) string {
