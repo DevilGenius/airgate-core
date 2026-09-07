@@ -146,8 +146,8 @@ func TestSelectionSnapshotRedisLoadAndFamilyCooldown(t *testing.T) {
 	if loadedFamily = s.loadRedisSelectionSnapshot(ctx, []*ent.Account{{ID: 1, Platform: "openai"}}, "gpt-4.1", snap); !loadedFamily {
 		t.Fatal("redis snapshot should report familyLoaded even when MGET fails")
 	}
-	if snap.loads[1] != 0 || snap.familyCooldown[1] {
-		t.Fatalf("failed redis snapshot should fail open: %+v", snap)
+	if !errors.Is(snap.err, ErrSchedulingUnavailable) {
+		t.Fatalf("failed redis snapshot must report unavailable: %+v", snap)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("redis error expectations: %v", err)

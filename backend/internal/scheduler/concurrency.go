@@ -201,7 +201,7 @@ func userConcurrencyCountKey(userID int) string {
 // acquireSlotByKey 通用并发槽获取：给定 Redis key 和上限，原子性的
 // 清理僵尸 slot + 检查上限 + ZADD 加入新 slot（score = 当前时间）。
 // maxConcurrency <= 0 时视为不限制，直接放行。
-// Redis 不可用时也直接放行，避免影响主链路可用性。
+// Redis 出错时容量未知，拒绝新增执行，避免突破集群上限。
 func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKey, indexKey, indexMember, requestID string, maxConcurrency int, slotTTL time.Duration) (int, bool, error) {
 	if cm.rdb == nil || maxConcurrency <= 0 {
 		return 0, false, nil
@@ -209,6 +209,8 @@ func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKe
 	if slotTTL <= 0 {
 		slotTTL = defaultSlotTTL
 	}
+	ctx, cancel := context.WithTimeout(ctx, redisAdmissionTimeout)
+	defer cancel()
 
 	now := time.Now().Unix()
 	keys := []string{key, countKey}
@@ -225,12 +227,11 @@ func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, countKe
 	raw, err := acquireSlotScript.Run(ctx, cm.rdb, keys, args...).Result()
 
 	if err != nil {
-		// Redis 不可用时放行
-		return 0, false, nil
+		return 0, false, fmt.Errorf("%w: acquire slot: %w", ErrSchedulingUnavailable, err)
 	}
 	result, current, ok := parseSlotScriptResult(raw)
 	if !ok {
-		return 0, false, nil
+		return 0, false, fmt.Errorf("%w: invalid slot result", ErrSchedulingUnavailable)
 	}
 
 	if result == 0 {
@@ -252,6 +253,8 @@ func (cm *ConcurrencyManager) releaseSlotByKey(ctx context.Context, key, countKe
 	if cm.rdb == nil {
 		return 0, false
 	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), redisAdmissionTimeout)
+	defer cancel()
 	keys := []string{key, countKey}
 	args := []interface{}{
 		requestID,

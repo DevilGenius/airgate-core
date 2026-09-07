@@ -8,6 +8,7 @@ import (
 )
 
 type selectionSnapshot struct {
+	err               error
 	loads             map[int]int
 	hasLoads          bool
 	familyCooldown    map[int]bool
@@ -96,10 +97,11 @@ func (s *Scheduler) loadRedisSelectionSnapshot(ctx context.Context, candidates [
 	if len(keys) == 0 {
 		return familyLoaded
 	}
-	values, err := s.rdb.MGet(ctx, keys...).Result()
+	readCtx, cancel := context.WithTimeout(ctx, redisAdmissionTimeout)
+	defer cancel()
+	values, err := s.rdb.MGet(readCtx, keys...).Result()
 	if err != nil {
-		// 选号快照失败开放：并发 miss 按 0 估算，family cooldown 按未冷却处理。
-		// 真正的并发上限仍由选中账号后的 AcquireSlot 原子脚本兜底。
+		snap.err = ErrSchedulingUnavailable
 		return familyLoaded
 	}
 	for index, value := range values {
@@ -147,6 +149,9 @@ func (s *Scheduler) loadFamilyCooldownSnapshot(ctx context.Context, candidates [
 
 func (s *Scheduler) loadedSelectionSnapshot(ctx context.Context, candidates []*ent.Account, model string, now time.Time) *selectionSnapshot {
 	snapshot := s.newSelectionSnapshot(ctx, candidates, model, now)
+	if snapshot.err != nil {
+		return snapshot
+	}
 	snapshot.loadSchedulability(ctx, s, s.deferredConstraintCandidates(ctx, candidates, model, now, snapshot))
 	return snapshot
 }

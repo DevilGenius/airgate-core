@@ -63,6 +63,9 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	}
 
 	snapshot := s.loadedSelectionSnapshot(ctx, candidates, model, now)
+	if snapshot.err != nil {
+		return nil, snapshot.err
+	}
 	var normalCandidates, stickyCandidates []*ent.Account
 	capacityBlocked := false
 	if !opts.RequireContinuationAffinity {
@@ -378,6 +381,9 @@ func (s *Scheduler) softPreviousResponseAffinityAllowed(ctx context.Context, can
 		return true
 	}
 	snapshot := s.loadedSelectionSnapshot(ctx, competitors, model, now)
+	if snapshot.err != nil {
+		return false
+	}
 	for _, acc := range competitors {
 		result := s.checkSchedulabilityResult(ctx, acc, model, now, false, snapshot)
 		if softAffinityCompetitorBlocks(affinity, affinitySched, acc, result.normal) {
@@ -648,6 +654,9 @@ func (s *Scheduler) checkHardAffinitySchedulability(ctx context.Context, acc *en
 }
 
 func (s *Scheduler) checkSchedulabilityResult(ctx context.Context, acc *ent.Account, model string, now time.Time, needHardAffinity bool, snapshot *selectionSnapshot) schedulabilityResult {
+	if snapshot != nil && snapshot.err != nil {
+		return schedulabilityResult{normal: NotSchedulable, hardAffinity: NotSchedulable}
+	}
 	acc = s.stateCache.Apply(acc)
 	base := schedulabilityWithTransientAvoidance(acc, now)
 	hardBase := base

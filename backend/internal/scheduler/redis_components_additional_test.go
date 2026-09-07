@@ -204,10 +204,8 @@ func TestRPMCounterRedisPaths(t *testing.T) {
 
 	mock.ExpectTime().SetVal(minuteTime)
 	mock.ExpectEvalSha(tryIncrementScript.Hash(), []string{key}, 10).SetErr(errors.New("eval failed"))
-	mock.ExpectTxPipeline()
-	mock.ExpectIncr(key).SetErr(errors.New("incr failed"))
-	if ok, err := rpm.TryIncrementRPM(ctx, 7, 10); err != nil || !ok {
-		t.Fatalf("TryIncrementRPM fail open = %v, %v", ok, err)
+	if ok, err := rpm.TryIncrementRPM(ctx, 7, 10); !errors.Is(err, ErrSchedulingUnavailable) || ok {
+		t.Fatalf("TryIncrementRPM failure = %v, %v", ok, err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("redis expectations before batch: %v", err)

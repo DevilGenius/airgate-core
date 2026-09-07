@@ -19,6 +19,7 @@ import (
 
 var (
 	ErrNoAvailableAccount           = errors.New("无可用账户")
+	ErrSchedulingUnavailable        = errors.New("调度服务暂不可用")
 	ErrAccountCapacityExhausted     = fmt.Errorf("%w: 账号并发容量已满", ErrNoAvailableAccount)
 	ErrGroupNotFound                = errors.New("分组不存在")
 	ErrContinuationAffinityMissing  = errors.New("续链请求无法定位原上游账号")
@@ -28,6 +29,8 @@ var (
 
 // dbTimeout 后台 DB 操作超时，防止 goroutine 泄漏。
 const dbTimeout = 10 * time.Second
+
+const redisAdmissionTimeout = time.Second
 
 type windowCostTracker interface {
 	GetSchedulability(ctx context.Context, accountID int, extra map[string]interface{}) Schedulability
@@ -265,12 +268,16 @@ func (s *Scheduler) IncrementRPM(ctx context.Context, accountID int) {
 
 // TryIncrementRPM 原子检查上限并递增。已达上限返回 false（未递增）。
 func (s *Scheduler) TryIncrementRPM(ctx context.Context, accountID int, maxRPM int, reservations ...*RPMReservation) bool {
-	allowed, err := s.rpm.TryIncrementRPM(ctx, accountID, maxRPM, reservations...)
+	allowed, err := s.TryIncrementRPMWithError(ctx, accountID, maxRPM, reservations...)
 	if err != nil {
 		slog.Debug("原子递增 RPM 失败", "account_id", accountID, "error", err)
-		return true // fail-open
+		return false
 	}
 	return allowed
+}
+
+func (s *Scheduler) TryIncrementRPMWithError(ctx context.Context, accountID int, maxRPM int, reservations ...*RPMReservation) (bool, error) {
+	return s.rpm.TryIncrementRPM(ctx, accountID, maxRPM, reservations...)
 }
 
 // DecrementRPM 回退 RPM 计数（请求未实际消耗上游配额时调用）。

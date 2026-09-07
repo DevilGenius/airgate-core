@@ -136,8 +136,8 @@ func TestSchedulerRPMAndApplyWrappers(t *testing.T) {
 	}
 
 	rpm.err = errors.New("redis down")
-	if allowed := s.TryIncrementRPM(ctx, 7, 10); !allowed {
-		t.Fatal("TryIncrementRPM error should fail open")
+	if allowed := s.TryIncrementRPM(ctx, 7, 10); allowed {
+		t.Fatal("TryIncrementRPM error must reject")
 	}
 	s.IncrementRPM(ctx, 7)
 

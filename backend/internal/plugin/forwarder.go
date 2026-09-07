@@ -272,6 +272,10 @@ func (f *Forwarder) Forward(c *gin.Context) {
 
 			preferredDifferentType := preferredDifferentAccountTypeForAttempt(attempt, maxFailoverAttempts, lastAttemptAccount)
 			if err := f.pickAccountPreferringDifferentType(c, state, preferredDifferentType, exclude...); err != nil {
+				if errors.Is(err, scheduler.ErrSchedulingUnavailable) {
+					openAIRateLimitError(c, http.StatusServiceUnavailable, "scheduler_unavailable", "调度服务暂不可用，请稍后重试", time.Second)
+					return
+				}
 				if status := canceledRequestStatus(ctx.Err()); status != 0 {
 					markCanceledRequest(c, status)
 					f.recordClientClosedRequest(c, state, status, totalAttempts)
@@ -357,6 +361,10 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			// logger 已经从 auth middleware 继承了 group_id，这里只补 account_id 避免重复字段。
 			attemptLogger := logger.With(sdk.LogFieldAccountID, accountID)
 			releaseAccountSlot, acquireFailure := f.acquireAccountSlot(c, state)
+			if acquireFailure == accountSlotAcquireUnavailable {
+				openAIRateLimitError(c, http.StatusServiceUnavailable, "scheduler_unavailable", "调度服务暂不可用，请稍后重试", time.Second)
+				return
+			}
 			if acquireFailure != accountSlotAcquireSuccess {
 				failureSummary.recordLocalCapacityFailure()
 				if state.requireContinuationAffinity {

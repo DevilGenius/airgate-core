@@ -164,7 +164,7 @@ func TestConcurrencyManagerAcquireReleaseScripts(t *testing.T) {
 	}
 }
 
-func TestConcurrencyManagerFailOpenAndCurrentCounts(t *testing.T) {
+func TestConcurrencyManagerFailsClosedAndCurrentCounts(t *testing.T) {
 	ctx := context.Background()
 
 	rdb, mock := redismock.NewClientMock()
@@ -172,14 +172,14 @@ func TestConcurrencyManagerFailOpenAndCurrentCounts(t *testing.T) {
 	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
 		`^\d+$`, "2", "req", "300", "7",
 	).SetErr(errors.New("redis down"))
-	if err := cm.AcquireSlot(ctx, 7, "req", 2, 0); err != nil {
-		t.Fatalf("AcquireSlot redis error should fail open, got %v", err)
+	if err := cm.AcquireSlot(ctx, 7, "req", 2, 0); !errors.Is(err, ErrSchedulingUnavailable) {
+		t.Fatalf("AcquireSlot redis error must reject, got %v", err)
 	}
 	mock.Regexp().ExpectEvalSha(acquireSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
 		`^\d+$`, "2", "bad", "300", "7",
 	).SetVal("bad")
-	if err := cm.AcquireSlot(ctx, 7, "bad", 2, 0); err != nil {
-		t.Fatalf("AcquireSlot malformed result should fail open, got %v", err)
+	if err := cm.AcquireSlot(ctx, 7, "bad", 2, 0); !errors.Is(err, ErrSchedulingUnavailable) {
+		t.Fatalf("AcquireSlot malformed result must reject, got %v", err)
 	}
 	mock.ExpectEvalSha(releaseSlotScript.Hash(), []string{concurrencyKey(7), concurrencyCountKey(7), accountConcurrencyWorkingIndexKey()},
 		"req", int(defaultSlotTTL.Seconds()), int(concurrencyZeroCountTTL.Seconds()), "7",

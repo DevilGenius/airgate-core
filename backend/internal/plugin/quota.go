@@ -178,6 +178,7 @@ const (
 	accountSlotAcquireRPM
 	accountSlotAcquireConcurrency
 	accountSlotAcquireMessageLock
+	accountSlotAcquireUnavailable
 )
 
 // acquireAccountSlot 获取账号级闸门：RPM 配额 + 账号并发槽 + 可选真实用户消息串行锁。
@@ -200,7 +201,11 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	// 1. RPM 原子检查并递增
 	maxRPM := scheduler.ExtraInt(state.account.Extra, "max_rpm")
 	state.rpmReservation = &scheduler.RPMReservation{}
-	if !f.scheduler.TryIncrementRPM(ctx, state.account.ID, maxRPM, state.rpmReservation) {
+	allowed, err := f.scheduler.TryIncrementRPMWithError(ctx, state.account.ID, maxRPM, state.rpmReservation)
+	if err != nil {
+		return nil, accountSlotAcquireUnavailable
+	}
+	if !allowed {
 		slog.Info("账号 RPM 已达上限，尝试 failover",
 			"account_id", state.account.ID, "max_rpm", maxRPM)
 		return nil, accountSlotAcquireRPM
@@ -215,6 +220,9 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 
 	if err := f.concurrency.AcquireSlot(ctx, state.account.ID, state.requestID, maxConc, slotTTL); err != nil {
 		f.scheduler.DecrementRPM(releaseCtx, state.account.ID, state.rpmReservation)
+		if errors.Is(err, scheduler.ErrSchedulingUnavailable) {
+			return nil, accountSlotAcquireUnavailable
+		}
 		slog.Info("账号并发已满，尝试 failover",
 			"account_id", state.account.ID, "max_concurrency", maxConc)
 		return nil, accountSlotAcquireConcurrency

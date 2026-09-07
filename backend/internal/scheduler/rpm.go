@@ -148,23 +148,29 @@ func (r *RPMCounter) TryIncrementRPM(ctx context.Context, accountID int, maxRPM 
 		return true, nil
 	}
 
-	key := r.getMinuteKey(ctx, accountID)
+	ctx, cancel := context.WithTimeout(ctx, redisAdmissionTimeout)
+	defer cancel()
+	now, err := r.rdb.Time(ctx).Result()
+	if err != nil {
+		return false, fmt.Errorf("%w: RPM clock: %w", ErrSchedulingUnavailable, err)
+	}
+	key := rpmMinuteKey(accountID, now.Unix()/60)
 	// 不限制时直接递增
 	if maxRPM <= 0 {
 		_, err := r.incrementKey(ctx, key)
 		if err == nil {
 			rememberRPM(reservations, key, accountID)
 		}
-		return true, err
+		if err != nil {
+			return false, fmt.Errorf("%w: RPM increment: %w", ErrSchedulingUnavailable, err)
+		}
+		return true, nil
 	}
 
 	result, err := tryIncrementScript.Run(ctx, r.rdb, []string{key}, maxRPM).Int()
 	if err != nil {
-		// fail-open：Redis 不可用时允许通过并尝试普通递增
-		if _, err := r.incrementKey(ctx, key); err == nil {
-			rememberRPM(reservations, key, accountID)
-		}
-		return true, nil
+		// Do not retry an ambiguous increment: it may already have run remotely.
+		return false, fmt.Errorf("%w: RPM admission: %w", ErrSchedulingUnavailable, err)
 	}
 	if result >= 0 {
 		rememberRPM(reservations, key, accountID)
