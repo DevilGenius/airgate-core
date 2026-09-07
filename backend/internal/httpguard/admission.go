@@ -27,7 +27,7 @@ type Admission struct {
 func NewServer(addr string, next http.Handler, maxRequests int, maxBytes int64) *http.Server {
 	return &http.Server{
 		Addr:              addr,
-		Handler:           NewAdmission(next, maxRequests, maxBytes),
+		Handler:           NewAdmission(WithWriteIdle(next, DefaultWriteIdle), maxRequests, maxBytes),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		IdleTimeout:       90 * time.Second,
