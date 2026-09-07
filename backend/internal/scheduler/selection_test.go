@@ -525,7 +525,7 @@ func TestSelectAccountHardPreviousResponseAllowsWindowCostOverflow(t *testing.T)
 	acc := newSelectionTestAccount(10)
 	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{acc}, nil)
 
-	s.BindResponseAccount(ctx, groupID, "openai", "resp_1", acc.ID)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_1", acc.ID, 1, 0)
 	if _, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
 		PreviousResponseID: "resp_1",
 	}); !errors.Is(err, ErrPreviousResponseAffinitySkip) {
@@ -558,7 +558,7 @@ func TestSelectAccountHardPreviousResponseAllowsDegradedProbe(t *testing.T) {
 	acc.State = account.StateDegraded
 	acc.StateUntil = &until
 	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{acc}, nil)
-	s.BindResponseAccount(ctx, groupID, "openai", "resp_probe", acc.ID)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_probe", acc.ID, 1, 0)
 
 	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
 		PreviousResponseID:          "resp_probe",
@@ -611,7 +611,7 @@ func TestSelectAccountHardPreviousResponseBlocksKnownCooldown(t *testing.T) {
 			acc := newSelectionTestAccount(10)
 			tt.configure(s, acc)
 			seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{acc}, nil)
-			s.BindResponseAccount(ctx, groupID, "openai", "resp_blocked", acc.ID)
+			s.BindResponseAccount(ctx, groupID, "openai", "resp_blocked", acc.ID, 1, 0)
 
 			_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
 				PreviousResponseID:          "resp_blocked",
@@ -634,7 +634,7 @@ func TestSoftPreviousResponseAffinityRequiresHighestPriority(t *testing.T) {
 	high.Priority = 20
 	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{low, high}, nil)
 
-	s.BindResponseAccount(ctx, groupID, "openai", "resp_low", low.ID)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_low", low.ID, 1, 0)
 	_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
 		PreviousResponseID: "resp_low",
 	})
@@ -642,7 +642,7 @@ func TestSoftPreviousResponseAffinityRequiresHighestPriority(t *testing.T) {
 		t.Fatalf("SelectAccountWithOptions(low affinity) error = %v, want ErrPreviousResponseAffinitySkip", err)
 	}
 
-	s.BindResponseAccount(ctx, groupID, "openai", "resp_high", high.ID)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_high", high.ID, 1, 0)
 	selected, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
 		PreviousResponseID: "resp_high",
 	})
@@ -665,7 +665,7 @@ func TestSoftPreviousResponseAffinityFastPathSkipsLowerPriorityCapacityChecks(t 
 	high := newSelectionTestAccount(20)
 	high.Priority = 20
 	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{low, fallback, high}, nil)
-	s.BindResponseAccount(ctx, groupID, "openai", "resp_high", high.ID)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_high", high.ID, 1, 0)
 
 	windowCost := s.windowCost.(*stubWindowCostTracker)
 	windowCost.calls = 0
@@ -691,7 +691,7 @@ func TestHardPreviousResponseAffinityFastPathSkipsUnrelatedCapacityChecks(t *tes
 	other := newSelectionTestAccount(20)
 	other.Priority = 100
 	seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{other, affinity}, nil)
-	s.BindResponseAccount(ctx, groupID, "openai", "resp_affinity", affinity.ID)
+	s.BindResponseAccount(ctx, groupID, "openai", "resp_affinity", affinity.ID, 1, 0)
 
 	windowCost := s.windowCost.(*stubWindowCostTracker)
 	windowCost.calls = 0
@@ -752,7 +752,7 @@ func TestHardAffinityDoesNotBypassNonWindowConstraints(t *testing.T) {
 			acc := newSelectionTestAccount(10)
 			tt.configure(s, acc)
 			seedSelectionTestGroup(t, groupID, "openai", []*ent.Account{acc}, nil)
-			s.BindResponseAccount(ctx, groupID, "openai", "resp_blocked", acc.ID)
+			s.BindResponseAccount(ctx, groupID, "openai", "resp_blocked", acc.ID, 1, 0)
 
 			_, err := s.SelectAccountWithOptions(ctx, "openai", "gpt-4.1", 1, groupID, "", AccountSelectionOptions{
 				PreviousResponseID:          "resp_blocked",

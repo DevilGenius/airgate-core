@@ -155,6 +155,7 @@ func (f *Forwarder) pickAccountPreferringDifferentType(c *gin.Context, state *fo
 			state.keyInfo.GroupID,
 			state.sessionID,
 			scheduler.AccountSelectionOptions{
+				APIKeyID:                    state.keyInfo.KeyID,
 				PreviousResponseID:          state.previousResponseID,
 				RequireContinuationAffinity: state.requireContinuationAffinity,
 				GroupNameSnapshot:           state.keyInfo.GroupName,

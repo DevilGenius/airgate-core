@@ -121,7 +121,7 @@ func TestResponseAffinityAdditionalMemoryAndRedisBranches(t *testing.T) {
 	nilAffinity.Refresh(ctx, 1, "openai", "resp", 1)
 
 	affinity := NewResponseAffinity(nil)
-	if key := responseAffinityKey(5, " openai ", " resp "); key != "ag:affinity:response:5:openai:resp" {
+	if key := responseAffinityKey(5, " openai ", " resp "); key != responseAffinityKey(5, "openai", "resp", 0, 0) {
 		t.Fatalf("response affinity key = %q", key)
 	}
 	affinity.setMemoryWithRedisRefreshAfter("", 1, time.Time{})

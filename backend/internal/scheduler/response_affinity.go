@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,26 +47,34 @@ func NewResponseAffinity(rdb *redis.Client) *ResponseAffinity {
 	}
 }
 
-func responseAffinityKey(groupID int, platform, responseID string) string {
-	return fmt.Sprintf("ag:affinity:response:%d:%s:%s", groupID, strings.TrimSpace(platform), strings.TrimSpace(responseID))
+func responseAffinityKey(groupID int, platform, responseID string, owners ...int) string {
+	userID, keyID := 0, 0
+	if len(owners) > 0 {
+		userID = owners[0]
+	}
+	if len(owners) > 1 {
+		keyID = owners[1]
+	}
+	hash := sha256.Sum256([]byte(strings.TrimSpace(responseID)))
+	return fmt.Sprintf("ag:affinity:response:v2:%d:%d:%d:%s:%x", userID, keyID, groupID, strings.TrimSpace(platform), hash)
 }
 
-func (a *ResponseAffinity) Bind(ctx context.Context, groupID int, platform, responseID string, accountID int) {
+func (a *ResponseAffinity) Bind(ctx context.Context, groupID int, platform, responseID string, accountID int, owners ...int) {
 	if a == nil || groupID <= 0 || strings.TrimSpace(platform) == "" || strings.TrimSpace(responseID) == "" || accountID <= 0 {
 		return
 	}
-	key := responseAffinityKey(groupID, platform, responseID)
+	key := responseAffinityKey(groupID, platform, responseID, owners...)
 	a.setMemory(key, accountID)
 	if a.rdb != nil {
 		a.rdb.Set(ctx, key, strconv.Itoa(accountID), a.ttl)
 	}
 }
 
-func (a *ResponseAffinity) Get(ctx context.Context, groupID int, platform, responseID string) (int, bool) {
+func (a *ResponseAffinity) Get(ctx context.Context, groupID int, platform, responseID string, owners ...int) (int, bool) {
 	if a == nil || groupID <= 0 || strings.TrimSpace(platform) == "" || strings.TrimSpace(responseID) == "" {
 		return 0, false
 	}
-	key := responseAffinityKey(groupID, platform, responseID)
+	key := responseAffinityKey(groupID, platform, responseID, owners...)
 	if accountID, ok := a.getMemory(key); ok {
 		return accountID, true
 	}
@@ -84,11 +93,11 @@ func (a *ResponseAffinity) Get(ctx context.Context, groupID int, platform, respo
 	return accountID, true
 }
 
-func (a *ResponseAffinity) Refresh(ctx context.Context, groupID int, platform, responseID string, accountID int) {
+func (a *ResponseAffinity) Refresh(ctx context.Context, groupID int, platform, responseID string, accountID int, owners ...int) {
 	if a == nil || groupID <= 0 || strings.TrimSpace(platform) == "" || strings.TrimSpace(responseID) == "" || accountID <= 0 {
 		return
 	}
-	key := responseAffinityKey(groupID, platform, responseID)
+	key := responseAffinityKey(groupID, platform, responseID, owners...)
 	shouldRefreshRedis := a.refreshMemory(key, accountID)
 	if a.rdb != nil && shouldRefreshRedis {
 		a.rdb.Set(ctx, key, strconv.Itoa(accountID), a.ttl)

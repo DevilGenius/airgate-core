@@ -29,6 +29,7 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 }
 
 type AccountSelectionOptions struct {
+	APIKeyID                    int
 	PreviousResponseID          string
 	RequireContinuationAffinity bool
 	GroupNameSnapshot           string
@@ -336,9 +337,9 @@ func (s *Scheduler) selectPreviousResponseAffinity(
 	previousResponseID string,
 	now time.Time,
 ) (*ent.Account, bool, error) {
-	accountID, found := s.responseAffinity.Get(ctx, groupID, platform, previousResponseID)
+	accountID, found := s.responseAffinity.Get(ctx, groupID, platform, previousResponseID, userID, opts.APIKeyID)
 	if !found {
-		return nil, false, nil
+		return nil, true, ErrContinuationAffinityMissing
 	}
 	acc := findAccountByID(candidates, accountID)
 	if acc == nil {
@@ -351,7 +352,7 @@ func (s *Scheduler) selectPreviousResponseAffinity(
 	result := s.checkSchedulabilityForAccount(ctx, acc, model, now, opts.RequireContinuationAffinity)
 	if opts.RequireContinuationAffinity {
 		if result.hardAffinity != NotSchedulable {
-			s.refreshPreviousResponseAffinity(ctx, groupID, platform, previousResponseID, accountID, userID, sessionID)
+			s.refreshPreviousResponseAffinity(ctx, groupID, platform, previousResponseID, accountID, userID, sessionID, opts.APIKeyID)
 			return acc, true, nil
 		}
 		return nil, true, continuationBlockedError(candidates, accountID)
@@ -360,7 +361,7 @@ func (s *Scheduler) selectPreviousResponseAffinity(
 		return nil, true, ErrPreviousResponseAffinitySkip
 	}
 	if s.softPreviousResponseAffinityAllowed(ctx, candidates, acc, result.normal, model, now) {
-		s.refreshPreviousResponseAffinity(ctx, groupID, platform, previousResponseID, accountID, userID, sessionID)
+		s.refreshPreviousResponseAffinity(ctx, groupID, platform, previousResponseID, accountID, userID, sessionID, opts.APIKeyID)
 		return acc, true, nil
 	}
 	// 被当前最高优先级可用层阻挡时直接交给 forwarder 恢复：删除 previous_response_id
@@ -368,8 +369,8 @@ func (s *Scheduler) selectPreviousResponseAffinity(
 	return nil, true, ErrPreviousResponseAffinitySkip
 }
 
-func (s *Scheduler) refreshPreviousResponseAffinity(ctx context.Context, groupID int, platform, previousResponseID string, accountID int, userID int, sessionID string) {
-	s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
+func (s *Scheduler) refreshPreviousResponseAffinity(ctx context.Context, groupID int, platform, previousResponseID string, accountID int, userID int, sessionID string, keyID int) {
+	s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID, userID, keyID)
 	if sessionID != "" {
 		s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 	}

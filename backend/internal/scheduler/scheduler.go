@@ -176,11 +176,11 @@ func (s *Scheduler) ListModelDemotions(accountID int, threshold float64) []Model
 }
 
 // BindResponseAccount 记录 Responses response_id 所在账号，用于后续 previous_response_id 续链路由。
-func (s *Scheduler) BindResponseAccount(ctx context.Context, groupID int, platform, responseID string, accountID int) {
+func (s *Scheduler) BindResponseAccount(ctx context.Context, groupID int, platform, responseID string, accountID int, owners ...int) {
 	if s == nil || s.responseAffinity == nil {
 		return
 	}
-	s.responseAffinity.Bind(ctx, groupID, platform, responseID, accountID)
+	s.responseAffinity.Bind(ctx, groupID, platform, responseID, accountID, owners...)
 }
 
 func (s *Scheduler) RefreshRouteGraphGroup(ctx context.Context, groupID int) {

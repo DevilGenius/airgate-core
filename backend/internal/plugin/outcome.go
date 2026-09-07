@@ -122,7 +122,7 @@ func (f *Forwarder) bindResponseAffinity(ctx context.Context, state *forwardStat
 		return
 	}
 	for _, responseID := range responseIDsFromOutcome(execution.outcome) {
-		f.scheduler.BindResponseAccount(ctx, state.keyInfo.GroupID, state.requestedPlatform, responseID, state.account.ID)
+		f.scheduler.BindResponseAccount(ctx, state.keyInfo.GroupID, state.requestedPlatform, responseID, state.account.ID, state.keyInfo.UserID, state.keyInfo.KeyID)
 	}
 }
 
