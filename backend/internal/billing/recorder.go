@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -474,6 +475,12 @@ func (r *Recorder) insertUsageLogs(ctx context.Context, tx *ent.Tx, batch []Usag
 	if dialectName != dialect.Postgres && dialectName != dialect.SQLite {
 		return nil, fmt.Errorf("unsupported billing insert dialect: %s", dialectName)
 	}
+	// Conflict checks on the event unique index also acquire locks. Retries can
+	// contain overlapping events in a different order, so order these as well.
+	batch = slices.Clone(batch)
+	slices.SortStableFunc(batch, func(a, b UsageRecord) int {
+		return strings.Compare(a.BillingEventID, b.BillingEventID)
+	})
 
 	now := time.Now()
 	recordsByEvent := make(map[string]insertedUsageLog, len(batch))
@@ -687,6 +694,9 @@ func updateAccountLastUsedAt(ctx context.Context, tx *ent.Tx, inserted []inserte
 		accountIDs = append(accountIDs, accountID)
 	}
 	sort.Ints(accountIDs)
+	if recorderInsertDialect(tx) == dialect.Postgres {
+		return updateAccountTimesBatch(ctx, tx, accountIDs, latestByAccount)
+	}
 	for _, accountID := range accountIDs {
 		usedAt := latestByAccount[accountID]
 		if _, err := tx.Account.Update().
@@ -770,6 +780,7 @@ SELECT
 	now()
 FROM batch
 GROUP BY 1, user_id, model
+ORDER BY 1, user_id, model
 ON CONFLICT (bucket_start, user_id, model) DO UPDATE SET
 	user_email = CASE
 		WHEN EXCLUDED.user_email <> '' THEN EXCLUDED.user_email
@@ -862,6 +873,7 @@ SELECT
 	now()
 FROM batch
 GROUP BY 1, api_key_id, user_id, group_id, account_id, platform, model
+ORDER BY 1, api_key_id, user_id, group_id, account_id, platform, model
 ON CONFLICT (bucket_start, api_key_id, user_id, group_id, account_id, platform, model) DO UPDATE SET
 	requests = public.usage_api_key_hourly_rollups.requests + EXCLUDED.requests,
 	input_tokens = public.usage_api_key_hourly_rollups.input_tokens + EXCLUDED.input_tokens,
@@ -1152,7 +1164,11 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 		}
 	}
 
-	for userID, cost := range userActualCosts {
+	if recorderInsertDialect(tx) == dialect.Postgres {
+		return applyUsageChargesBatch(ctx, tx, userActualCosts, keyBilledCosts, keyActualCosts)
+	}
+	for _, userID := range sortedBillingIDs(userActualCosts) {
+		cost := userActualCosts[userID]
 		if err := tx.User.UpdateOneID(userID).
 			AddBalance(-cost).
 			Exec(ctx); err != nil {
@@ -1169,7 +1185,7 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 	for k := range keyActualCosts {
 		keyIDs[k] = struct{}{}
 	}
-	for keyID := range keyIDs {
+	for _, keyID := range sortedBillingIDs(keyIDs) {
 		update := tx.APIKey.UpdateOneID(keyID)
 		if billed := keyBilledCosts[keyID]; billed > 0 {
 			update = update.AddUsedQuota(billed)
