@@ -863,21 +863,23 @@ func (m *Manager) stopPluginRuntime(inst *PluginInstance, idle <-chan struct{}, 
 			"timeout_ms", drainTimeout.Milliseconds(),
 		)
 	}
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stopCancel()
 
 	if inst.Gateway != nil {
-		if err := inst.Gateway.Stop(context.Background()); err != nil {
+		if err := inst.Gateway.Stop(stopCtx); err != nil {
 			slog.Warn("plugin_stop_failed",
 				sdk.LogFieldPluginID, inst.Name, "kind", "gateway", sdk.LogFieldError, err)
 		}
 	}
 	if inst.Extension != nil {
-		if err := inst.Extension.Stop(context.Background()); err != nil {
+		if err := inst.Extension.Stop(stopCtx); err != nil {
 			slog.Warn("plugin_stop_failed",
 				sdk.LogFieldPluginID, inst.Name, "kind", "extension", sdk.LogFieldError, err)
 		}
 	}
 	if inst.Middleware != nil {
-		if err := inst.Middleware.Stop(context.Background()); err != nil {
+		if err := inst.Middleware.Stop(stopCtx); err != nil {
 			slog.Warn("plugin_stop_failed",
 				sdk.LogFieldPluginID, inst.Name, "kind", "middleware", sdk.LogFieldError, err)
 		}
