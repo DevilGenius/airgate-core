@@ -138,7 +138,7 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 		}
 
 		// 验证 API Key 格式
-		if !strings.HasPrefix(key, "sk-") {
+		if !auth.ValidAPIKeyFormat(key) {
 			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, "invalid_format", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 			abortWithOpenAIError(c, http.StatusUnauthorized, "invalid_api_key", "无效的 API Key 格式")
 			return
@@ -150,6 +150,9 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 			status := http.StatusUnauthorized
 			reason := "invalid_key"
 			switch err {
+			case auth.ErrAPIKeyLookupBusy:
+				code, reason, status = "service_unavailable", "lookup_budget", http.StatusServiceUnavailable
+				c.Header("Retry-After", "1")
 			case auth.ErrInvalidAPIKey:
 				// 维持默认 401 / invalid_api_key
 			case auth.ErrAPIKeyExpired:

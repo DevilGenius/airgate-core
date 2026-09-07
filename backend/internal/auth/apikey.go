@@ -11,7 +11,6 @@ import (
 	"io"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -47,10 +46,10 @@ type apiKeyCacheEntry struct {
 }
 
 var (
-	apiKeyCache   sync.Map // map[hash] → apiKeyCacheEntry
-	apiKeyCacheMu sync.Mutex
-	apiKeyRedis   *redis.Client
-	apiKeyRandom  io.Reader = rand.Reader
+	apiKeyCache       = newLocalKeyCache(8192)
+	apiKeyValidations = newKeyValidationGroup(8, 256)
+	apiKeyRedis       *redis.Client
+	apiKeyRandom      io.Reader = rand.Reader
 
 	queryAPIKeyForLogin = func(ctx context.Context, db *ent.Client, hash string) (*ent.APIKey, error) {
 		return db.APIKey.Query().
@@ -242,8 +241,7 @@ func ValidateAPIKeyForLogin(ctx context.Context, db *ent.Client, key string) (*A
 	}, nil
 }
 
-// ValidateAPIKey 验证 API Key 并返回关联信息。带 5s TTL 内存缓存，
-// 高并发下同一个 key 300 req → 1 次 DB 查询 + 299 次缓存命中。
+// ValidateAPIKey uses a bounded one-second cache and coalesces cache misses.
 //
 // 错误语义：
 //   - ent.IsNotFound(err)：真的"key 不存在或已禁用" → ErrInvalidAPIKey（客户端 401）
@@ -251,20 +249,28 @@ func ValidateAPIKeyForLogin(ctx context.Context, db *ent.Client, key string) (*A
 //
 // DB 错误不缓存（下次请求立即重试，加快从瞬时故障中恢复）。
 func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInfo, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !ValidAPIKeyFormat(key) {
+		return nil, ErrInvalidAPIKey
+	}
 	hash := HashAPIKey(key)
+	if info, err, ok := cachedAPIKey(hash); ok {
+		return info, err
+	}
+	info, err := apiKeyValidations.do(ctx, hash, func(loadCtx context.Context) (*APIKeyInfo, error) { return validateAPIKeyUncached(loadCtx, db, hash) })
+	if info != nil {
+		copy := *info
+		info = &copy
+	}
+	return info, err
+}
 
+func validateAPIKeyUncached(ctx context.Context, db *ent.Client, hash string) (*APIKeyInfo, error) {
 	// 读缓存
-	if cached, ok := apiKeyCache.Load(hash); ok {
-		if e := cached.(apiKeyCacheEntry); time.Now().Before(e.expiresAt) {
-			if e.info != nil {
-				slog.Debug("api_key_cache_hit", sdk.LogFieldAPIKeyID, e.info.KeyID)
-				hydrateAPIKeyInfo(e.info)
-			} else {
-				slog.Debug("api_key_cache_hit_negative", sdk.LogFieldError, e.err)
-			}
-			return e.info, e.err
-		}
-		apiKeyCache.Delete(hash)
+	if info, err, ok := cachedAPIKey(hash); ok {
+		return info, err
 	}
 	if info, err, ok := loadAPIKeyCacheFromRedis(ctx, hash); ok {
 		if info != nil {
@@ -279,6 +285,9 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	slog.Debug("api_key_cache_miss")
 
 	// 缓存未命中，查 DB
+	if !apiKeyValidations.allowDatabaseLookup() {
+		return nil, ErrAPIKeyLookupBusy
+	}
 	ak, err := queryAPIKeyForValidation(ctx, db, hash)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -357,7 +366,7 @@ func hydrateAPIKeyInfo(info *APIKeyInfo) {
 }
 
 // cacheAPIKeyResult 把验证结果（成功或已知失败）写入缓存。
-// 成功结果的 UserBalance / UsedQuota 会在 TTL 内"陈旧"，但缓存 TTL 很短（5s），
+// 成功结果的 UserBalance / UsedQuota 会在 TTL 内"陈旧"，但缓存 TTL 很短（1s），
 // 用户主流程不会明显感知到；balance 余额在并发扣费时的准确性由别处的数据库事务保证。
 func cacheAPIKeyResult(hash string, info *APIKeyInfo, err error) {
 	storeAPIKeyLocalCache(hash, info, err)
@@ -398,6 +407,8 @@ func loadAPIKeyCacheFromRedis(ctx context.Context, hash string) (*APIKeyInfo, er
 	if apiKeyRedis == nil {
 		return nil, nil, false
 	}
+	ctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
 	raw, err := apiKeyRedis.Get(ctx, apiKeyRedisCacheKey(hash)).Bytes()
 	if err != nil {
 		return nil, nil, false
@@ -461,12 +472,7 @@ func SetAPIKeyCacheRedis(rdb *redis.Client) {
 // 传空字符串清除所有缓存。
 func InvalidateAPIKeyCache(key string) {
 	if key == "" {
-		apiKeyCacheMu.Lock()
-		apiKeyCache.Range(func(k, _ any) bool {
-			apiKeyCache.Delete(k)
-			return true
-		})
-		apiKeyCacheMu.Unlock()
+		apiKeyCache.Clear()
 		deleteAllAPIKeyRedisCache()
 		return
 	}
