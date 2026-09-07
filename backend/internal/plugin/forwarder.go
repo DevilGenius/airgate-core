@@ -3,6 +3,8 @@ package plugin
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"net/http"
 	"strings"
 	"sync"
@@ -915,6 +917,10 @@ func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKe
 // 流式已写入 → 不可；err 非 nil（插件自身崩）→ 可；
 // 其余由 Kind.ShouldFailover() 决定。图片提交同样使用这套判定。
 func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution forwardExecution) bool {
+	if terminalForwardFailure(execution.outcome, execution.err) {
+		c.Header("X-Should-Retry", "false")
+		return false
+	}
 	if state.stream && c.Writer.Written() {
 		return false
 	}
@@ -927,7 +933,11 @@ func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution f
 	if execution.err != nil {
 		return true
 	}
-	return execution.outcome.Kind.ShouldFailover()
+	return execution.outcome.ShouldFailover()
+}
+
+func terminalForwardFailure(outcome sdk.ForwardOutcome, err error) bool {
+	return outcome.FailoverScope == sdk.FailoverScopeTerminal || grpcstatus.Code(err) == codes.ResourceExhausted
 }
 
 func (f *Forwarder) canDispatchCandidateFailover(c *gin.Context, state *forwardState, execution forwardExecution) bool {

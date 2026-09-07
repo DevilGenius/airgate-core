@@ -840,7 +840,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 
 			h.applyHostOutcome(ctx, acc.ID, accFull, schedulingModel, outcome, duration)
 
-			if fwdErr != nil || outcome.Kind.ShouldFailover() {
+			if !terminalForwardFailure(outcome, fwdErr) && (fwdErr != nil || outcome.ShouldFailover()) {
 				slog.Warn("host_forward_attempt_failed",
 					sdk.LogFieldGroupID, route.GroupID,
 					"effective_rate", route.EffectiveRate,
@@ -1046,7 +1046,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 
 			h.applyHostOutcome(ctx, acc.ID, accFull, schedulingModel, outcome, duration)
 
-			canRetry := !fw.committed && (fwdErr != nil || outcome.Kind.ShouldFailover())
+			canRetry := !fw.committed && !terminalForwardFailure(outcome, fwdErr) && (fwdErr != nil || outcome.ShouldFailover())
 			if canRetry {
 				slog.Warn("host_forward_stream_attempt_failed",
 					sdk.LogFieldGroupID, route.GroupID,
