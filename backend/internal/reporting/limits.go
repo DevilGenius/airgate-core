@@ -20,7 +20,7 @@ var (
 
 type historyNeedsBackfill struct{}
 
-func (historyNeedsBackfill) Error() string { return "历史统计不完整，需要执行回填" }
+func (historyNeedsBackfill) Error() string { return "历史统计正在自动修复，请稍后重试" }
 func (historyNeedsBackfill) Unwrap() error { return ErrHistoryNotReady }
 
 const MaxGroups = 8192

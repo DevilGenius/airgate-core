@@ -15,6 +15,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/schema"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
@@ -28,6 +29,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/i18n"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/redisconfig"
+	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/DevilGenius/airgate-core/internal/server"
 	"github.com/DevilGenius/airgate-core/internal/setup"
 	"github.com/DevilGenius/airgate-core/internal/usageprojection"
@@ -210,7 +212,7 @@ func startMainServer(cfg *config.Config) {
 
 	// 启动时执行非破坏性迁移，补齐缺失表和字段，避免升级后因 schema 落后导致接口报错。
 	migrationCtx, migrationCancel := context.WithTimeout(context.Background(), 60*time.Second)
-	if err := db.Schema.Create(migrationCtx, migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
+	if err := db.Schema.Create(migrationCtx, migrate.WithDropIndex(false), migrate.WithDropColumn(false), schema.WithHooks(bootstrap.DeferUsageIndexes)); err != nil {
 		migrationCancel()
 		slog.Error("db_migration_failed", sdk.LogFieldError, err)
 		os.Exit(1)
@@ -265,11 +267,16 @@ func startMainServer(cfg *config.Config) {
 		}
 	}()
 
-	verificationCtx, stopVerification := context.WithCancel(context.Background())
-	defer stopVerification()
-	usageprojection.StartVerification(verificationCtx, drv.DB())
+	maintenanceCtx, stopMaintenance := context.WithCancel(context.Background())
+	defer stopMaintenance()
+	safego.Go("usage-maintenance", func() {
+		if err := bootstrap.RunUsageMaintenance(maintenanceCtx, drv.DB()); err != nil && maintenanceCtx.Err() == nil {
+			slog.Warn("usage_maintenance_failed", "error", err)
+		}
+		usageprojection.StartMaintenance(maintenanceCtx, drv.DB())
+	})
 	<-quit
-	stopVerification()
+	stopMaintenance()
 	slog.Info("收到关闭信号，开始优雅关闭...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

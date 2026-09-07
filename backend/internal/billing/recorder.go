@@ -748,7 +748,7 @@ INSERT INTO public.usage_hourly_rollups (
 	updated_at
 )
 SELECT
-	date_trunc('hour', created_at),
+	date_trunc('hour', created_at, 'UTC'),
 	user_id,
 	COALESCE(MAX(NULLIF(user_email, '')), ''),
 	model,
@@ -850,7 +850,7 @@ INSERT INTO public.usage_api_key_hourly_rollups (
 	total_cost, actual_cost, billed_cost, updated_at
 )
 SELECT
-	date_trunc('hour', created_at), api_key_id, user_id, group_id, account_id, platform, model,
+	date_trunc('hour', created_at, 'UTC'), api_key_id, user_id, group_id, account_id, platform, model,
 	COUNT(*)::bigint,
 	COALESCE(SUM(input_tokens), 0)::bigint,
 	COALESCE(SUM(output_tokens), 0)::bigint,

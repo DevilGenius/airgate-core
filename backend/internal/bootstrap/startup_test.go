@@ -1,6 +1,9 @@
 package bootstrap
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSplitSQLStatements(t *testing.T) {
 	sql := `
@@ -60,4 +63,25 @@ func TestSystemUpgradeChecksumIgnoresLineEndings(t *testing.T) {
 	if systemUpgradeChecksum(normalizedLF) != systemUpgradeChecksum(normalizedCRLF) {
 		t.Fatal("checksum should be stable across LF and CRLF line endings")
 	}
+}
+
+func TestLegacyRollupDataIsNotBackfilledDuringStartup(t *testing.T) {
+	for _, upgrade := range loadSystemUpgrades() {
+		if upgrade.ID != "20260701012000_usage_hourly_rollups" {
+			continue
+		}
+		checksum := systemUpgradeChecksum(upgrade.SQL)
+		ddl, err := startupUpgradeSQL(upgrade)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(ddl, "CREATE TABLE") || strings.Contains(ddl, "TRUNCATE") || strings.Contains(ddl, "FROM public.usage_logs") {
+			t.Fatalf("unsafe startup SQL: %s", ddl)
+		}
+		if systemUpgradeChecksum(upgrade.SQL) != checksum || !strings.Contains(upgrade.SQL, "TRUNCATE") {
+			t.Fatal("published migration was changed")
+		}
+		return
+	}
+	t.Fatal("legacy migration missing")
 }

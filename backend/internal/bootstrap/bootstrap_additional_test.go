@@ -368,8 +368,8 @@ func TestRunSystemUpgradesPanicsOnSQLiteDriver(t *testing.T) {
 		if recovered == nil {
 			t.Fatal("RunSystemUpgrades did not panic on PostgreSQL advisory lock SQL")
 		}
-		if !strings.Contains(fmt.Sprint(recovered), "lock system upgrades") {
-			t.Fatalf("panic = %v, want lock system upgrades", recovered)
+		if !strings.Contains(fmt.Sprint(recovered), "set migration lock deadline") {
+			t.Fatalf("panic = %v, want PostgreSQL lock deadline setup failure", recovered)
 		}
 	}()
 	RunSystemUpgrades(entsql.OpenDB("sqlite", db))
@@ -392,8 +392,11 @@ func TestRunSystemUpgradesWithMockPostgresDriver(t *testing.T) {
 	if !state.execContains("pg_advisory_lock") || !state.execContains("pg_advisory_unlock") {
 		t.Fatalf("lock/unlock statements missing: %v", state.execs)
 	}
-	if got := state.execCount("INSERT INTO public.system_upgrade"); got != len(upgrades) {
-		t.Fatalf("insert count = %d, want %d", got, len(upgrades))
+	if got := state.execCount("INSERT INTO public.system_upgrade"); got != len(upgrades)-5 {
+		t.Fatalf("insert count = %d, want %d completed startup migrations", got, len(upgrades)-5)
+	}
+	if state.execContains("CREATE INDEX CONCURRENTLY") || state.execContains("ANALYZE public.usage_logs") {
+		t.Fatal("large-table index maintenance ran synchronously during startup")
 	}
 	if !state.execContains("CREATE TABLE IF NOT EXISTS public.system_upgrade") ||
 		!state.execContains("ALTER TABLE public.system_upgrade ADD COLUMN IF NOT EXISTS id text") ||

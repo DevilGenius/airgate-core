@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DevilGenius/airgate-core/internal/safego"
+	"github.com/lib/pq"
 )
 
 const AdvisoryLockKey int64 = 20260908070000
@@ -103,20 +103,29 @@ func (p projection) verificationSQL() string {
 // Each projection is verified and marked in a single consistent snapshot. Live
 // billing commits its detail and rollups atomically and is not locked out.
 func VerifyPending(ctx context.Context, db *sql.DB) error {
+	return verifyPendingInSchema(ctx, db, "")
+}
+
+func verifyPendingInSchema(ctx context.Context, db *sql.DB, schema string) error {
 	for _, p := range projections() {
-		if err := verifyProjection(ctx, db, p); err != nil {
+		if err := verifyProjection(ctx, db, p, schema); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func verifyProjection(ctx context.Context, db *sql.DB, p projection) error {
+func verifyProjection(ctx context.Context, db *sql.DB, p projection, schema string) error {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if schema != "" {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL search_path TO "+pq.QuoteIdentifier(schema)+", pg_catalog"); err != nil {
+			return err
+		}
+	}
 	var locked bool
 	if err := tx.QueryRowContext(ctx, "SELECT pg_try_advisory_xact_lock($1)", AdvisoryLockKey).Scan(&locked); err != nil {
 		return err
@@ -149,30 +158,4 @@ func verifyProjection(ctx context.Context, db *sql.DB, p projection) error {
 	}
 	slog.Info("usage_rollup_coverage_verified", "projection", p.name, "state", state, "mismatched_buckets", mismatches, "duration_ms", time.Since(started).Milliseconds())
 	return nil
-}
-
-// StartVerification keeps one bounded maintenance scan out of HTTP startup and
-// retries transient failures. Verified projections are a cheap no-op on restart.
-func StartVerification(ctx context.Context, db *sql.DB) {
-	safego.Go("usage-rollup-coverage", func() {
-		for attempt := 0; attempt < 3; attempt++ {
-			verifyCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-			err := VerifyPending(verifyCtx, db)
-			cancel()
-			if err == nil || ctx.Err() != nil {
-				return
-			}
-			slog.Warn("usage_rollup_verification_failed", "attempt", attempt+1, "error", err)
-			if attempt == 2 {
-				return
-			}
-			timer := time.NewTimer(time.Duration(attempt+1) * 30 * time.Second)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return
-			case <-timer.C:
-			}
-		}
-	})
 }

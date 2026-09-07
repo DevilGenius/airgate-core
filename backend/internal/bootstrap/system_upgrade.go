@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	stdsql "database/sql"
+	"database/sql/driver"
 	"embed"
 	"encoding/hex"
 	"fmt"
@@ -44,21 +45,35 @@ func RunSystemUpgrades(drv *entsql.Driver) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 	conn, err := drv.DB().Conn(ctx)
 	if err != nil {
 		panicSystemUpgrade("open system upgrade connection", err)
 	}
 	defer func() { _ = conn.Close() }()
+	if _, err := conn.ExecContext(ctx, `SET lock_timeout='2s'`); err != nil {
+		panicSystemUpgrade("set migration lock deadline", err)
+	}
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 2*time.Second)
+		defer stop()
+		if _, err := conn.ExecContext(cleanup, `RESET lock_timeout`); err != nil {
+			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
 
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 2*time.Second)
+		defer stop()
+		if _, err := conn.ExecContext(cleanup, `SELECT pg_advisory_unlock($1)`, systemUpgradeAdvisoryLockKey); err != nil {
+			slog.Warn("system_upgrade_unlock_failed", sdk.LogFieldError, err)
+			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
 	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, systemUpgradeAdvisoryLockKey); err != nil {
 		panicSystemUpgrade("lock system upgrades", err)
 	}
-	defer func() {
-		if _, err := conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, systemUpgradeAdvisoryLockKey); err != nil {
-			slog.Warn("system_upgrade_unlock_failed", sdk.LogFieldError, err)
-		}
-	}()
 
 	if err := prepareSystemUpgradeTable(ctx, conn); err != nil {
 		panicSystemUpgrade("prepare system_upgrade table", err)
@@ -84,6 +99,10 @@ func RunSystemUpgrades(drv *entsql.Driver) {
 		}
 		if err != stdsql.ErrNoRows {
 			panicSystemUpgrade("check system upgrade "+upgrade.ID, err)
+		}
+		if maintenanceOnly(upgrade) {
+			slog.Info("system_upgrade_deferred", "id", upgrade.ID, "reason", "concurrent index maintenance runs after HTTP startup")
+			continue
 		}
 
 		start := time.Now()
@@ -243,12 +262,34 @@ func systemUpgradeDescription(sql, fallback string) string {
 }
 
 func executeSystemUpgradeSQL(ctx context.Context, conn *stdsql.Conn, upgrade systemUpgrade) error {
-	for _, stmt := range splitSQLStatements(upgrade.SQL) {
-		if _, err := conn.ExecContext(ctx, stmt); err != nil {
+	source, err := startupUpgradeSQL(upgrade)
+	if err != nil {
+		return err
+	}
+	for _, stmt := range splitSQLStatements(source) {
+		statementCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		_, err := conn.ExecContext(statementCtx, stmt)
+		cancel()
+		if err != nil {
 			return fmt.Errorf("execute statement in %s: %w", upgrade.ID, err)
 		}
 	}
 	return nil
+}
+
+// Published migrations and their recorded checksums stay immutable. New
+// installations apply the legacy projection DDL, then use resumable maintenance
+// for its historical data instead of TRUNCATE/full aggregation during startup.
+func startupUpgradeSQL(upgrade systemUpgrade) (string, error) {
+	if upgrade.ID != "20260701012000_usage_hourly_rollups" {
+		return upgrade.SQL, nil
+	}
+	ddl, _, found := strings.Cut(upgrade.SQL, "\nTRUNCATE TABLE public.usage_hourly_rollups;")
+	if !found {
+		return "", fmt.Errorf("legacy rollup migration layout changed; cannot separate its backfill safely")
+	}
+	slog.Info("usage_rollup_backfill_deferred", "migration", upgrade.ID, "command", "go run ./cmd/usage-rollup-backfill -config <core-config>")
+	return ddl, nil
 }
 
 func splitSQLStatements(sql string) []string {
