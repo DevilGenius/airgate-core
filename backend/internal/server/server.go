@@ -20,6 +20,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/bootstrap"
 	"github.com/DevilGenius/airgate-core/internal/config"
+	"github.com/DevilGenius/airgate-core/internal/httpguard"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
@@ -199,10 +200,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	// 注册路由
 	s.registerRoutes()
 
-	s.srv = &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-		Handler: s.engine,
-	}
+	s.srv = httpguard.NewServer(fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port), s.engine, cfg.Server.MaxInFlightRequests, cfg.Server.MaxBufferedBodyBytes)
 
 	return s, nil
 }

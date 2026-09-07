@@ -100,6 +100,9 @@ type ServerConfig struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 	Mode string `yaml:"mode"` // debug / release
+	// Instance HTTP admission, defaults: 1024 handlers and 128 MiB retained body bytes.
+	MaxInFlightRequests  int   `yaml:"max_in_flight_requests"`
+	MaxBufferedBodyBytes int64 `yaml:"max_buffered_body_bytes"`
 	// TrustedProxies 显式可信反向代理 IP/CIDR。为空表示不信任任何代理头。
 	TrustedProxies []string `yaml:"trusted_proxies"`
 }

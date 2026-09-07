@@ -163,6 +163,21 @@ const allRoutesFailedDefaultRetryAfter = time.Second
 // Middleware：OnForwardBegin 只在首次 attempt 调用（避免 failover 污染审计计数），
 // OnForwardEnd 在最终一次 attempt（成功或放弃）触发，LIFO 降序。Begin DENY 会拒绝请求。
 func (f *Forwarder) Forward(c *gin.Context) {
+	keyInfo, ok := requireKeyInfo(c)
+	if !ok {
+		return
+	}
+	admission := &forwardState{keyInfo: keyInfo, requestPath: requestPath(c)}
+	if !f.checkBalance(c, admission) || !f.checkAPIKeyRPM(c, admission) {
+		return
+	}
+	if !isMetadataOnlyPath(admission.requestPath) {
+		release := f.acquireClientQuota(c, admission)
+		if release == nil {
+			return
+		}
+		defer release()
+	}
 	trace := f.beginRequestTrace(c)
 	if trace != nil {
 		defer f.finishRequestTrace(c, trace)
@@ -174,12 +189,6 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	if trace != nil {
 		trace.bindState(state)
 		state.trace = trace
-	}
-	if !f.checkBalance(c, state) {
-		return
-	}
-	if (state.keyInfo.KeyMaxRPM > 0 || state.keyInfo.KeyMaxNonResponsesRPM > 0) && !f.checkAPIKeyRPM(c, state) {
-		return
 	}
 
 	// 请求级 logger：继承 middleware 注入的 request_id / user_id / group_id 等字段，
@@ -203,12 +212,6 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		f.forwardMetadataOnly(c, state)
 		return
 	}
-
-	releaseClientQuota := f.acquireClientQuota(c, state)
-	if releaseClientQuota == nil {
-		return // 429 已写
-	}
-	defer releaseClientQuota()
 
 	routes := routesForAPIKey(state)
 	if len(routes) == 0 {

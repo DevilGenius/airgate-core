@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"mime"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
 	"github.com/DevilGenius/airgate-core/internal/forwardpath"
+	"github.com/DevilGenius/airgate-core/internal/httpguard"
 	"github.com/DevilGenius/airgate-core/internal/routing"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -56,6 +58,15 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		}
 	}
 	if err != nil {
+		var timeout net.Error
+		if errors.As(err, &timeout) && timeout.Timeout() {
+			openAIError(c, http.StatusRequestTimeout, "invalid_request_error", "request_timeout", "读取请求体超时")
+			return nil, false
+		}
+		if errors.Is(err, httpguard.ErrBodyBudget) {
+			openAIRateLimitError(c, http.StatusServiceUnavailable, "server_busy", "请求缓冲区繁忙，请稍后重试", time.Second)
+			return nil, false
+		}
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
 			slog.Warn("request_body_too_large",
