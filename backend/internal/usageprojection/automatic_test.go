@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+
+	"github.com/DevilGenius/airgate-core/internal/config"
 )
 
 func TestAutomaticMaintenanceRetriesUntilReady(t *testing.T) {
@@ -77,7 +78,7 @@ func TestLocalAutomaticMaintenance(t *testing.T) {
 			if err != nil {
 				t.Fatal("open local database failed")
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			db.SetMaxOpenConns(4)
 			schema := "ag_review_auto_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 			qualified := func(name string) string { return pq.QuoteIdentifier(schema) + "." + pq.QuoteIdentifier(name) }
@@ -114,12 +115,12 @@ func TestLocalAutomaticMaintenance(t *testing.T) {
 					t.Fatal(err)
 				}
 				if _, err = tx.ExecContext(t.Context(), "SET LOCAL search_path TO "+pq.QuoteIdentifier(schema)+", pg_catalog"); err != nil {
-					tx.Rollback()
+					_ = tx.Rollback()
 					t.Fatal(err)
 				}
 				for _, p := range projections() {
 					if _, err = tx.ExecContext(t.Context(), "WITH batch AS (SELECT "+sourceColumns+" FROM usage_logs WHERE id<=$1) "+p.upsertSQL(p.name), tc.projected); err != nil {
-						tx.Rollback()
+						_ = tx.Rollback()
 						t.Fatal(err)
 					}
 				}
@@ -163,14 +164,14 @@ func TestLocalAutomaticMaintenance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer blocker.Rollback()
+			defer func() { _ = blocker.Rollback() }()
 			if _, err = blocker.ExecContext(t.Context(), "LOCK TABLE "+qualified("usage_logs")+" IN ACCESS EXCLUSIVE MODE"); err != nil {
 				t.Fatal(err)
 			}
 			quick, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 			err = reconcileMaintenance(quick, db, options)
 			cancel()
-			blocker.Rollback()
+			_ = blocker.Rollback()
 			if err != nil {
 				t.Fatalf("verified restart touched history: %v", err)
 			}

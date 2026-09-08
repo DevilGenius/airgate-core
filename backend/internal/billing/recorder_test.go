@@ -254,9 +254,13 @@ func TestRecordQueuesAndFallsBackWhenBufferFull(t *testing.T) {
 	recorder := NewRecorder(db, 1)
 
 	queued := billingRecordForFixture("bill_queue", user, group, account, nil)
-	recorder.Record(queued)
+	if err := recorder.Record(queued); err != nil {
+		t.Fatal(err)
+	}
 	fallback := billingRecordForFixture("bill_fallback", user, group, account, nil)
-	recorder.Record(fallback)
+	if err := recorder.Record(fallback); err != nil {
+		t.Fatal(err)
+	}
 
 	select {
 	case got := <-recorder.ch:
@@ -273,11 +277,15 @@ func TestRecordQueuesAndFallsBackWhenBufferFull(t *testing.T) {
 		t.Fatalf("fallback record was not persisted: %v", err)
 	}
 
-	recorder.Record(queued)
+	if err := recorder.Record(queued); err != nil {
+		t.Fatal(err)
+	}
 	bad := queued
 	bad.BillingEventID = "bill_bad_fallback"
 	bad.Platform = ""
-	recorder.Record(bad)
+	if err := recorder.Record(bad); err == nil {
+		t.Fatal("invalid fallback record should fail")
+	}
 }
 
 func TestRunFlushesTickerAndStopBatches(t *testing.T) {
@@ -330,7 +338,9 @@ func TestStopFlushesStartedRecorder(t *testing.T) {
 	defer func() { recorderFlushInterval = oldInterval }()
 
 	recorder.Start()
-	recorder.Record(billingRecordForFixture("bill_stop_method", user, group, account, nil))
+	if err := recorder.Record(billingRecordForFixture("bill_stop_method", user, group, account, nil)); err != nil {
+		t.Fatal(err)
+	}
 	recorder.Stop()
 	recorder.Stop()
 	waitForUsageLog(t, ctx, db, "bill_stop_method")

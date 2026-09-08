@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DevilGenius/airgate-core/internal/reporting"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
+
+	"github.com/DevilGenius/airgate-core/internal/reporting"
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )

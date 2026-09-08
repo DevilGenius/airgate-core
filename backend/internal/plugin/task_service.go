@@ -224,7 +224,7 @@ func (h *HostService) createTask(ctx context.Context, pluginID string, req hostC
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	unlock, err := lockTaskAdmission(admissionCtx, tx)
 	if err != nil {
 		return nil, err

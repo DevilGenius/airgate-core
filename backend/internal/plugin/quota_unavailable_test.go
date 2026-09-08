@@ -5,10 +5,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/DevilGenius/airgate-core/ent"
-	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redismock/v9"
+
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
 func TestAccountAdmissionStopsWhenRedisClockFails(t *testing.T) {

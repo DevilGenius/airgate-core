@@ -8,8 +8,9 @@ import (
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
-	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/lib/pq"
+
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 func sortedBillingIDs[V any](values map[int]V) []int {
@@ -33,7 +34,7 @@ func lockBillingRows(ctx context.Context, tx *ent.Tx, table string, ids []int, r
 	if err := tx.Driver().Query(ctx, query, []any{pq.Array(ids)}, &rows); err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	count := 0
 	for rows.Next() {
 		count++

@@ -10,7 +10,7 @@ import (
 
 func TestUsageBucketsAggregateBeforeLoading(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	user := createTestUser(t, db, "buckets@example.com")
 	account := db.Account.Create().SetName("bucket-account").SetPlatform("openai").SetType("apikey").SetCredentials(map[string]string{}).SaveX(t.Context())
 	created := time.Date(2026, 6, 20, 1, 15, 0, 0, time.UTC)
@@ -32,7 +32,7 @@ func TestUsageBucketsAggregateBeforeLoading(t *testing.T) {
 
 func TestUsageBucketsMatchLocalBoundariesAndDST(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	user := createTestUser(t, db, "bucket-zones@example.com")
 	var raw []appusage.TrendEntry
 	for i, timestamp := range []string{"2026-10-31T18:20:00Z", "2026-10-31T18:35:00Z", "2026-11-01T03:59:00Z", "2026-11-01T04:01:00Z", "2026-11-01T05:30:00Z", "2026-11-01T06:30:00Z", "2026-11-01T07:01:00Z", "2026-11-02T05:00:00Z"} {

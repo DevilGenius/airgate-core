@@ -120,7 +120,7 @@ func verifyProjection(ctx context.Context, db *sql.DB, p projection, schema stri
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if schema != "" {
 		if _, err := tx.ExecContext(ctx, "SET LOCAL search_path TO "+pq.QuoteIdentifier(schema)+", pg_catalog"); err != nil {
 			return err

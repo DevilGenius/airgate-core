@@ -41,7 +41,7 @@ func TestRuntimeCallbackResourcesTransferWithoutProviderKnowledge(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 		data, _ := io.ReadAll(r.Body)
 		if r.StatusCode != 200 || string(data) != expected {
 			t.Fatalf("%d %q", r.StatusCode, data)

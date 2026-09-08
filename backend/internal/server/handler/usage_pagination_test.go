@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 type paginationRouteRepository struct {

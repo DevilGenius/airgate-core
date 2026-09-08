@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+
 	"github.com/DevilGenius/airgate-core/internal/reporting"
 )
 
 func TestRollupCoverageRequiresVerifiedHistory(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	exec := func(query string, args ...any) {
 		t.Helper()
 		var result sql.Result

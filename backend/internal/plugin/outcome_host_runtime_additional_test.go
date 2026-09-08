@@ -247,7 +247,7 @@ func TestForwarderRecordUsagePersistsFallbackRecord(t *testing.T) {
 	}
 
 	recorder := billing.NewRecorder(db, 1)
-	recorder.Record(billing.UsageRecord{
+	if err := recorder.Record(billing.UsageRecord{
 		BillingEventID: "prefill-record-usage",
 		UserID:         user.ID,
 		UserEmail:      user.Email,
@@ -255,7 +255,9 @@ func TestForwarderRecordUsagePersistsFallbackRecord(t *testing.T) {
 		GroupID:        group.ID,
 		Platform:       "openai",
 		Model:          "prefill",
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 	forwarder := &Forwarder{
 		scheduler:  scheduler.NewScheduler(db, nil),
 		calculator: billing.NewCalculator(),

@@ -4,9 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestResourceFailuresCannotBeRetriedByHTTPOrHost(t *testing.T) {

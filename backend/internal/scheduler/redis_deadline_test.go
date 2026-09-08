@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/redisconfig"
-	"github.com/redis/go-redis/v9"
 )
 
 func TestRedisAdmissionDeadlineWhenPeerNeverResponds(t *testing.T) {
@@ -19,7 +20,7 @@ func TestRedisAdmissionDeadlineWhenPeerNeverResponds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	accepted := make(chan net.Conn, 1)
 	go func() {
 		conn, err := listener.Accept()
@@ -32,7 +33,7 @@ func TestRedisAdmissionDeadlineWhenPeerNeverResponds(t *testing.T) {
 	_, portText, _ := net.SplitHostPort(listener.Addr().String())
 	port, _ := strconv.Atoi(portText)
 	rdb := redis.NewClient(redisconfig.Options(config.RedisConfig{Host: "127.0.0.1", Port: port}))
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 	started := time.Now()
 	allowed, err := NewRPMCounter(rdb).TryIncrementRPM(context.Background(), 7, 10)
 	if allowed || !errors.Is(err, ErrSchedulingUnavailable) {

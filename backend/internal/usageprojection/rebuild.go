@@ -66,7 +66,7 @@ func Rebuild(ctx context.Context, db *sql.DB, options RebuildOptions) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if _, err = conn.ExecContext(ctx, "SET search_path TO "+pq.QuoteIdentifier(options.Schema)+", pg_catalog"); err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func maintenanceTx(ctx context.Context, conn *sql.Conn) (*sql.Tx, error) {
 		return nil, err
 	}
 	if _, err = tx.ExecContext(ctx, `SET LOCAL lock_timeout='1s'`); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return nil, err
 	}
 	return tx, nil
@@ -201,7 +201,7 @@ func prepareRebuild(ctx context.Context, conn *sql.Conn, schema string) (Progres
 	if err != nil {
 		return job, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	for _, p := range projections() {
 		if _, err = tx.ExecContext(ctx, "CREATE TABLE "+pq.QuoteIdentifier(shadowName(p, job.JobID))+" (LIKE "+pq.QuoteIdentifier(p.name)+" INCLUDING ALL)"); err != nil {
 			return job, err
@@ -258,7 +258,7 @@ func verifyRebuild(ctx context.Context, conn *sql.Conn, job Progress, timeout ti
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	for _, p := range projections() {
 		p.actualFrom = strings.Replace(p.actualFrom, p.name, pq.QuoteIdentifier(shadowName(p, job.JobID)), 1)
 		var mismatches int64
@@ -282,7 +282,7 @@ func cutoverRebuild(ctx context.Context, conn *sql.Conn, job Progress) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err = tx.ExecContext(ctx, "LOCK TABLE usage_logs IN SHARE ROW EXCLUSIVE MODE"); err != nil {
 		return err
 	}

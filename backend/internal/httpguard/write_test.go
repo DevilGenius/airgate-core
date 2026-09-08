@@ -37,7 +37,7 @@ func TestSlowReaderCancelsHandlerContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_, err = io.WriteString(conn, "GET / HTTP/1.1\r\nHost: local\r\n\r\n")
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestHTTP2UpstreamPauseDoesNotExpireWriteDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	data, err := io.ReadAll(response.Body)
 	if err != nil || string(data) != "firstsecond" || response.ProtoMajor != 2 {
 		t.Fatalf("long stream interrupted: protocol=%s body=%q error=%v", response.Proto, data, err)

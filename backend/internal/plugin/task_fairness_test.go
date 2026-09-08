@@ -6,19 +6,20 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/DevilGenius/airgate-core/ent"
 	enttask "github.com/DevilGenius/airgate-core/ent/task"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestTaskDispatcherBypassesDisabledPluginAndRefillsBeforeSlowTaskFinishes(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	db := testdb.OpenMemoryEnt(t, "task_fairness", schema.WithGlobalUniqueID(false))
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	started := make(chan int64, 16)
 	releaseSlow := make(chan struct{})
 	client, cleanup := newExtensionRuntimeClient(t, &taskRuntimeExtension{pluginRuntimeExtension: pluginRuntimeExtension{id: "fair-plugin"}, types: []string{"image"}, process: func(ctx context.Context, task sdk.HostTask) error {
@@ -73,7 +74,7 @@ func TestTaskDispatcherBypassesDisabledPluginAndRefillsBeforeSlowTaskFinishes(t 
 
 func TestTaskAdmissionRejectsExcessQueueButPreservesIdempotency(t *testing.T) {
 	db := testdb.OpenMemoryEnt(t, "task_admission", schema.WithGlobalUniqueID(false))
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ctx := t.Context()
 	host := &HostService{db: db}
 	first, err := host.createTask(ctx, "plugin", hostCreateTaskRequest{UserID: 1, TaskType: "image", IdempotencyKey: "same"})

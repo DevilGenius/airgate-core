@@ -12,8 +12,9 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
-	"github.com/DevilGenius/airgate-core/ent/migrate"
 	"github.com/lib/pq"
+
+	"github.com/DevilGenius/airgate-core/ent/migrate"
 )
 
 // Secondary analytics indexes are optional for correctness. Keep uniqueness
@@ -117,7 +118,7 @@ func RunUsageMaintenance(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	var locked bool
 	if err = conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", systemUpgradeAdvisoryLockKey).Scan(&locked); err != nil {
 		return err

@@ -7,9 +7,10 @@ import (
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"github.com/lib/pq"
+
 	"github.com/DevilGenius/airgate-core/ent/usagelog"
 	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
-	"github.com/lib/pq"
 )
 
 // BuildPageIndex streams IDs only; it never loads UsageLog entities or historical
@@ -26,7 +27,7 @@ func (s *UsageStore) BuildPageIndex(ctx context.Context, filter appusage.ListFil
 		if err != nil {
 			return nil, err
 		}
-		defer tx.Rollback()
+		defer func() { _ = tx.Rollback() }()
 		driver = tx.Driver()
 		matched, all, complete, err := usagePaginationModels(ctx, driver, filter.Model)
 		if err != nil {
@@ -63,7 +64,7 @@ func (s *UsageStore) BuildPageIndex(ctx context.Context, filter appusage.ListFil
 	if err := driver.Query(ctx, query, args, &rows); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	index := &appusage.PageIndex{}
 	var id int64
 	for rows.Next() {
@@ -112,7 +113,7 @@ func usagePaginationModels(ctx context.Context, driver dialect.Driver, raw strin
 	if err := driver.Query(ctx, query, args, &rows); err != nil {
 		return nil, 0, false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		return nil, 0, false, rows.Err()
 	}

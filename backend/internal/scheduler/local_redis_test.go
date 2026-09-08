@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/DevilGenius/airgate-core/internal/config"
 )
 
 func localReviewRedis(t *testing.T) *redis.Client {

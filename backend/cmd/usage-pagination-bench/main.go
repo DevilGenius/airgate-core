@@ -17,9 +17,10 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/config"
-	_ "github.com/lib/pq"
 )
 
 type row struct {
@@ -73,7 +74,7 @@ func main() {
 	must(err)
 	db, err := sql.Open("postgres", cfg.Database.DSN())
 	must(err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
@@ -107,7 +108,7 @@ func main() {
 		start := time.Now()
 		response, err := client.Do(req)
 		must(err)
-		defer response.Body.Close()
+		defer func() { _ = response.Body.Close() }()
 		body, err := io.ReadAll(response.Body)
 		must(err)
 		if response.StatusCode != http.StatusOK {

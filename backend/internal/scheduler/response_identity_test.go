@@ -2,8 +2,9 @@ package scheduler
 
 import (
 	"errors"
-	"github.com/DevilGenius/airgate-core/ent"
 	"testing"
+
+	"github.com/DevilGenius/airgate-core/ent"
 )
 
 func TestResponseAffinityIsScopedByUserAndKey(t *testing.T) {

@@ -13,9 +13,10 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/config"
-	_ "github.com/lib/pq"
 )
 
 // Opt-in, read-only verification against the explicitly selected local dev
@@ -46,7 +47,7 @@ func TestLocalReportingR01(t *testing.T) {
 		if err != nil {
 			t.Fatalf("local request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 		if err != nil {
 			t.Fatal("read local response failed")
@@ -79,7 +80,7 @@ func TestLocalReportingR01(t *testing.T) {
 	if err != nil {
 		t.Fatal("open local database failed")
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(1)
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
@@ -156,7 +157,7 @@ func TestLocalUnverifiedHistoryR07(t *testing.T) {
 	if err != nil {
 		t.Fatal("open local database failed")
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(1)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -181,7 +182,7 @@ func TestLocalUnverifiedHistoryR07(t *testing.T) {
 	if err != nil {
 		t.Fatal("local coverage request failed")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var result struct {
 		Code    int
 		Message string
@@ -223,7 +224,7 @@ func TestLocalReportingReadyR07(t *testing.T) {
 			Data json.RawMessage
 		}
 		err = json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&result)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil || resp.StatusCode != 200 || result.Code != 0 || len(result.Data) == 0 {
 			t.Fatalf("%s: HTTP %d, code %d", path, resp.StatusCode, result.Code)
 		}

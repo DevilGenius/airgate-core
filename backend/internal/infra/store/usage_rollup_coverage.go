@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/lib/pq"
+
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/internal/reporting"
-	"github.com/lib/pq"
 )
 
 // A nil/zero lower bound requests all history and requires a verified backfill.
@@ -25,7 +26,7 @@ func requireUsageRollupCoverage(ctx context.Context, db *ent.Client, projection 
 		}
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
 			return err

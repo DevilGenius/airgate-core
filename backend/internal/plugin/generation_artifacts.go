@@ -138,7 +138,7 @@ func (m *Manager) writeActiveArtifact(name string, a *pluginArtifact) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 	if _, err = f.Write(append(data, '\n')); err != nil {
 		_ = f.Close()
 		return err

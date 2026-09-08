@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+
 	"github.com/DevilGenius/airgate-core/ent"
 	"github.com/DevilGenius/airgate-core/ent/predicate"
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"

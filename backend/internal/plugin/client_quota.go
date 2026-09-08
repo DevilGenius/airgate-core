@@ -7,9 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
 func (f *Forwarder) acquireDistributedClientQuota(c *gin.Context, state *forwardState) func() {

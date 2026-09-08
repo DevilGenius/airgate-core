@@ -6,10 +6,11 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
-	"github.com/DevilGenius/airgate-core/ent"
-	enttask "github.com/DevilGenius/airgate-core/ent/task"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/DevilGenius/airgate-core/ent"
+	enttask "github.com/DevilGenius/airgate-core/ent/task"
 )
 
 const (
@@ -57,7 +58,7 @@ func lockTaskAdmission(ctx context.Context, tx *ent.Tx) (func(), error) {
 	if err := tx.Driver().Query(ctx, "SELECT pg_try_advisory_xact_lock(20260908260000)", []any{}, &rows); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var acquired bool
 	if !rows.Next() {
 		return nil, status.Error(codes.Unavailable, "task admission lock unavailable")

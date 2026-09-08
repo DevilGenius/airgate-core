@@ -6,8 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/gin-gonic/gin"
+
+	"github.com/DevilGenius/airgate-core/internal/scheduler"
 )
 
 func TestLostClientLeaseIsUnavailableRatherThanClientDisconnect(t *testing.T) {

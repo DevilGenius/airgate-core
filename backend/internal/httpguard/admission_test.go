@@ -103,14 +103,14 @@ func TestSlowUploadAndHeadersHaveReadDeadlines(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer listener.Close()
-			defer server.Close()
+			defer func() { _ = listener.Close() }()
+			defer func() { _ = server.Close() }()
 			go func() { _ = server.Serve(listener) }()
 			conn, err := net.Dial("tcp", listener.Addr().String())
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			_ = conn.SetDeadline(time.Now().Add(time.Second))
 			if _, err := io.WriteString(conn, request); err != nil {
 				t.Fatal(err)

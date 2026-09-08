@@ -4,10 +4,11 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
+
 	appusage "github.com/DevilGenius/airgate-core/internal/app/usage"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
 	"github.com/DevilGenius/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
 )
 
 func (h *UsageHandler) UserUsagePagination(c *gin.Context) {

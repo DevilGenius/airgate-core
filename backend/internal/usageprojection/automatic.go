@@ -8,8 +8,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/lib/pq"
+
+	"github.com/DevilGenius/airgate-core/internal/safego"
 )
 
 type maintenanceState struct {
@@ -34,11 +35,11 @@ func inspectMaintenance(ctx context.Context, db *sql.DB, schema string) (mainten
 		var version int
 		var status string
 		if err := rows.Scan(&version, &status); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return state, err
 		}
 		if version != 1 {
-			rows.Close()
+			_ = rows.Close()
 			return state, fmt.Errorf("unsupported usage projection version %d", version)
 		}
 		count++
@@ -49,12 +50,12 @@ func inspectMaintenance(ctx context.Context, db *sql.DB, schema string) (mainten
 		case "failed":
 			state.failed = true
 		default:
-			rows.Close()
+			_ = rows.Close()
 			return state, fmt.Errorf("unsupported usage projection state %q", status)
 		}
 	}
 	err = rows.Err()
-	rows.Close()
+	_ = rows.Close()
 	if err != nil {
 		return state, err
 	}

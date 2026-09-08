@@ -12,10 +12,11 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
-	"github.com/DevilGenius/airgate-core/ent"
-	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+
+	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/config"
 )
 
 func TestLocalBillingBatchLocksR06(t *testing.T) {
@@ -31,7 +32,7 @@ func TestLocalBillingBatchLocksR06(t *testing.T) {
 	if err != nil {
 		t.Fatal("open local database failed")
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(8)
 	name := "ag_review_r06_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 	quoted := pq.QuoteIdentifier(name)
@@ -125,7 +126,7 @@ func TestLocalBillingBatchLocksR06(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if err := execBillingUpdate(ctx, tx, "SET LOCAL search_path TO "+quoted+",pg_catalog", nil); err != nil {
 		t.Fatal(err)
 	}

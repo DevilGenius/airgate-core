@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
-	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+
+	"github.com/DevilGenius/airgate-core/internal/config"
 )
 
 func TestDeferredUsageIndexesPreserveConstraintsAndDescriptors(t *testing.T) {
@@ -47,14 +48,14 @@ func TestLocalInvalidConcurrentIndexCanBeRebuilt(t *testing.T) {
 	if err != nil {
 		t.Fatal("open local database failed")
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	name := "ag_review_r08_index_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 	index := name + "_idx"
 	if _, err = conn.ExecContext(ctx, "CREATE TABLE public."+pq.QuoteIdentifier(name)+" (value integer)"); err != nil {

@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+
+	"github.com/DevilGenius/airgate-core/internal/config"
 )
 
 func TestLocalRebuildResumesAndCapturesLateIDs(t *testing.T) {
@@ -28,7 +29,7 @@ func TestLocalRebuildResumesAndCapturesLateIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal("open local database failed")
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(4)
 	schema := "ag_review_r08_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 	qualified := func(name string) string { return pq.QuoteIdentifier(schema) + "." + pq.QuoteIdentifier(name) }
@@ -65,12 +66,12 @@ func TestLocalRebuildResumesAndCapturesLateIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err = seed.ExecContext(t.Context(), "SET LOCAL search_path TO "+pq.QuoteIdentifier(schema)+", pg_catalog"); err != nil {
-		seed.Rollback()
+		_ = seed.Rollback()
 		t.Fatal(err)
 	}
 	for _, p := range projections() {
 		if _, err = seed.ExecContext(t.Context(), "WITH batch AS (SELECT "+sourceColumns+" FROM usage_logs) "+p.upsertSQL(p.name)); err != nil {
-			seed.Rollback()
+			_ = seed.Rollback()
 			t.Fatal(err)
 		}
 	}
@@ -83,7 +84,7 @@ func TestLocalRebuildResumesAndCapturesLateIDs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tx.Rollback()
+		defer func() { _ = tx.Rollback() }()
 		if _, err = tx.ExecContext(t.Context(), "SET LOCAL search_path TO "+pq.QuoteIdentifier(schema)+", pg_catalog"); err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +129,7 @@ func TestLocalRebuildResumesAndCapturesLateIDs(t *testing.T) {
 	var reader *sql.Tx
 	defer func() {
 		if reader != nil {
-			reader.Rollback()
+			_ = reader.Rollback()
 		}
 	}()
 	started := time.Now()
@@ -156,7 +157,7 @@ func TestLocalRebuildResumesAndCapturesLateIDs(t *testing.T) {
 	}
 	write(1001)
 	count("usage_hourly_rollups", 103)
-	reader.Rollback()
+	_ = reader.Rollback()
 	reader = nil
 	if err = Rebuild(t.Context(), db, RebuildOptions{Schema: schema, BatchSize: 25}); err != nil {
 		t.Fatal(err)

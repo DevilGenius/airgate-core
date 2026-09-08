@@ -14,7 +14,7 @@ import (
 
 func TestUsagePageIndexMatchesFiltersAndImmutablePages(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ctx := t.Context()
 	u1 := createTestUser(t, db, "pages-one@example.test")
 	u2 := createTestUser(t, db, "pages-two@example.test")

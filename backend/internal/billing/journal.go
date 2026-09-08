@@ -113,7 +113,7 @@ func readJournalRecord(path string) (UsageRecord, error) {
 	if err != nil {
 		return record, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	data, err := io.ReadAll(io.LimitReader(f, maxJournalRecordBytes+41))
 	if err != nil {
 		return record, err
@@ -163,7 +163,7 @@ func (j *Journal) Append(record UsageRecord) (UsageRecord, error) {
 		return record, err
 	}
 	nameTemp := f.Name()
-	defer os.Remove(nameTemp)
+	defer func() { _ = os.Remove(nameTemp) }()
 	if _, err = f.Write(data); err == nil {
 		err = f.Sync()
 	}

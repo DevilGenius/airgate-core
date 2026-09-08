@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/DevilGenius/airgate-core/internal/config"
 	_ "github.com/lib/pq"
+
+	"github.com/DevilGenius/airgate-core/internal/config"
 )
 
 // PostgreSQL temp tables shadow public tables on this private connection only.
@@ -24,7 +25,7 @@ func TestLocalCoverageVerification(t *testing.T) {
 	if err != nil {
 		t.Fatal("open test database failed")
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	exec := func(query string) {

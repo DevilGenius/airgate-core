@@ -3,14 +3,15 @@ package plugin
 import (
 	"context"
 	"encoding/json"
-	"github.com/DevilGenius/airgate-core/internal/auth"
-	"github.com/DevilGenius/airgate-core/internal/config"
 	"io"
 	"net/http"
 	"os"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/DevilGenius/airgate-core/internal/auth"
+	"github.com/DevilGenius/airgate-core/internal/config"
 )
 
 // Opt-in: replaces the three running local development gateways. It never
@@ -40,7 +41,7 @@ func TestLocalGatewayGenerationReload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("%s: HTTP %d", path, resp.StatusCode)
 		}

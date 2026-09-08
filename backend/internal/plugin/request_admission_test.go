@@ -5,9 +5,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DevilGenius/airgate-core/internal/auth"
 	"github.com/DevilGenius/airgate-core/internal/server/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 type mustNotReadBody struct{ t *testing.T }

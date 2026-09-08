@@ -120,7 +120,7 @@ func decodePageIndex(raw []byte) (*PageIndex, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	// Bound both compressed cache entries and their expanded representation.
 	data, err := io.ReadAll(io.LimitReader(reader, 64<<20+1))
 	if err != nil {

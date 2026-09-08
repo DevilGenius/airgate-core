@@ -222,7 +222,7 @@ func scanSourceFingerprint(root string) (string, bool) {
 			return nil
 		}
 		if strings.HasSuffix(info.Name(), ".go") || info.Name() == "go.mod" || info.Name() == "go.sum" || strings.Contains(filepath.ToSlash(path), "/webdist/") {
-			fmt.Fprintf(hash, "%s:%d:%d\\n", path, info.Size(), info.ModTime().UnixNano())
+			_, _ = fmt.Fprintf(hash, "%s:%d:%d\\n", path, info.Size(), info.ModTime().UnixNano())
 			found = true
 		}
 		return nil

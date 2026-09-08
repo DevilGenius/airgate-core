@@ -11,9 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"github.com/DevilGenius/airgate-core/internal/config"
 	"github.com/DevilGenius/airgate-core/internal/usageprojection"
-	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "open database failed")
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

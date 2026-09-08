@@ -2,7 +2,6 @@ package billing
 
 import (
 	"context"
-	entsql "entgo.io/ent/dialect/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	entsql "entgo.io/ent/dialect/sql"
 )
 
 func TestJournalCrashHelper(t *testing.T) {
