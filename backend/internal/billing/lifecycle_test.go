@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"entgo.io/ent/dialect/sql/schema"
+
 	"github.com/DevilGenius/airgate-core/ent"
+	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
 
 func TestConcurrentRecordAndStopDoNotSendToClosedChannel(t *testing.T) {
@@ -83,7 +87,8 @@ func TestShutdownWaitsForReservedProducerToPublishUsage(t *testing.T) {
 }
 
 func TestShutdownDeadlineRetainsJournalAndCancelsDatabaseWrite(t *testing.T) {
-	db := openBillingRecorderDB(t, "journal_stop_deadline")
+	// Canceling a CGO SQLite transaction may discard the last connection.
+	db := testdb.OpenEnt(t, "file:"+filepath.ToSlash(filepath.Join(t.TempDir(), "billing.db"))+"?_fk=1", schema.WithGlobalUniqueID(false))
 	defer closeBillingDB(t, db)
 	u, g, a, _ := createBillingFixture(t, t.Context(), db, "deadline")
 	dir := t.TempDir()

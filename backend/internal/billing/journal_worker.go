@@ -94,7 +94,7 @@ func permanentBillingError(err error) bool {
 		return postgres.Code.Class() == "22" || postgres.Code.Class() == "23" || postgres.Code.Class() == "21"
 	}
 	var sqlite interface{ Code() int }
-	return errors.As(err, &sqlite) && sqlite.Code()&255 == 19
+	return (errors.As(err, &sqlite) && sqlite.Code()&255 == 19) || cgoSQLiteConstraintError(err)
 }
 
 func (r *Recorder) flushJournalBatch(ctx context.Context, batch []UsageRecord) error {
