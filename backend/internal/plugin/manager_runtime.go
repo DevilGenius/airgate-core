@@ -800,7 +800,11 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 	return canonicalName, nil
 }
 
-func (m *Manager) stopPlugin(name string) {
+func (m *Manager) stopPlugin(name string, parents ...context.Context) {
+	ctx := context.Background()
+	if len(parents) > 0 {
+		ctx = parents[0]
+	}
 	m.mu.Lock()
 	resolvedName := m.resolveNameLocked(name)
 	inst, ok := m.instances[resolvedName]
@@ -811,7 +815,10 @@ func (m *Manager) stopPlugin(name string) {
 		}
 		m.mu.Unlock()
 		if wait != nil {
-			<-wait
+			select {
+			case <-wait:
+			case <-ctx.Done():
+			}
 		}
 		return
 	}
@@ -840,12 +847,16 @@ func (m *Manager) stopPlugin(name string) {
 		m.devWatcher.remove(inst.Name)
 	}
 
-	m.stopPluginRuntime(inst, idle, pluginStopDrainTimeout)
+	m.stopPluginRuntime(inst, idle, pluginStopDrainTimeout, ctx)
 }
 
-func (m *Manager) stopPluginRuntime(inst *PluginInstance, idle <-chan struct{}, drainTimeout time.Duration) {
+func (m *Manager) stopPluginRuntime(inst *PluginInstance, idle <-chan struct{}, drainTimeout time.Duration, parents ...context.Context) {
 	if inst == nil {
 		return
+	}
+	parent := context.Background()
+	if len(parents) > 0 {
+		parent = parents[0]
 	}
 
 	// Caller must begin drain before unlinking/replacing the instance so new
@@ -863,7 +874,7 @@ func (m *Manager) stopPluginRuntime(inst *PluginInstance, idle <-chan struct{}, 
 			"timeout_ms", drainTimeout.Milliseconds(),
 		)
 	}
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	stopCtx, stopCancel := context.WithTimeout(parent, 10*time.Second)
 	defer stopCancel()
 
 	if inst.Gateway != nil {
@@ -976,7 +987,9 @@ func pluginStopKeys(requestedName, resolvedName string, inst *PluginInstance) []
 // StopAll 停止所有插件。
 func (m *Manager) StopAll(ctx context.Context) {
 	if m.devWatcher != nil {
-		m.devWatcher.Close()
+		if err := m.devWatcher.CloseContext(ctx); err != nil {
+			slog.Warn("plugin_watcher_shutdown_pending", "error", err)
+		}
 	}
 
 	m.mu.RLock()
@@ -987,7 +1000,7 @@ func (m *Manager) StopAll(ctx context.Context) {
 	m.mu.RUnlock()
 
 	for _, name := range names {
-		m.stopPlugin(name)
+		m.stopPlugin(name, ctx)
 	}
 }
 

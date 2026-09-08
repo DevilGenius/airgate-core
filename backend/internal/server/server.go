@@ -4,10 +4,13 @@ package server
 import (
 	"context"
 	stdsql "database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -31,12 +34,13 @@ import (
 
 // Server HTTP 服务器
 type Server struct {
-	cfg    *config.Config
-	db     *ent.Client
-	rdb    *redis.Client
-	jwtMgr *auth.JWTManager
-	engine *gin.Engine
-	srv    *http.Server
+	cfg        *config.Config
+	db         *ent.Client
+	rdb        *redis.Client
+	jwtMgr     *auth.JWTManager
+	engine     *gin.Engine
+	srv        *http.Server
+	httpCancel context.CancelFunc
 
 	// 插件系统组件
 	pluginMgr      *plugin.Manager
@@ -205,6 +209,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	s.registerRoutes()
 
 	s.srv = httpguard.NewServer(fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port), s.engine, cfg.Server.MaxInFlightRequests, cfg.Server.MaxBufferedBodyBytes)
+	httpCtx, httpCancel := context.WithCancel(context.Background())
+	s.httpCancel = httpCancel
+	s.srv.BaseContext = func(net.Listener) context.Context { return httpCtx }
 
 	return s, nil
 }
@@ -319,23 +326,45 @@ func (s *Server) StartPlugins(ctx context.Context) {
 // Shutdown 优雅关闭服务器
 func (s *Server) Shutdown(ctx context.Context) error {
 	slog.Info("正在关闭服务器...")
-
-	shutdownErr := s.srv.Shutdown(ctx)
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+	}
+	s.recorder.StopAdmission()
+	s.pluginMgr.StopTaskAdmission()
+	deadline, _ := ctx.Deadline()
+	grace := min(5*time.Second, time.Until(deadline)/3)
+	if grace < 0 {
+		grace = 0
+	}
+	httpGrace, cancelGrace := context.WithTimeout(ctx, grace)
+	shutdownErr := s.srv.Shutdown(httpGrace)
+	cancelGrace()
+	if s.httpCancel != nil {
+		s.httpCancel()
+	}
+	if shutdownErr != nil {
+		_ = s.srv.Close()
+		if errors.Is(shutdownErr, context.DeadlineExceeded) && ctx.Err() == nil {
+			slog.Info("http_shutdown_forced_after_grace")
+			shutdownErr = nil
+		}
+	}
 
 	if s.pluginStartCancel != nil {
 		s.pluginStartCancel()
 	}
 
-	// 停止使用量记录器
-	s.recorder.Stop()
-
 	// 停止插件市场后台同步
+	var marketplaceErr error
 	if !s.cfg.Plugins.Marketplace.Disabled {
-		s.marketplace.Stop()
+		marketplaceErr = s.marketplace.StopContext(ctx)
 	}
 
 	// 停止所有插件
+	taskErr := s.pluginMgr.StopTaskDispatcher(ctx)
 	s.pluginMgr.StopAll(ctx)
-
-	return shutdownErr
+	billingErr := s.recorder.StopContext(ctx)
+	return errors.Join(shutdownErr, taskErr, billingErr, marketplaceErr)
 }

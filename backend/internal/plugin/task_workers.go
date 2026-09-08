@@ -87,3 +87,10 @@ func (m *Manager) StopTaskDispatcher(ctx context.Context) error {
 	p.mu.Unlock()
 	return p.wait(ctx)
 }
+
+func (m *Manager) StopTaskAdmission() {
+	p := m.taskWorkers()
+	p.mu.Lock()
+	p.stopping = true
+	p.mu.Unlock()
+}

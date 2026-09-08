@@ -44,6 +44,7 @@ type devWatcher struct {
 
 	stop      chan struct{}
 	done      chan struct{}
+	joined    chan struct{}
 	closeOnce sync.Once
 	wg        sync.WaitGroup
 	closed    bool
@@ -65,6 +66,7 @@ func newDevWatcher(mgr *Manager) *devWatcher {
 		plugins:  make(map[string]*devWatchEntry),
 		stop:     make(chan struct{}),
 		done:     make(chan struct{}),
+		joined:   make(chan struct{}),
 	}
 	safego.Go("plugin_dev_watcher", dw.loop)
 	return dw
@@ -98,8 +100,12 @@ func (dw *devWatcher) remove(name string) {
 
 // Close 停止 watcher 轮询，并等待已触发的 reload goroutine 结束。
 func (dw *devWatcher) Close() {
+	_ = dw.CloseContext(context.Background())
+}
+
+func (dw *devWatcher) CloseContext(ctx context.Context) error {
 	if dw == nil {
-		return
+		return nil
 	}
 	dw.closeOnce.Do(func() {
 		dw.mu.Lock()
@@ -108,9 +114,14 @@ func (dw *devWatcher) Close() {
 		dw.mu.Unlock()
 
 		close(dw.stop)
-		<-dw.done
-		dw.wg.Wait()
+		go func() { <-dw.done; dw.wg.Wait(); close(dw.joined) }()
 	})
+	select {
+	case <-dw.joined:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // loop 每 interval 扫描一次所有注册插件，发现 mtime 增长就触发 reload。

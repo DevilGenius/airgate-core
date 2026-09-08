@@ -144,6 +144,7 @@ type Recorder struct {
 	stopped      chan struct{}
 	retryStopped chan struct{}
 	once         sync.Once
+	startOnce    sync.Once
 
 	apiKeyAlertMu      sync.RWMutex
 	apiKeyBalanceAlert APIKeyBalanceAlertFunc
@@ -158,6 +159,17 @@ type Recorder struct {
 	producerIdle       chan struct{}
 	syncWrites         chan struct{}
 	syncWaiters        chan struct{}
+	queueMu            sync.RWMutex
+	queueClosed        bool
+	started            bool
+	recordCalls        int
+	recordIdle         chan struct{}
+	recordsClosed      bool
+	writesCtx          context.Context
+	cancelWrites       context.CancelFunc
+	shutdownCtx        context.Context
+	shutdownDone       chan struct{}
+	shutdownErr        error
 }
 
 // RecorderStats exposes queue counters for runtime monitoring.
@@ -181,6 +193,7 @@ func NewRecorder(db *ent.Client, bufferSize int, rdb ...*redis.Client) *Recorder
 	}
 	idle := make(chan struct{})
 	close(idle)
+	writeCtx, cancelWrites := context.WithCancel(context.Background())
 	return &Recorder{
 		db:           db,
 		rdb:          cache,
@@ -189,7 +202,8 @@ func NewRecorder(db *ent.Client, bufferSize int, rdb ...*redis.Client) *Recorder
 		stopCh:       make(chan struct{}),
 		stopped:      make(chan struct{}),
 		retryStopped: make(chan struct{}),
-		accepting:    true, producerIdle: idle, syncWrites: make(chan struct{}, 4), syncWaiters: make(chan struct{}, 64),
+		recordIdle:   idle, writesCtx: writeCtx, cancelWrites: cancelWrites, shutdownDone: make(chan struct{}),
+		accepting: true, producerIdle: idle, syncWrites: make(chan struct{}, 4), syncWaiters: make(chan struct{}, 64),
 	}
 }
 
@@ -210,6 +224,11 @@ func (r *Recorder) apiKeyBalanceAlertCallback() APIKeyBalanceAlertFunc {
 func (r *Recorder) Record(record UsageRecord) error {
 	record = ensureBillingEventID(record)
 	record = ensureUsageOccurredAt(record, time.Now())
+	finish, err := r.beginRecordCall()
+	if err != nil {
+		return r.saveLateRecord(record)
+	}
+	defer finish()
 	if r.journal != nil {
 		_, err := r.journal.Append(record)
 		if err == nil {
@@ -219,9 +238,16 @@ func (r *Recorder) Record(record UsageRecord) error {
 		}
 		return err
 	}
+	r.queueMu.RLock()
+	if r.queueClosed {
+		r.queueMu.RUnlock()
+		return errRecorderStopping
+	}
 	select {
 	case r.ch <- record:
+		r.queueMu.RUnlock()
 	default:
+		r.queueMu.RUnlock()
 		slog.Warn("billing_record_buffer_full",
 			"user_id", record.UserID,
 			"model", record.Model,
@@ -246,6 +272,13 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 	ctx, cancel := context.WithTimeout(ctx, syncFallbackTimeout)
 	defer cancel()
 	record = ensureUsageOccurredAt(ensureBillingEventID(record), time.Now())
+	finish, callErr := r.beginRecordCall()
+	if callErr != nil {
+		return 0, r.saveLateRecord(record)
+	}
+	defer finish()
+	stopCancellation := context.AfterFunc(r.writesCtx, cancel)
+	defer stopCancellation()
 	if r.journal != nil {
 		var err error
 		record, err = r.journal.Append(record)
@@ -323,31 +356,35 @@ func (r *Recorder) recordSyncDatabase(ctx context.Context, record UsageRecord) (
 
 // Start 启动后台写入 goroutine
 func (r *Recorder) Start() {
+	r.startOnce.Do(r.start)
+}
+
+func (r *Recorder) start() {
+	r.admissionMu.Lock()
+	if !r.accepting {
+		r.admissionMu.Unlock()
+		return
+	}
+	r.started = true
 	if r.journal != nil {
 		ctx, cancel := context.WithCancel(context.Background())
 		r.journalCancel = cancel
+		r.admissionMu.Unlock()
 		recorderGo("billing_journal", func() { r.runJournal(ctx) })
 		return
 	}
+	r.admissionMu.Unlock()
 	recorderGo("billing_recorder", r.run)
 	recorderGo("billing_recorder_retry", r.runRetries)
 }
 
 // Stop 停止写入，等待缓冲区清空
 func (r *Recorder) Stop() {
-	r.once.Do(func() {
-		if r.journal != nil {
-			if r.journalCancel != nil {
-				r.journalCancel()
-				<-r.journalDone
-			}
-			return
-		}
-		close(r.stopCh)
-		<-r.stopped
-		close(r.retryCh)
-		<-r.retryStopped
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownFlushTimeout)
+	defer cancel()
+	if err := r.StopContext(ctx); err != nil {
+		slog.Warn("billing_shutdown_pending", "error", err)
+	}
 }
 
 // Stats returns cheap in-memory queue counters for runtime monitoring.
@@ -376,7 +413,7 @@ func (r *Recorder) run() {
 	defer ticker.Stop()
 
 	batch := make([]UsageRecord, 0, batchSize)
-	ctx := context.Background()
+	ctx := r.writesCtx
 
 	for {
 		select {
@@ -395,12 +432,19 @@ func (r *Recorder) run() {
 
 		case <-r.stopCh:
 			// 停止前处理剩余数据
+			r.queueMu.Lock()
+			r.queueClosed = true
 			close(r.ch)
 			for rec := range r.ch {
 				batch = append(batch, rec)
 			}
+			r.queueMu.Unlock()
 			if len(batch) > 0 {
-				shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownFlushTimeout)
+				base := r.shutdownCtx
+				if base == nil {
+					base = context.Background()
+				}
+				shutdownCtx, cancel := context.WithTimeout(base, shutdownFlushTimeout)
 				r.flush(shutdownCtx, batch)
 				cancel()
 			}
@@ -444,7 +488,7 @@ func (r *Recorder) enqueueRetry(ctx context.Context, batch []UsageRecord, cause 
 
 func (r *Recorder) runRetries() {
 	defer close(r.retryStopped)
-	ctx := context.Background()
+	ctx := r.writesCtx
 	for batch := range r.retryCh {
 		if err := r.flushRetryBatch(ctx, batch); err != nil {
 			r.deadLetter(batch, "retry_exhausted", err)

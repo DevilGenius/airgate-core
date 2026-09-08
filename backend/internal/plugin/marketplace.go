@@ -181,15 +181,23 @@ func (m *Marketplace) Start(ctx context.Context) {
 
 // Stop 停止后台同步
 func (m *Marketplace) Stop() {
-	m.once.Do(func() {
-		close(m.stopCh)
-		m.mu.RLock()
-		started := m.started
-		m.mu.RUnlock()
-		if started {
-			<-m.stopped
-		}
-	})
+	_ = m.StopContext(context.Background())
+}
+
+func (m *Marketplace) StopContext(ctx context.Context) error {
+	m.once.Do(func() { close(m.stopCh) })
+	m.mu.RLock()
+	started := m.started
+	m.mu.RUnlock()
+	if !started {
+		return nil
+	}
+	select {
+	case <-m.stopped:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // run 后台运行循环：启动时同步一次，之后按 refreshInterval 定时同步

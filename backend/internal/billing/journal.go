@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -33,6 +34,17 @@ type Journal struct {
 	cursor    int
 	bytes     int64
 	lastErr   error
+	state     atomic.Pointer[journalStats]
+}
+
+type journalStats struct {
+	count int
+	bytes int64
+	err   error
+}
+
+func (j *Journal) publishStatsLocked() {
+	j.state.Store(&journalStats{len(j.entries), j.bytes, j.lastErr})
 }
 
 func JournalDirectory(pluginDir, override string) string {
@@ -125,6 +137,7 @@ func readJournalRecord(path string) (UsageRecord, error) {
 func (j *Journal) Append(record UsageRecord) (UsageRecord, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	defer j.publishStatsLocked()
 	name := journalName(record.BillingEventID)
 	target := filepath.Join(j.dir, name)
 	if existing, err := readJournalRecord(target); err == nil {
@@ -197,6 +210,7 @@ func (j *Journal) Append(record UsageRecord) (UsageRecord, error) {
 func (j *Journal) Refresh() error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	defer j.publishStatsLocked()
 	files, err := os.ReadDir(j.dir)
 	if err != nil {
 		j.lastErr = err
@@ -287,6 +301,7 @@ func (j *Journal) Batch(limit int) ([]UsageRecord, error) {
 func (j *Journal) forget(name string) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	defer j.publishStatsLocked()
 	j.bytes -= j.entries[name]
 	delete(j.entries, name)
 	j.compactOrder()
@@ -347,7 +362,8 @@ func (j *Journal) Requeue(id string) error {
 }
 
 func (j *Journal) Stats() (int, int64, error) {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	return len(j.entries), j.bytes, j.lastErr
+	if state := j.state.Load(); state != nil {
+		return state.count, state.bytes, state.err
+	}
+	return 0, 0, nil
 }

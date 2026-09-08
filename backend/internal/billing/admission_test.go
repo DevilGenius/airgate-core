@@ -63,10 +63,12 @@ func TestBillingAdmissionRejectsHighWaterAndRecovers(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.journal.bytes = journalHighWaterBytes
+	r.journal.publishStatsLocked()
 	if _, err := r.Reserve(); !errors.Is(err, ErrBillingBusy) {
 		t.Fatal("high-water admitted more consumption")
 	}
 	r.journal.bytes = 0
+	r.journal.publishStatsLocked()
 	release, err := r.Reserve()
 	if err != nil {
 		t.Fatal(err)
