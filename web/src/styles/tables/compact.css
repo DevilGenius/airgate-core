@@ -121,12 +121,28 @@
 /* Distribution tables stay compact and scroll inside summary cards. */
 
 .ag-distribution-table-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  max-height: 11rem;
+  max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
+}
+
+.ag-distribution-table-scroll > .ag-compact-data-table {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ag-distribution-table-scroll .ag-compact-data-table > [data-slot="wrapper"] {
+  display: flex;
+  min-height: 100%;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
 .ag-markdown-table {

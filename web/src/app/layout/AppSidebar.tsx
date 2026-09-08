@@ -237,7 +237,7 @@ const SidebarFooter = memo(function SidebarFooter({ collapsed, isMobile }: { col
   };
 
   return (
-    <div className="space-y-1 border-t border-border p-3">
+    <div className="ag-sidebar-footer space-y-1 border-t border-border p-3">
       {!collapsed && (
         <Button
           className="w-full justify-center"

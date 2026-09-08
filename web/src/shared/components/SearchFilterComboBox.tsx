@@ -1,8 +1,9 @@
-import { memo, useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 import { Input } from '@heroui/react';
 import { Search } from 'lucide-react';
 import { REMOTE_SEARCH_DEBOUNCE_MS } from '../constants';
 import { useSmoothSearchInput } from '../hooks/useSmoothSearchInput';
+import { useFloatingPopover } from '../hooks/useFloatingPopover';
 
 export interface SearchFilterComboBoxOption {
   description?: ReactNode;
@@ -50,6 +51,7 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
   });
   const isOpenRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const { popoverRef, triggerRef } = useFloatingPopover<HTMLDivElement>({ isOpen, align: 'start' });
   const selectedOnPointerDownRef = useRef(false);
 
   const closeDropdown = useCallback(() => {
@@ -153,6 +155,7 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
       <div className="relative" onPointerDownCapture={handleInputPointerDown}>
         <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
         <Input
+          ref={triggerRef as RefObject<HTMLInputElement | null>}
           aria-label={ariaLabel}
           className="ag-search-combobox-input"
           placeholder={placeholder}
@@ -161,7 +164,12 @@ export const SearchFilterComboBox = memo(function SearchFilterComboBox({
           onFocus={openDropdown}
         />
       </div>
-      <div className="ag-search-combobox-popover" hidden={!isOpen}>
+      <div
+        ref={popoverRef}
+        className="ag-search-combobox-popover"
+        data-floating-open={isOpen ? 'true' : undefined}
+        popover="manual"
+      >
         <div className="ag-search-combobox-list" role="listbox" aria-label={ariaLabel}>
           {items.length === 0 ? (
             <div className="ag-search-combobox-empty">

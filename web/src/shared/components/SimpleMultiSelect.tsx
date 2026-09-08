@@ -58,6 +58,7 @@ export const SimpleMultiSelect = memo(function SimpleMultiSelect({
       className={['ag-simple-select-trigger select__trigger', triggerClassName].filter(Boolean).join(' ')}
       label={displayLabel}
       onOpenChange={onOpenChange}
+      popoverAlign="start"
       rootClassName={['ag-simple-select', 'ag-simple-multi-select', fullWidth && 'ag-simple-select--full', className].filter(Boolean).join(' ')}
     >
       {() => (

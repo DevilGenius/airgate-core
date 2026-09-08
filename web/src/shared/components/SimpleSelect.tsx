@@ -51,6 +51,7 @@ export const SimpleSelect = memo(function SimpleSelect({
       disabled={isDisabled}
       label={displayLabel}
       onOpenChange={onOpenChange}
+      popoverAlign="start"
       rootClassName={['ag-simple-select', fullWidth && 'ag-simple-select--full', className].filter(Boolean).join(' ')}
     >
       {(close) => (

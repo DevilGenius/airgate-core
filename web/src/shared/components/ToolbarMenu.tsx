@@ -1,5 +1,6 @@
-import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
+import { useFloatingPopover } from '../hooks/useFloatingPopover';
 
 interface ToolbarMenuProps {
   ariaLabel: string;
@@ -9,6 +10,7 @@ interface ToolbarMenuProps {
   icon?: ReactNode;
   label: ReactNode;
   onOpenChange?: (isOpen: boolean) => void;
+  popoverAlign?: 'start' | 'end';
   rootClassName?: string;
 }
 
@@ -31,11 +33,13 @@ export const ToolbarMenu = memo(function ToolbarMenu({
   icon,
   label,
   onOpenChange,
+  popoverAlign = 'end',
   rootClassName,
 }: ToolbarMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isOpenRef = useRef(isOpen);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const { popoverRef, triggerRef } = useFloatingPopover<HTMLDivElement>({ isOpen, align: popoverAlign });
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -88,6 +92,7 @@ export const ToolbarMenu = memo(function ToolbarMenu({
   return (
     <div ref={rootRef} className={['ag-toolbar-menu', rootClassName].filter(Boolean).join(' ')}>
       <button
+        ref={triggerRef as RefObject<HTMLButtonElement | null>}
         type="button"
         aria-expanded={isOpen}
         aria-haspopup="menu"
@@ -103,7 +108,13 @@ export const ToolbarMenu = memo(function ToolbarMenu({
         <ChevronDown className="ag-toolbar-menu-caret" aria-hidden="true" />
       </button>
       {isOpen ? (
-        <div className="ag-toolbar-menu-popover" role="presentation">
+        <div
+          ref={popoverRef}
+          className="ag-toolbar-menu-popover"
+          data-floating-open="true"
+          popover="manual"
+          role="presentation"
+        >
           <div className="ag-toolbar-menu-list" role="menu" aria-label={ariaLabel}>
             {children(close)}
           </div>

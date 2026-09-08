@@ -511,11 +511,15 @@ function PluginConfigModal({
               width: 'min(100%, calc(100vw - 2rem))',
             }}
           >
-            <Modal.Header>
-              <Modal.Heading>{`配置 - ${plugin?.display_name || plugin?.name || ''}`}</Modal.Heading>
+            <Modal.Header className="ag-modal-header ag-modal-header--with-close">
+              <div className="ag-modal-title-row">
+                <div className="ag-modal-title-copy">
+                  <Modal.Heading className="ag-modal-heading">{`配置 - ${plugin?.display_name || plugin?.name || ''}`}</Modal.Heading>
+                </div>
+              </div>
               <Modal.CloseTrigger />
             </Modal.Header>
-            <Modal.Body>
+            <Modal.Body className="p-6">
               {isLoading ? (
                 <div className="flex items-center justify-center py-10">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
@@ -792,11 +796,15 @@ function InstallPluginModal({
             className="ag-elevation-modal"
             style={{ maxWidth: '520px', width: 'min(100%, calc(100vw - 2rem))' }}
           >
-            <Modal.Header>
-              <Modal.Heading>{t('plugins.install_plugin')}</Modal.Heading>
+            <Modal.Header className="ag-modal-header ag-modal-header--with-close">
+              <div className="ag-modal-title-row">
+                <div className="ag-modal-title-copy">
+                  <Modal.Heading className="ag-modal-heading">{t('plugins.install_plugin')}</Modal.Heading>
+                </div>
+              </div>
               <Modal.CloseTrigger />
             </Modal.Header>
-            <Modal.Body>
+            <Modal.Body className="p-6">
               <Tabs
                 className="ag-install-tabs ag-page-tabs ag-page-tabs-compact"
                 selectedKey={installTab}

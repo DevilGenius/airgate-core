@@ -39,7 +39,7 @@ export function AppShell() {
   }, [site.site_name]);
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-bg text-text">
+    <div className="ag-app-shell fixed inset-0 flex overflow-hidden bg-bg text-text">
       <ShellLoadingLine />
 
       {isMobile && mobileOpen && (

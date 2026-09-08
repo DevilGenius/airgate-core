@@ -143,10 +143,8 @@
 }
 
 .ag-simple-select .ag-toolbar-menu-popover {
-  left: 0;
-  right: auto;
-  width: 100%;
-  min-width: 100%;
+  width: min(var(--ag-floating-trigger-width, 100%), 18rem);
+  min-width: min(var(--ag-floating-trigger-width, 100%), 18rem);
 }
 
 .ag-simple-select-popover-content {
@@ -215,13 +213,19 @@
 }
 
 .ag-search-combobox-popover {
-  position: absolute;
-  z-index: 90;
-  top: calc(100% + 0.375rem);
-  left: 0;
-  width: 100%;
-  min-width: 100%;
+  position: fixed;
+  inset: auto;
+  z-index: 220;
+  top: var(--ag-floating-top, calc(100% + 0.375rem));
+  left: var(--ag-floating-left, 0);
+  right: auto;
+  bottom: auto;
+  margin: 0;
+  width: min(var(--ag-floating-trigger-width, 100%), 20rem);
+  min-width: min(var(--ag-floating-trigger-width, 100%), 20rem);
   max-width: min(20rem, calc(100vw - 2rem));
+  max-height: min(28rem, calc(100dvh - 1.5rem));
+  overflow-y: auto;
   border: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
   border-radius: var(--field-radius);
   background: var(--overlay);
@@ -230,6 +234,14 @@
   padding: 0.25rem;
   animation: none !important;
   transition: none !important;
+}
+
+.ag-search-combobox-popover:not(:popover-open) {
+  display: none;
+}
+
+.ag-search-combobox-popover:not([data-floating-open="true"]) {
+  display: none;
 }
 
 .ag-search-combobox-popover[hidden] {
