@@ -90,7 +90,12 @@ func (f *Forwarder) runForwardEndChain(c *gin.Context, state *forwardState, exec
 func callMiddlewareBegin(parent context.Context, p *PluginInstance, req *sdk.MiddlewareRequest) *sdk.MiddlewareDecision {
 	ctx, cancel := context.WithTimeout(parent, middlewarePerCallTimeout)
 	defer cancel()
-	decision, err := p.Middleware.OnForwardBegin(ctx, req)
+	current, release, err := p.Acquire()
+	if err != nil {
+		return nil
+	}
+	defer release()
+	decision, err := current.Middleware.OnForwardBegin(ctx, req)
 	if err != nil {
 		return nil
 	}
@@ -100,7 +105,12 @@ func callMiddlewareBegin(parent context.Context, p *PluginInstance, req *sdk.Mid
 func callMiddlewareEnd(parent context.Context, p *PluginInstance, evt *sdk.MiddlewareEvent) {
 	ctx, cancel := context.WithTimeout(parent, middlewarePerCallTimeout)
 	defer cancel()
-	_ = p.Middleware.OnForwardEnd(ctx, evt)
+	current, release, err := p.Acquire()
+	if err != nil {
+		return
+	}
+	defer release()
+	_ = current.Middleware.OnForwardEnd(ctx, evt)
 }
 
 func buildMiddlewareRequest(state *forwardState, bag map[string]string) *sdk.MiddlewareRequest {

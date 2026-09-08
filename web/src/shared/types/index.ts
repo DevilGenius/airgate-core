@@ -804,6 +804,9 @@ export interface TestProxyResp {
 // ==================== Plugin ====================
 
 export interface PluginResp {
+  generation: string;
+  update_state: 'active' | 'preparing' | 'draining';
+  draining_requests: number;
   name: string;
   display_name?: string;
   version?: string;

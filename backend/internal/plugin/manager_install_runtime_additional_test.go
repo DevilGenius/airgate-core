@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestInstallFromBinaryWithSHA256ValidationEdges(t *testing.T) {
@@ -183,148 +182,6 @@ func TestInstallFromGithubValidationErrorsBeforeProcessStart(t *testing.T) {
 	}
 }
 
-func TestManagerRuntimeFilesystemAndStopEdges(t *testing.T) {
-	ctx := context.Background()
-	missing := filepath.Join(t.TempDir(), "missing")
-	mgr := NewManager(missing, "debug", "", nil)
-	t.Cleanup(mgr.devWatcher.Close)
-
-	if err := mgr.LoadAll(ctx); err != nil {
-		t.Fatalf("LoadAll missing dir error = %v", err)
-	}
-	if err := mgr.LoadDev(ctx, "demo", missing); err == nil {
-		t.Fatal("LoadDev missing src error = nil")
-	}
-	if err := mgr.ReloadDev(ctx, "demo"); err == nil {
-		t.Fatal("ReloadDev non-dev error = nil")
-	}
-
-	root := t.TempDir()
-	mgr.pluginDir = root + string(rune(0))
-	if err := mgr.LoadAll(ctx); err == nil || !strings.Contains(err.Error(), "读取插件目录失败") {
-		t.Fatalf("LoadAll invalid path error = %v", err)
-	}
-
-	if err := os.WriteFile(filepath.Join(root, "not-a-dir"), []byte("x"), 0644); err != nil {
-		t.Fatalf("write file: %v", err)
-	}
-	if err := os.Mkdir(filepath.Join(root, "empty-plugin"), 0755); err != nil {
-		t.Fatalf("mkdir plugin: %v", err)
-	}
-	if err := os.Mkdir(filepath.Join(root, "bad-plugin"), 0755); err != nil {
-		t.Fatalf("mkdir bad plugin: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "bad-plugin", "bad-plugin"), []byte("not an executable plugin"), 0644); err != nil {
-		t.Fatalf("write bad plugin binary: %v", err)
-	}
-	mgr.pluginDir = root
-	if err := mgr.LoadAll(ctx); err != nil {
-		t.Fatalf("LoadAll empty entries error = %v", err)
-	}
-	if err := mgr.waitForPluginStop(ctx, " "); err != nil {
-		t.Fatalf("waitForPluginStop blank name = %v", err)
-	}
-
-	done := make(chan struct{})
-	mgr.mu.Lock()
-	mgr.stopping["demo"] = done
-	mgr.mu.Unlock()
-	close(done)
-	mgr.stopPlugin("demo")
-
-	blocked := make(chan struct{})
-	mgr.mu.Lock()
-	mgr.stopping["blocked"] = blocked
-	mgr.mu.Unlock()
-	cancelCtx, cancel := context.WithCancel(ctx)
-	cancel()
-	if err := mgr.waitForPluginStop(cancelCtx, "blocked"); !errors.Is(err, context.Canceled) {
-		t.Fatalf("waitForPluginStop canceled error = %v", err)
-	}
-
-	finish := make(chan struct{})
-	mgr.mu.Lock()
-	mgr.stopping["finish"] = finish
-	mgr.mu.Unlock()
-	mgr.finishPluginStop([]string{"finish", "missing"}, finish)
-	select {
-	case <-finish:
-	default:
-		t.Fatal("finishPluginStop did not close done channel")
-	}
-	if got := mgr.stopping["finish"]; got != nil {
-		t.Fatalf("stopping entry after finish = %v", got)
-	}
-
-	keys := pluginStopKeys(" requested ", "canonical", &PluginInstance{Name: "canonical", SourceName: "requested", BinaryDir: "bin"})
-	if strings.Join(keys, ",") != "requested,canonical,bin" {
-		t.Fatalf("pluginStopKeys = %v", keys)
-	}
-
-	stoppedBackground := false
-	mgr.mu.Lock()
-	mgr.instances["demo"] = &PluginInstance{
-		Name:           "demo",
-		SourceName:     "requested",
-		BinaryDir:      "bin",
-		Platform:       "openai",
-		stopBackground: func() { stoppedBackground = true },
-	}
-	mgr.modelCache["openai"] = nil
-	mgr.routeCache["demo"] = nil
-	mgr.credCache["openai"] = nil
-	mgr.accountTypeCache["openai"] = nil
-	mgr.frontendPageCache["demo"] = nil
-	mgr.hostHandles["demo"] = &pluginHostHandle{pluginName: "demo"}
-	mgr.aliases["requested"] = "demo"
-	mgr.devPaths["demo"] = root
-	mgr.mu.Unlock()
-	mgr.stopPlugin("requested")
-	if !stoppedBackground {
-		t.Fatal("stopPlugin did not call stopBackground")
-	}
-	if mgr.instances["demo"] != nil || mgr.modelCache["openai"] != nil || mgr.hostHandles["demo"] != nil {
-		t.Fatalf("stopPlugin left runtime cache entries: instances=%+v models=%+v handles=%+v", mgr.instances, mgr.modelCache, mgr.hostHandles)
-	}
-	mgr.StopAll(ctx)
-}
-
-func TestStopPluginRuntimeDoesNotBeginDrain(t *testing.T) {
-	mgr := &Manager{}
-	inst := &PluginInstance{Name: "demo"}
-
-	mgr.stopPluginRuntime(inst, nil, pluginStopDrainTimeout)
-
-	inst.lifecycleMu.Lock()
-	draining := inst.draining
-	inst.lifecycleMu.Unlock()
-	if draining {
-		t.Fatal("stopPluginRuntime should use caller-provided drain state")
-	}
-}
-
-func TestStopPluginDrainTimeoutIsImmediate(t *testing.T) {
-	idle := make(chan struct{})
-	done := make(chan bool, 1)
-	go func() {
-		done <- waitPluginDrain(nil, idle, pluginStopDrainTimeout)
-	}()
-
-	select {
-	case drained := <-done:
-		if drained {
-			t.Fatal("open idle channel should not drain with immediate stop timeout")
-		}
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("immediate stop timeout blocked waiting for drain")
-	}
-
-	close(idle)
-	if !waitPluginDrain(nil, idle, pluginStopDrainTimeout) {
-		t.Fatal("closed idle channel should report drained")
-	}
-}
-
 func TestManagerInstallLocalFilesystemEdges(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
@@ -344,7 +201,6 @@ func TestManagerInstallLocalFilesystemEdges(t *testing.T) {
 	mgr.instances["canonical"] = &PluginInstance{
 		Name:           "canonical",
 		SourceName:     "alias",
-		BinaryDir:      "binary-dir",
 		Platform:       "openai",
 		stopBackground: func() { stoppedBackground = true },
 	}
@@ -358,10 +214,10 @@ func TestManagerInstallLocalFilesystemEdges(t *testing.T) {
 	if !stoppedBackground {
 		t.Fatal("Uninstall did not stop background work")
 	}
-	if _, err := os.Stat(canonicalDir); !os.IsNotExist(err) {
-		t.Fatalf("canonical dir stat error = %v, want not exist", err)
+	if _, err := os.Stat(canonicalDir); err != nil {
+		t.Fatalf("canonical dir stat error = %v, unrelated directory should remain", err)
 	}
-	if _, err := os.Stat(binaryDir); !os.IsNotExist(err) {
+	if _, err := os.Stat(binaryDir); err != nil {
 		t.Fatalf("binary dir stat error = %v, want not exist", err)
 	}
 	mgr.mu.RLock()
@@ -372,31 +228,17 @@ func TestManagerInstallLocalFilesystemEdges(t *testing.T) {
 	}
 
 	mgr.pluginDir = root + string(rune(0))
-	if err := mgr.Uninstall(ctx, "missing"); err == nil || !strings.Contains(err.Error(), "删除插件目录失败") {
+	if err := mgr.Uninstall(ctx, "missing"); err == nil || !strings.Contains(err.Error(), "删除插件清单失败") {
 		t.Fatalf("Uninstall invalid path error = %v", err)
 	}
 }
 
-func TestInstallFromBinaryStopsBeforeRealStartOnFilesystemError(t *testing.T) {
+func TestInstallFromBinaryPreservesActiveOnFilesystemError(t *testing.T) {
 	mgr := NewManager(t.TempDir()+string(rune(0)), "debug", "", nil)
 	t.Cleanup(mgr.devWatcher.Close)
 
 	err := mgr.InstallFromBinary(context.Background(), "fallback-name", []byte("not an executable plugin"))
-	if err == nil || !strings.Contains(err.Error(), "创建插件目录失败") {
+	if err == nil || !strings.Contains(err.Error(), "创建插件版本目录失败") {
 		t.Fatalf("InstallFromBinary invalid plugin dir error = %v", err)
-	}
-}
-
-func TestProbeAndRestorePreviousBinaryFilesystemErrors(t *testing.T) {
-	mgr := NewManager(t.TempDir(), "debug", "", nil)
-	t.Cleanup(mgr.devWatcher.Close)
-
-	if _, err := mgr.probePluginName("bad"+string(rune(0))+"name", []byte("x")); err == nil || !strings.Contains(err.Error(), "写入临时二进制失败") {
-		t.Fatalf("probePluginName invalid fallback error = %v", err)
-	}
-
-	err := mgr.restorePreviousBinary(context.Background(), "demo", filepath.Join(t.TempDir()+string(rune(0)), "demo"), []byte("previous"))
-	if err == nil || !strings.Contains(err.Error(), "写回旧插件二进制失败") {
-		t.Fatalf("restorePreviousBinary invalid path error = %v", err)
 	}
 }

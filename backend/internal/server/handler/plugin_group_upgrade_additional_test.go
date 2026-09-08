@@ -95,7 +95,7 @@ func TestPluginHandlerRoutesWithFakeAdminService(t *testing.T) {
 	if manager.githubRepo != "DevilGenius/airgate-openai" || manager.githubVersion != "v0.2.0" {
 		t.Fatalf("github install args = %q %q", manager.githubRepo, manager.githubVersion)
 	}
-	if manager.uninstalled != "gateway-openai" || manager.reloadedDev != "gateway-openai" || !marketplace.synced {
+	if manager.uninstalled != "gateway-openai" || !manager.reloadedInstance || !marketplace.synced {
 		t.Fatalf("delegation state manager=%+v marketplace=%+v", manager, marketplace)
 	}
 
@@ -195,7 +195,7 @@ func TestPluginHandlerErrorRoutesWithFakeAdminService(t *testing.T) {
 
 	nonDevHandler := NewPluginHandler(pluginadmin.NewService(&pluginHandlerManagerStub{}, nil))
 	w := invokeHandlerForValidation(http.MethodPost, "/plugins/p/reload", "", gin.Params{{Key: "name", Value: "p"}}, nil, nonDevHandler.ReloadPlugin)
-	if w.Code != http.StatusBadRequest {
+	if w.Code != http.StatusOK {
 		t.Fatalf("non-dev reload status = %d, body=%s", w.Code, w.Body.String())
 	}
 }
@@ -366,7 +366,7 @@ func (s *pluginHandlerManagerStub) ReloadDev(_ context.Context, name string) err
 
 func (s *pluginHandlerManagerStub) ReloadInstance(context.Context, string) error {
 	s.reloadedInstance = true
-	return nil
+	return s.reloadDevErr
 }
 
 func (s *pluginHandlerManagerStub) IsDev(string) bool {

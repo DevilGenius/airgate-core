@@ -78,8 +78,8 @@ func NewHostService(
 //  3. spawn 完成 → Info() 拿到 capability 列表 → 调 handle.SetCapabilities(...)
 //  4. 之后插件调任何 RPC 都会按当前 capability set 过滤
 //
-// 这个时序窗口意味着：插件的 Init() 阶段**不应该**调 host RPC（capability 还没绑），
-// 只能在 Start() 之后用。这是有意为之——Init 应该是同步的、不依赖 core 反向通道。
+// Capability binding completes before Init. A candidate can restore shared
+// state during initialization using its own authenticated Host connection.
 func (h *HostService) NewPluginHandle(pluginName string) *pluginHostHandle {
 	return &pluginHostHandle{base: h, pluginName: pluginName}
 }
@@ -198,6 +198,11 @@ func (h *HostService) invoke(
 ) (map[string]interface{}, error) {
 	_ = metadata
 	switch method {
+	case sdk.RuntimeStateMethod:
+		if h.manager == nil {
+			return nil, status.Error(codes.Unavailable, "runtime state unavailable")
+		}
+		return h.manager.runtimeState.invoke(ctx, pluginID, payload)
 	case hostMethodSchedulerSelectAccount:
 		var req hostSelectAccountRequest
 		if err := decodeHostPayload(payload, &req); err != nil {

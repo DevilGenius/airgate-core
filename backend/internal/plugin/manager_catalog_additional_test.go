@@ -29,6 +29,8 @@ func TestManagerCatalogClonesAliasesAndMeta(t *testing.T) {
 		instances: map[string]*PluginInstance{
 			"gateway-openai": {
 				Name:               "gateway-openai",
+				Artifact:           &pluginArtifact{},
+				frontendAssets:     map[string]bool{"index.js": true},
 				DisplayName:        "OpenAI",
 				Version:            "1.2.3",
 				Author:             "AirGate",
@@ -115,9 +117,7 @@ func TestManagerCatalogClonesAliasesAndMeta(t *testing.T) {
 	if got := mgr.frontendPageCache["gateway-openai"][0].Title; got != "OpenAI" {
 		t.Fatalf("GetFrontendPages should clone, cache title = %q", got)
 	}
-	if got, ok := mgr.DevWebDistPath("openai"); !ok || got != filepath.Join(filepath.Dir(srcPath), "web", "dist") {
-		t.Fatalf("DevWebDistPath() = %q/%v", got, ok)
-	}
+
 	if !mgr.HasWebAssets("openai") {
 		t.Fatal("HasWebAssets(alias) = false, want true")
 	}
@@ -157,7 +157,7 @@ func TestManagerInstalledBinaryHashAndNameNormalization(t *testing.T) {
 	want := hex.EncodeToString(sum[:])
 
 	mgr := &Manager{pluginDir: root}
-	if got := mgr.installedBinarySHA256Locked(&PluginInstance{Name: "gateway-openai", BinaryDir: "gateway-openai"}); got != want {
+	if got := mgr.installedBinarySHA256Locked(&PluginInstance{Name: "gateway-openai", Artifact: &pluginArtifact{SHA256: want}}); got != want {
 		t.Fatalf("installedBinarySHA256Locked() = %q, want %q", got, want)
 	}
 	if got := mgr.installedBinarySHA256Locked(nil); got != "" {
@@ -166,12 +166,7 @@ func TestManagerInstalledBinaryHashAndNameNormalization(t *testing.T) {
 	if got := normalizePluginName(" gateway-openai "); got != "gateway-openai" {
 		t.Fatalf("normalizePluginName() = %q", got)
 	}
-	if got := canonicalPluginName(sdk.PluginInfo{ID: " gateway-openai "}, "fallback"); got != "gateway-openai" {
-		t.Fatalf("canonicalPluginName(id) = %q", got)
-	}
-	if got := canonicalPluginName(sdk.PluginInfo{}, " fallback "); got != "fallback" {
-		t.Fatalf("canonicalPluginName(fallback) = %q", got)
-	}
+
 }
 
 func TestManagerPluginConfigUsesSQLiteTestDB(t *testing.T) {
@@ -220,58 +215,6 @@ func TestManagerPluginConfigUsesSQLiteTestDB(t *testing.T) {
 	}
 }
 
-func TestManagerLifecycleAndHostHandles(t *testing.T) {
-	t.Parallel()
-
-	mgr := NewManager(t.TempDir(), "debug", "", nil)
-	t.Cleanup(mgr.devWatcher.Close)
-
-	mgr.SetLoading(true)
-	if !mgr.IsLoading() {
-		t.Fatal("IsLoading() = false, want true")
-	}
-	mgr.SetLoading(false)
-	if mgr.IsLoading() {
-		t.Fatal("IsLoading() = true, want false")
-	}
-	if got := (&Manager{}).prepareHostHandle("plugin"); got != nil {
-		t.Fatalf("prepareHostHandle without host service = %+v, want nil", got)
-	}
-
-	host := NewHostService(nil, mgr, nil, nil, nil, nil)
-	mgr.SetHostService(host)
-	handle := mgr.prepareHostHandle("requested")
-	if handle == nil || handle.pluginName != "requested" {
-		t.Fatalf("prepareHostHandle() = %+v", handle)
-	}
-	if got := mgr.prepareHostHandle("requested"); got != handle {
-		t.Fatal("prepareHostHandle should reuse existing handle")
-	}
-	mgr.finalizeHostHandle("requested", sdk.PluginInfo{
-		SDKVersion:   sdk.SDKVersion,
-		Capabilities: []sdk.Capability{sdk.CapabilityHostInvoke},
-	})
-	if err := handle.requireMethod("anything.allowed.by.host.invoke"); err != nil {
-		t.Fatalf("finalized host handle denied method: %v", err)
-	}
-	mgr.relocateHostHandle("requested", "canonical")
-	if got := mgr.lookupHostHandle("requested"); got != nil {
-		t.Fatalf("old host handle = %+v, want nil", got)
-	}
-	if got := mgr.lookupHostHandle("canonical"); got != handle || got.pluginName != "canonical" {
-		t.Fatalf("relocated host handle = %+v", got)
-	}
-	mgr.relocateHostHandle("canonical", "canonical")
-	if got := mgr.lookupHostHandle("canonical"); got != handle {
-		t.Fatal("relocate to same key should keep handle")
-	}
-	mgr.removeHostHandle("canonical")
-	if got := mgr.lookupHostHandle("canonical"); got != nil {
-		t.Fatalf("removed host handle = %+v, want nil", got)
-	}
-	mgr.finalizeHostHandle("missing", sdk.PluginInfo{})
-}
-
 func TestDevWatcherScansAndCloses(t *testing.T) {
 	t.Parallel()
 
@@ -289,11 +232,11 @@ func TestDevWatcherScansAndCloses(t *testing.T) {
 		t.Fatalf("write ignored file: %v", err)
 	}
 
-	if _, ok := scanMaxGoMtime(filepath.Join(root, "missing")); ok {
-		t.Fatal("scanMaxGoMtime(missing) ok = true, want false")
+	if _, ok := scanSourceFingerprint(filepath.Join(root, "missing")); ok {
+		t.Fatal("scanSourceFingerprint(missing) ok = true, want false")
 	}
-	if _, ok := scanMaxGoMtime(root); !ok {
-		t.Fatal("scanMaxGoMtime(root) ok = false, want true")
+	if _, ok := scanSourceFingerprint(root); !ok {
+		t.Fatal("scanSourceFingerprint(root) ok = false, want true")
 	}
 
 	dw := newDevWatcher(&Manager{})

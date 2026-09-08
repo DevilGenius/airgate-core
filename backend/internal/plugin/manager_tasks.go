@@ -48,6 +48,8 @@ func (c *taskTypesCache) set(pluginID string, types []string) {
 	c.types[pluginID] = types
 }
 
+func (c *taskTypesCache) remove(key string) { c.mu.Lock(); delete(c.types, key); c.mu.Unlock() }
+
 // StartTaskDispatcher 启动任务分发循环。在 Manager 启动时调用。
 // 启动前先将所有遗留的 processing 任务重置为 retrying，确保服务重启后立即恢复。
 func (m *Manager) StartTaskDispatcher(ctx context.Context) {
@@ -211,7 +213,12 @@ func (m *Manager) dispatchPluginTasks(ctx context.Context, pluginID string, task
 		return
 	}
 
-	typeSet, err := m.getPluginTaskTypes(ctx, pluginID, inst.Extension)
+	inst, releaseBatch, err := inst.Acquire()
+	if err != nil {
+		return
+	}
+	defer releaseBatch()
+	typeSet, err := m.getPluginTaskTypes(ctx, pluginID+":"+inst.Generation, inst.Extension)
 	if err != nil {
 		slog.Warn("task_dispatch_get_types_failed", sdk.LogFieldPluginID, pluginID, sdk.LogFieldError, err)
 		return
@@ -239,10 +246,7 @@ func (m *Manager) dispatchPluginTasks(ctx context.Context, pluginID string, task
 		if !pool.begin(pluginID) {
 			return
 		}
-		if !inst.acquireRequest() {
-			pool.finish(pluginID, false)
-			return
-		}
+		inst.retainRequest()
 		if err := claimDispatchTask(ctx, db, t); err != nil {
 			inst.releaseRequest()
 			pool.finish(pluginID, false)

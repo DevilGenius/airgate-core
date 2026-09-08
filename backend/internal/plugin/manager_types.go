@@ -4,7 +4,6 @@ package plugin
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"strings"
 	"sync"
 
@@ -20,7 +19,16 @@ import (
 type PluginInstance struct {
 	Name               string
 	SourceName         string
-	BinaryDir          string
+	Generation         string
+	Artifact           *pluginArtifact
+	owner              *Manager
+	stopOnce           sync.Once
+	drainOnce          sync.Once
+	stopped            chan struct{}
+	backgroundTasks    []sdk.BackgroundTask
+	frontendAssets     map[string]bool
+	runtime            lifecycleClient
+	callbacks          []*runtimeCallbackResource
 	DisplayName        string
 	Version            string
 	Author             string
@@ -50,14 +58,15 @@ type PluginInstance struct {
 var errPluginInstanceDraining = errors.New("plugin instance is reloading or stopping")
 
 func (inst *PluginInstance) Forward(ctx context.Context, req *sdk.ForwardRequest) (sdk.ForwardOutcome, error) {
-	if inst == nil || inst.Gateway == nil {
+	current, release, err := inst.Acquire()
+	if err != nil {
+		return sdk.ForwardOutcome{}, err
+	}
+	defer release()
+	if current.Gateway == nil {
 		return sdk.ForwardOutcome{}, errors.New("plugin gateway is not available")
 	}
-	if !inst.acquireRequest() {
-		return sdk.ForwardOutcome{Kind: sdk.OutcomeUnknown, Reason: errPluginInstanceDraining.Error()}, errPluginInstanceDraining
-	}
-	defer inst.releaseRequest()
-	return inst.Gateway.Forward(ctx, req)
+	return current.Gateway.Forward(ctx, req)
 }
 
 func (inst *PluginInstance) acquireRequest() bool {
@@ -127,10 +136,6 @@ type Manager struct {
 	// 由 SetHostService 注入；nil 时插件 ctx.Host()==nil（软失败模式）。
 	hostFactory *HostService
 
-	// hostHandles 保留每个插件名 → 它当前的 host handle，用于 spawn 完成后写入 capability set。
-	// key 一般是 canonicalName；spawn 中会用 requestedName 临时占位，spawn 后改 key。
-	hostHandles map[string]*pluginHostHandle
-
 	// pluginDB 给每个插件 provision 独立 schema + 受限 role + plugin_dsn。
 	// 详见 ADR-0001 Decision 5。nil 时不做 provisioning（仍然可以正常加载插件，
 	// 只是它们拿不到 plugin_dsn，必须用旧的 db_dsn）。
@@ -142,8 +147,17 @@ type Manager struct {
 
 	mu             sync.RWMutex
 	instances      map[string]*PluginInstance
-	stopping       map[string]chan struct{}
 	loading        bool
+	closing        bool
+	runtimeCtx     context.Context
+	runtimeCancel  context.CancelFunc
+	updates        map[string]*pluginUpdate
+	activeUpdates  int
+	artifactMu     sync.RWMutex
+	retiring       map[string]*PluginInstance
+	runtimeState   runtimeStateStore
+	callbackMu     sync.Mutex
+	callbacks      map[runtimeCallbackKey]*runtimeCallbackResource
 	taskPoolOnce   sync.Once
 	taskPool       *taskWorkerPool
 	taskDispatchMu sync.Mutex
@@ -185,6 +199,9 @@ func (m *Manager) IsLoading() bool {
 
 // PluginMeta 插件运行时元信息。
 type PluginMeta struct {
+	Generation         string
+	UpdateState        string
+	DrainingRequests   int
 	Name               string
 	DisplayName        string
 	Version            string
@@ -209,14 +226,17 @@ type PluginMeta struct {
 // 由 SetHostService 注入。因此这里不再需要 coreBaseURL / apiKeySecret 参数：插件不再
 // 走 HTTP + admin key 回调 core。
 func NewManager(pluginDir, logLevel, coreDSN string, db *ent.Client) *Manager {
+	runtimeCtx, runtimeCancel := context.WithCancel(context.Background())
 	m := &Manager{
+		runtimeCtx:            runtimeCtx,
+		runtimeCancel:         runtimeCancel,
+		updates:               make(map[string]*pluginUpdate),
+		retiring:              make(map[string]*PluginInstance),
 		pluginDir:             pluginDir,
 		logLevel:              logLevel,
 		coreDSN:               coreDSN,
 		db:                    db,
-		hostHandles:           make(map[string]*pluginHostHandle),
 		instances:             make(map[string]*PluginInstance),
-		stopping:              make(map[string]chan struct{}),
 		aliases:               make(map[string]string),
 		devPaths:              make(map[string]string),
 		modelCache:            make(map[string][]sdk.ModelInfo),
@@ -234,79 +254,6 @@ func NewManager(pluginDir, logLevel, coreDSN string, db *ent.Client) *Manager {
 	return m
 }
 
-// prepareHostHandle 在 spawn 一个插件之前为它创建/获取一个 host handle。
-// 调用方负责在 spawn 完成后调 finalizeHostHandle 写入 capability set。
-//
-// 如果 hostFactory == nil（部署没启用 host service），返回 nil，调用方走软失败路径。
-func (m *Manager) prepareHostHandle(name string) *pluginHostHandle {
-	if m.hostFactory == nil {
-		return nil
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if existing, ok := m.hostHandles[name]; ok {
-		return existing
-	}
-	handle := m.hostFactory.NewPluginHandle(name)
-	m.hostHandles[name] = handle
-	return handle
-}
-
-// finalizeHostHandle 把插件实际声明的 capability 写入它的 host handle，让后续 RPC 通过校验。
-func (m *Manager) finalizeHostHandle(name string, info sdk.PluginInfo) {
-	handle := m.lookupHostHandle(name)
-	if handle == nil {
-		return
-	}
-	caps := make(map[sdk.Capability]bool, len(info.Capabilities))
-	for _, c := range info.Capabilities {
-		caps[c] = true
-	}
-	handle.SetCapabilities(caps)
-	slog.Info("plugin capability 已绑定",
-		"plugin", name, "sdk_version", info.SDKVersion, "capabilities", info.Capabilities)
-}
-
-// lookupHostHandle 取已注册的 host handle。
-func (m *Manager) lookupHostHandle(name string) *pluginHostHandle {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.hostHandles[name]
-}
-
-// removeHostHandle 在 stopPlugin 时调用，回收 handle。
-func (m *Manager) removeHostHandle(name string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.hostHandles, name)
-}
-
-// relocateHostHandle 把一个 host handle 从 oldName key 改名为 newName key。
-//
-// 用于 spawn 后 canonical name 与 requestedName 不一致的场景：spawn 前我们用
-// requestedName 占位创建 handle，spawn 后才知道真正的 canonicalName。
-func (m *Manager) relocateHostHandle(oldName, newName string) {
-	if oldName == newName {
-		return
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	handle, ok := m.hostHandles[oldName]
-	if !ok {
-		return
-	}
-	handle.pluginName = newName
-	delete(m.hostHandles, oldName)
-	m.hostHandles[newName] = handle
-}
-
 func normalizePluginName(name string) string {
 	return strings.TrimSpace(name)
-}
-
-func canonicalPluginName(info sdk.PluginInfo, fallback string) string {
-	if id := normalizePluginName(info.ID); id != "" {
-		return id
-	}
-	return normalizePluginName(fallback)
 }

@@ -41,7 +41,7 @@ func (m *Manager) RuntimeCacheStats(ctx context.Context) (
 	if inst == nil || inst.Gateway == nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("openai gateway is unavailable")
 	}
-	status, _, body, err := inst.Gateway.HandleHTTPRequest(ctx, http.MethodGet, runtimeHashPath, "", nil, nil)
+	status, _, body, err := inst.HandleHTTPRequest(ctx, http.MethodGet, runtimeHashPath, "", nil, nil)
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("query openai runtime cache stats: %w", err)
 	}

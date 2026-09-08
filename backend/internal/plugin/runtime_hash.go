@@ -2,13 +2,9 @@ package plugin
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
+	"strconv"
 	"time"
-
-	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
 )
 
 const (
@@ -24,7 +20,9 @@ type RuntimeHashState struct {
 func DefaultRuntimeHashState() RuntimeHashState {
 	return RuntimeHashState{TextEnabled: true, ImageEnabled: true}
 }
-
+func (state RuntimeHashState) settings() map[string]string {
+	return map[string]string{"text_hash_enabled": strconv.FormatBool(state.TextEnabled), "image_hash_enabled": strconv.FormatBool(state.ImageEnabled)}
+}
 func (m *Manager) RuntimeHashState() RuntimeHashState {
 	if m == nil {
 		return DefaultRuntimeHashState()
@@ -34,100 +32,51 @@ func (m *Manager) RuntimeHashState() RuntimeHashState {
 	return m.runtimeHashStateLocked()
 }
 
+// Public system settings use the SDK runtime settings contract for every
+// plugin. Which settings a provider implements is decided inside that plugin.
 func (m *Manager) SetRuntimeHashState(ctx context.Context, state RuntimeHashState) error {
 	if m == nil {
-		return fmt.Errorf("plugin manager is unavailable")
+		return fmt.Errorf("plugin manager unavailable")
 	}
 	m.runtimeHashMu.Lock()
 	defer m.runtimeHashMu.Unlock()
-
 	m.mu.RLock()
-	var gateway *sdkgrpc.GatewayGRPCClient
-	for _, instance := range m.instances {
-		if instance != nil && instance.Platform == "openai" && instance.Gateway != nil {
-			gateway = instance.Gateway
-			break
+	var targets []*PluginInstance
+	for _, inst := range m.instances {
+		if inst.runtimeClient() != nil && inst.acquireRequest() {
+			targets = append(targets, inst)
 		}
 	}
-	if gateway != nil {
-		err := applyRuntimeHashState(ctx, gateway, state)
-		m.mu.RUnlock()
-		if err != nil {
+	m.mu.RUnlock()
+	defer func() {
+		for _, inst := range targets {
+			inst.releaseRequest()
+		}
+	}()
+	requestCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), runtimeHashUpdateTimeout)
+	defer cancel()
+	for _, inst := range targets {
+		if err := inst.runtimeClient().ApplyRuntimeSettings(requestCtx, state.settings()); err != nil {
 			return err
 		}
-	} else {
-		m.mu.RUnlock()
 	}
-	m.runtimeHashState = state
-	m.runtimeHashConfigured = true
+	m.runtimeHashState, m.runtimeHashConfigured = state, true
 	return nil
 }
-
-// prepareRuntimeHashForPublish holds the desired-state read lock until
-// the configured plugin instance is published, preventing a concurrent update
-// from being lost during plugin load or hot reload.
-func (m *Manager) prepareRuntimeHashForPublish(
-	ctx context.Context,
-	gateway *sdkgrpc.GatewayGRPCClient,
-	platform string,
-) (func(), error) {
-	if m == nil || gateway == nil || platform != "openai" {
+func (m *Manager) prepareRuntimeSettingsForPublish(ctx context.Context, client lifecycleClient) (func(), error) {
+	if client == nil {
 		return func() {}, nil
 	}
 	m.runtimeHashMu.RLock()
-	state := m.runtimeHashStateLocked()
-	if err := applyRuntimeHashState(ctx, gateway, state); err != nil {
+	if err := client.ApplyRuntimeSettings(ctx, m.runtimeHashStateLocked().settings()); err != nil {
 		m.runtimeHashMu.RUnlock()
 		return nil, err
 	}
 	return m.runtimeHashMu.RUnlock, nil
 }
-
 func (m *Manager) runtimeHashStateLocked() RuntimeHashState {
 	if !m.runtimeHashConfigured {
 		return DefaultRuntimeHashState()
 	}
 	return m.runtimeHashState
-}
-
-func applyRuntimeHashState(
-	ctx context.Context,
-	gateway *sdkgrpc.GatewayGRPCClient,
-	state RuntimeHashState,
-) error {
-	if gateway == nil {
-		return fmt.Errorf("openai gateway is unavailable")
-	}
-	body, err := json.Marshal(state)
-	if err != nil {
-		return fmt.Errorf("encode runtime hash state: %w", err)
-	}
-	requestCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), runtimeHashUpdateTimeout)
-	defer cancel()
-	status, _, responseBody, err := gateway.HandleHTTPRequest(
-		requestCtx,
-		http.MethodPut,
-		runtimeHashPath,
-		"application/json",
-		nil,
-		body,
-	)
-	if err != nil {
-		return fmt.Errorf("update openai runtime hash: %w", err)
-	}
-	if status != http.StatusOK {
-		message := strings.TrimSpace(string(responseBody))
-		if len(message) > 512 {
-			message = message[:512]
-		}
-		return fmt.Errorf("update openai runtime hash: status %d: %s", status, message)
-	}
-	var applied RuntimeHashState
-	if err := json.Unmarshal(responseBody, &applied); err != nil {
-		return fmt.Errorf("decode openai runtime hash state: %w", err)
-	}
-	if applied != state {
-		return fmt.Errorf("openai runtime hash state mismatch: got %+v, want %+v", applied, state)
-	}
-	return nil
 }

@@ -11,10 +11,10 @@ import (
 	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
 )
 
-func TestReloadRejectsNonDevPlugin(t *testing.T) {
+func TestReloadSupportsProductionPlugin(t *testing.T) {
 	service := NewService(pluginAdminManagerStub{}, pluginMarketplaceStub{})
-	if err := service.Reload(t.Context(), "demo"); err != ErrPluginNotDev {
-		t.Fatalf("Reload() error = %v, want %v", err, ErrPluginNotDev)
+	if err := service.Reload(t.Context(), "demo"); err != nil {
+		t.Fatalf("Reload() error = %v", err)
 	}
 }
 
@@ -569,7 +569,7 @@ func TestReloadDevPlugin(t *testing.T) {
 	called := false
 	service := NewService(pluginAdminManagerStub{
 		isDev: true,
-		reloadDev: func(_ context.Context, name string) error {
+		reloadInstance: func(_ context.Context, name string) error {
 			if name != "demo" {
 				t.Fatalf("ReloadDev name = %q", name)
 			}
@@ -590,7 +590,7 @@ func TestReloadReturnsReloadError(t *testing.T) {
 	wantErr := errors.New("reload dev failed")
 	service := NewService(pluginAdminManagerStub{
 		isDev: true,
-		reloadDev: func(context.Context, string) error {
+		reloadInstance: func(context.Context, string) error {
 			return wantErr
 		},
 	}, nil)

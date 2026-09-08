@@ -1221,7 +1221,7 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 		run: func(runCtx context.Context, writer http.ResponseWriter) (ConnectivityTestTiming, error) {
 			req := *forwardReq
 			req.Writer = writer
-			outcome, forwardErr := inst.Gateway.Forward(runCtx, &req)
+			outcome, forwardErr := inst.Forward(runCtx, &req)
 			timing := connectivityTestTiming(outcome)
 			if forwardErr != nil {
 				s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, forwardErr)
@@ -1744,7 +1744,7 @@ func (s *Service) queryTokenRefresh(ctx context.Context, inst *plugin.PluginInst
 		return tokenRefreshResponse{}, err
 	}
 
-	statusCode, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "accounts/token-refresh", "", nil, reqBody)
+	statusCode, _, respBody, err := inst.HandleHTTPRequest(ctx, "POST", "accounts/token-refresh", "", nil, reqBody)
 	if err != nil {
 		return tokenRefreshResponse{}, err
 	}
@@ -1802,7 +1802,7 @@ func (s *Service) triggerUsageProbe(ctx context.Context, inst *plugin.PluginInst
 	})
 	probeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	status, _, respBody, err := inst.Gateway.HandleHTTPRequest(probeCtx, "POST", "usage/probe", "", nil, reqBody)
+	status, _, respBody, err := inst.HandleHTTPRequest(probeCtx, "POST", "usage/probe", "", nil, reqBody)
 	if err != nil || status != http.StatusOK {
 		slog.Debug("account_usage_probe_failed",
 			sdk.LogFieldAccountID, id,

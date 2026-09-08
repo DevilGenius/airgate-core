@@ -711,9 +711,11 @@ function Ensure-PluginDists {
 function Start-PluginWatchers {
   foreach ($plugin in $PluginSpecs) {
     Remove-Item -Force $plugin.WatchOut, $plugin.WatchErr -ErrorAction SilentlyContinue
+    $embedOutput = $plugin.EmbedDir.Replace("'", "''")
+    $watchCommand = "pnpm exec vite build --watch --outDir '$embedOutput' --emptyOutDir"
     $watch = Start-Process `
       -FilePath "pwsh" `
-      -ArgumentList @("-NoLogo", "-NoProfile", "-Command", "pnpm dev") `
+      -ArgumentList @("-NoLogo", "-NoProfile", "-Command", $watchCommand) `
       -WorkingDirectory $plugin.WebDir `
       -WindowStyle Hidden `
       -RedirectStandardOutput $plugin.WatchOut `

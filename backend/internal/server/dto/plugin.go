@@ -2,6 +2,9 @@ package dto
 
 // PluginResp 插件响应
 type PluginResp struct {
+	Generation         string             `json:"generation"`
+	UpdateState        string             `json:"update_state"`
+	DrainingRequests   int                `json:"draining_requests"`
 	Name               string             `json:"name"`
 	DisplayName        string             `json:"display_name,omitempty"`
 	Version            string             `json:"version,omitempty"`

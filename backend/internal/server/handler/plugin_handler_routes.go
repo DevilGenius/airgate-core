@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -170,7 +171,7 @@ func (h *PluginHandler) UninstallPlugin(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// ReloadPlugin 热加载开发模式插件。
+// ReloadPlugin prepares and activates a new process in either environment.
 func (h *PluginHandler) ReloadPlugin(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
@@ -179,8 +180,8 @@ func (h *PluginHandler) ReloadPlugin(c *gin.Context) {
 	}
 
 	if err := h.service.Reload(c.Request.Context(), name); err != nil {
-		if err == apppluginadmin.ErrPluginNotDev {
-			response.BadRequest(c, err.Error())
+		if errors.Is(err, coreplugin.ErrPluginUpdateBusy) {
+			c.JSON(http.StatusConflict, gin.H{"code": http.StatusConflict, "message": err.Error()})
 			return
 		}
 		response.InternalError(c, "热加载插件失败: "+err.Error())

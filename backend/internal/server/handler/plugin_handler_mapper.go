@@ -7,6 +7,9 @@ import (
 
 func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
 	resp := dto.PluginResp{
+		Generation:         item.Generation,
+		UpdateState:        item.UpdateState,
+		DrainingRequests:   item.DrainingRequests,
 		Name:               item.Name,
 		DisplayName:        item.DisplayName,
 		Version:            item.Version,

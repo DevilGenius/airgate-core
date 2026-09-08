@@ -171,7 +171,18 @@ func isStreamRequest(r *http.Request) bool {
 func (ep *ExtensionProxy) handle(c *gin.Context, pluginName, subPath, entry string) {
 	slog.Debug("ExtensionProxy 收到请求", "pluginName", pluginName, "subPath", subPath, "entry", entry, "method", c.Request.Method, "fullPath", c.Request.URL.Path)
 
-	ext := ep.manager.GetExtensionByName(pluginName)
+	reference := ep.manager.GetInstance(pluginName)
+	if reference == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "extension 插件未找到或未运行"})
+		return
+	}
+	inst, release, acquireErr := reference.Acquire()
+	if acquireErr != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "plugin unavailable"})
+		return
+	}
+	defer release()
+	ext := inst.Extension
 	if ext == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "extension 插件未找到或未运行"})
 		return

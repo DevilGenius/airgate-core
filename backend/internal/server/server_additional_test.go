@@ -246,7 +246,8 @@ func TestServePluginAssetFallbacks(t *testing.T) {
 		t.Fatalf("write logo.svg: %v", err)
 	}
 	mgr := plugin.NewManager(baseDir, "", "", nil)
-	handler := servePluginAsset(mgr, baseDir)
+	handler := servePluginAsset(testGenerationAssets{root: assetDir})
+	t.Cleanup(func() { mgr.StopAll(context.Background()) })
 
 	c, w := newServerTestContext(http.MethodGet, "/plugins/demo/assets/app.js", gin.Params{
 		{Key: "name", Value: "demo"},
@@ -373,4 +374,13 @@ func TestHandleRuntimeAssetStorageInitError(t *testing.T) {
 	if status := c.Writer.Status(); status != http.StatusInternalServerError {
 		t.Fatalf("closed db runtime asset status = %d", status)
 	}
+}
+
+type testGenerationAssets struct{ root string }
+
+func (a testGenerationAssets) ReadPluginAsset(_ string, path string) ([]byte, error) {
+	if strings.Contains(path, "\\") || strings.HasPrefix(path, "/") {
+		return nil, os.ErrInvalid
+	}
+	return os.ReadFile(filepath.Join(a.root, path))
 }

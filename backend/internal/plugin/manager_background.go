@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/DevilGenius/airgate-core/internal/safego"
-	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
 )
 
 // minBackgroundInterval 兜底最小间隔，避免插件声明 0 / 极小间隔时把 Core 打爆。
@@ -29,13 +28,20 @@ func (m *Manager) startExtensionBackgroundTasks(inst *PluginInstance) {
 	if inst == nil || inst.Extension == nil {
 		return
 	}
-	tasks := inst.Extension.BackgroundTasks()
+	tasks := inst.backgroundTasks
 	if len(tasks) == 0 {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(m.runtimeCtx)
+	inst.lifecycleMu.Lock()
+	if inst.draining {
+		inst.lifecycleMu.Unlock()
+		cancel()
+		return
+	}
 	inst.stopBackground = cancel
+	inst.lifecycleMu.Unlock()
 
 	for _, t := range tasks {
 		interval := t.Interval
@@ -48,37 +54,32 @@ func (m *Manager) startExtensionBackgroundTasks(inst *PluginInstance) {
 		taskName := t.Name
 		appliedInterval := interval
 		safego.Go("plugin_background_task:"+inst.Name+":"+taskName, func() {
-			m.runBackgroundTaskLoop(ctx, inst.Name, inst.Extension, taskName, appliedInterval)
+			m.runGenerationBackgroundLoop(ctx, inst, taskName, appliedInterval)
 		})
 		slog.Info("已启动插件后台任务", "plugin", inst.Name, "task", t.Name, "interval", interval)
 	}
 }
 
-func (m *Manager) runBackgroundTaskLoop(ctx context.Context, pluginName string, ext *sdkgrpc.ExtensionGRPCClient, taskName string, interval time.Duration) {
-	// 启动后立即执行一次，避免重启后等待整个 interval 才清理。
-	m.runBackgroundTaskOnce(ctx, pluginName, ext, taskName)
-
+// Tickers stop at cutover; a task already executing retains its generation and
+// has its own deadline, independent of the ticker cancellation.
+func (m *Manager) runGenerationBackgroundLoop(ctx context.Context, inst *PluginInstance, name string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
+		if ctx.Err() != nil || !inst.acquireRequest() {
+			return
+		}
+		callCtx, cancel := context.WithTimeout(m.runtimeCtx, taskRunTimeout)
+		err := inst.Extension.RunBackgroundTask(callCtx, name)
+		cancel()
+		inst.releaseRequest()
+		if err != nil {
+			slog.Warn("plugin_background_failed", "plugin", inst.Name, "task", name, "error", err)
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			m.runBackgroundTaskOnce(ctx, pluginName, ext, taskName)
 		}
-	}
-}
-
-func (m *Manager) runBackgroundTaskOnce(parent context.Context, pluginName string, ext *sdkgrpc.ExtensionGRPCClient, taskName string) {
-	// parent 已 Done 时直接放弃，不要再发 RPC（插件即将停止）。
-	if err := parent.Err(); err != nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(parent, taskRunTimeout)
-	defer cancel()
-	if err := ext.RunBackgroundTask(ctx, taskName); err != nil {
-		slog.Warn("插件后台任务执行失败",
-			"plugin", pluginName, "task", taskName, "error", err)
 	}
 }

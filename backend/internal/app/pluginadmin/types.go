@@ -33,6 +33,9 @@ type MarketplaceReader interface {
 
 // PluginMeta 插件元信息。
 type PluginMeta struct {
+	Generation         string
+	UpdateState        string
+	DrainingRequests   int
 	Name               string
 	DisplayName        string
 	Version            string

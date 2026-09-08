@@ -143,8 +143,8 @@ describe('plugin account form loading', () => {
   it('caches platform to plugin mapping and supports explicit cache clear', async () => {
     vi.mocked(pluginsApi.list).mockResolvedValue({
       list: [
-        { name: 'gateway-openai', platform: 'openai' },
-        { name: 'gateway-claude', platform: 'claude' },
+        { name: 'gateway-openai', platform: 'openai', generation: 'test', update_state: 'active', draining_requests: 0 },
+        { name: 'gateway-claude', platform: 'claude', generation: 'test', update_state: 'active', draining_requests: 0 },
       ],
       page: 1,
       page_size: 100,
@@ -165,7 +165,7 @@ describe('plugin account form loading', () => {
 
   it('loads and reuses plugin-provided account forms', async () => {
     vi.mocked(pluginsApi.list).mockResolvedValue({
-      list: [{ name: 'gateway-openai', platform: 'openai' }],
+      list: [{ name: 'gateway-openai', platform: 'openai', generation: 'test', update_state: 'active', draining_requests: 0 }],
       page: 1,
       page_size: 100,
       total: 1,

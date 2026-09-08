@@ -201,7 +201,7 @@ func (s *accountUsageService) fetchUpstreamUsageForAccounts(ctx context.Context,
 			batch := reqList[start:end]
 			body, _ := json.Marshal(batch)
 			startedAt := time.Now()
-			status, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "usage/accounts", "", nil, body)
+			status, _, respBody, err := inst.HandleHTTPRequest(ctx, "POST", "usage/accounts", "", nil, body)
 			if err != nil || status != http.StatusOK {
 				slog.Debug("account_usage_probe_batch_failed",
 					sdk.LogFieldPlatform, platform,
@@ -308,7 +308,7 @@ func (s *accountUsageService) fetchSingleAccountUsage(ctx context.Context, item 
 		return AccountUsageInfo{}, nil, false
 	}
 
-	status, _, respBody, err := inst.Gateway.HandleHTTPRequest(ctx, "POST", "usage/probe", "", nil, body)
+	status, _, respBody, err := inst.HandleHTTPRequest(ctx, "POST", "usage/probe", "", nil, body)
 	if err == nil && status == http.StatusOK {
 		info, usageErrors, ok := parseSingleAccountUsagePluginResponse(item.ID, respBody)
 		if ok || len(usageErrors) > 0 {
@@ -320,7 +320,7 @@ func (s *accountUsageService) fetchSingleAccountUsage(ctx context.Context, item 
 	if err != nil {
 		return AccountUsageInfo{}, nil, false
 	}
-	status, _, respBody, err = inst.Gateway.HandleHTTPRequest(ctx, "POST", "usage/accounts", "", nil, body)
+	status, _, respBody, err = inst.HandleHTTPRequest(ctx, "POST", "usage/accounts", "", nil, body)
 	if err != nil || status != http.StatusOK {
 		return AccountUsageInfo{}, nil, false
 	}

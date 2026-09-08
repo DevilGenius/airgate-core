@@ -38,7 +38,10 @@ func TestNewForwarderAndRuntimePureHelpers(t *testing.T) {
 	}
 
 	manager := NewManager(t.TempDir(), "debug", "host=localhost dbname=airgate", nil)
-	cfg := manager.buildInitConfig(context.Background(), "demo")
+	cfg, err := manager.buildInitConfig(context.Background(), "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if cfg[sdk.ConfigKeyLogLevel] != "debug" || cfg["db_dsn"] != "host=localhost dbname=airgate" {
 		t.Fatalf("init config = %+v", cfg)
 	}
@@ -72,7 +75,10 @@ func TestManagerBuildInitConfigWithDatabase(t *testing.T) {
 	manager := NewManager(t.TempDir(), "info", "", db)
 	t.Cleanup(manager.devWatcher.Close)
 	manager.coreDSN = "host=core dbname=airgate"
-	cfg := manager.buildInitConfig(ctx, "demo")
+	cfg, err := manager.buildInitConfig(ctx, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if cfg[sdk.ConfigKeyLogLevel] != "info" || cfg["db_dsn"] != "host=core dbname=airgate" ||
 		cfg["custom"] != "value" || cfg["local_storage_dir"] != "local-assets" || cfg["asset_s3_bucket"] != "bucket" {
 		t.Fatalf("db init config = %+v", cfg)
@@ -84,9 +90,8 @@ func TestManagerBuildInitConfigWithDatabase(t *testing.T) {
 	}
 	closedManager := NewManager(t.TempDir(), "debug", "", closedDB)
 	t.Cleanup(closedManager.devWatcher.Close)
-	closedCfg := closedManager.buildInitConfig(ctx, "demo")
-	if closedCfg[sdk.ConfigKeyLogLevel] != "debug" {
-		t.Fatalf("closed db init config = %+v", closedCfg)
+	if _, err := closedManager.buildInitConfig(ctx, "demo"); err == nil {
+		t.Fatal("unavailable configuration database was accepted")
 	}
 }
 

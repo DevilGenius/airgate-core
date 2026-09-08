@@ -144,7 +144,7 @@ func TestDispatchPendingTasksMarksUnsupportedTaskTypesWithSQLite(t *testing.T) {
 		t.Fatalf("create missing plugin task: %v", err)
 	}
 
-	ttCache.set("plugin-a", []string{"image"})
+	ttCache.set("plugin-a:", []string{"image"})
 	manager := NewManager(t.TempDir(), "debug", "", nil)
 	manager.hostFactory = &HostService{db: db}
 	manager.instances["plugin-a"] = &PluginInstance{Name: "plugin-a", Extension: &sdkgrpc.ExtensionGRPCClient{}}

@@ -508,7 +508,7 @@ func TestExtensionBackgroundTasksRuntime(t *testing.T) {
 	defer emptyCleanup()
 	manager.startExtensionBackgroundTasks(&PluginInstance{Name: "empty", Extension: emptyClient})
 
-	inst := &PluginInstance{Name: "demo", Extension: client}
+	inst := &PluginInstance{Name: "demo", Extension: client, backgroundTasks: client.BackgroundTasks()}
 	manager.startExtensionBackgroundTasks(inst)
 	if inst.stopBackground == nil {
 		t.Fatal("stopBackground was not installed")
@@ -523,11 +523,6 @@ func TestExtensionBackgroundTasksRuntime(t *testing.T) {
 	}
 	inst.stopBackground()
 
-	cancelled, cancel := context.WithCancel(context.Background())
-	cancel()
-	manager.runBackgroundTaskOnce(cancelled, "demo", client, "sync")
-	manager.runBackgroundTaskOnce(context.Background(), "demo", client, "fail")
-	manager.runBackgroundTaskLoop(cancelled, "demo", client, "sync", time.Hour)
 }
 
 func TestMiddlewareRuntimeBeginDenyErrorsAndEndOrder(t *testing.T) {

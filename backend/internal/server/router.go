@@ -315,19 +315,8 @@ func (s *Server) registerRoutes() {
 	r.GET("/uploads/*path", serveUploadAsset("data/uploads"))
 	r.GET("/assets-runtime/*path", s.handleRuntimeAsset)
 
-	// 插件前端静态资源（/plugins/{pluginName}/assets/*）
-	//
-	// 与 r.Static 不同：这是一个 dev-aware handler，对每个请求按以下顺序查找：
-	//   1. 如果该插件是 dev 模式 → 从 <plugin_src>/web/dist/ 读 vite watch 实时产物
-	//   2. fallback 到 data/plugins/<id>/assets/ —— 生产模式或 vite 还没构建好
-	//
-	// 这样所有插件的 vite watch 都可以统一输出到自己的 web/dist，不需要再让
-	// vite watch --outDir 写到 core 的 plugin assets dir。
-	pluginDir := s.cfg.Plugins.Dir
-	if pluginDir == "" {
-		pluginDir = "data/plugins"
-	}
-	r.GET("/plugins/:name/assets/*path", servePluginAsset(s.pluginMgr, pluginDir))
+	// Plugin assets are pinned to an immutable process generation in every environment.
+	r.GET("/plugins/:name/assets/*path", servePluginAsset(s.pluginMgr))
 
 	// 静态文件服务（前端 SPA）
 	r.StaticFS("/assets", http.FS(assetsFS))
@@ -350,16 +339,6 @@ func (s *Server) registerRoutes() {
 	})
 }
 
-// servePluginAsset 处理 /plugins/<name>/assets/* 请求。
-//
-// 双模式：
-//   - dev 模式：从 <plugin_src>/web/dist/<rel> 读 vite watch 实时构建产物。
-//     这样 openai/epay/health 都可以让 vite watch 输出到自己的 web/dist，
-//     core 透明地从那里读，不再需要让 vite watch --outDir 写到 core 内部目录。
-//   - production 模式：fallback 到 data/plugins/<name>/assets/<rel>，
-//     由 core 启动时通过 GetWebAssets() 把插件 binary embed 的 webdist 提取出来。
-//
-// 路径穿越防御：clean 后检查不允许 ".."。
 func (s *Server) handleRuntimeAsset(c *gin.Context) {
 	rel := strings.TrimPrefix(path.Clean("/"+c.Param("path")), "/")
 	if rel == "" || rel == "." || strings.HasPrefix(rel, "../") || strings.Contains(rel, "/../") {
@@ -419,33 +398,23 @@ func (s *Server) handleRuntimeAsset(c *gin.Context) {
 	c.Data(http.StatusOK, contentType, data)
 }
 
-func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
+func servePluginAsset(mgr interface {
+	ReadPluginAsset(string, string) ([]byte, error)
+}) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		name := c.Param("name")
 		rel := strings.TrimPrefix(c.Param("path"), "/")
 
 		// 路径穿越防御
-		clean := filepath.Clean("/" + rel)
+		clean := path.Clean("/" + rel)
 		if strings.Contains(clean, "..") {
 			c.Status(http.StatusBadRequest)
 			return
 		}
 		rel = strings.TrimPrefix(clean, "/")
 
-		// 优先尝试 dev 路径
-		if devDir, ok := mgr.DevWebDistPath(name); ok {
-			full := filepath.Join(devDir, rel)
-			if data, err := os.ReadFile(full); err == nil {
-				c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
-				setPluginAssetSecurityHeaders(c, rel)
-				c.Data(http.StatusOK, contentTypeFromExt(rel), data)
-				return
-			}
-		}
-
-		// fallback 到 production 路径
-		full := filepath.Join(baseDir, name, "assets", rel)
-		data, err := os.ReadFile(full)
+		data, err := mgr.ReadPluginAsset(name, rel)
+		c.Header("Cache-Control", "no-cache")
 		if err != nil {
 			// 插件可选 CSS：若 index.css 不存在，返回空 CSS 而非 404。
 			// 否则浏览器会在 network 面板打印 404，污染开发者控制台。

@@ -2,6 +2,9 @@ package plugin
 
 import (
 	"context"
+	"crypto/sha256"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -12,28 +15,9 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/safego"
 )
 
-// dev_watcher.go：监听 dev 模式插件源码目录的 .go 文件改动，自动 ReloadDev。
-//
-// 实现选型：**mtime 轮询**而不是 fsnotify。
-//
-// 之所以不用 fsnotify：本项目主要在 WSL2 + /mnt/e（9p drvfs 挂载的 Windows 盘）
-// 上开发，9p 文件系统**不会向 Linux inotify 投递事件**——fsnotify 可以正常注册
-// 监听，但永远收不到回调。这是 WSL2 的已知限制，不是我们的 bug。
-// 相同的原因，airgate-core 的 .air.toml 也开了 build.poll=true 才能让 air 在
-// 同一份代码上工作。
-//
-// 轮询方案的代价是 1~2 秒的延迟和一点点 CPU；好处是在所有文件系统上都能工作
-// （ext4/9p/NFS/SMB 都行），而且实现非常直接：扫描注册的 srcPath，比较 .go
-// 文件的最大 mtime，发现增长就触发 ReloadInstance。
-//
-// 设计原则：
-//   - 只在 dev 模式下启用（生产部署没有 srcPath）。
-//   - 每个插件独立维护 lastMtime；任意 .go 文件 mtime 比上次记录大就 reload。
-//   - 只关心 .go 文件（_test.go 排除）；前端 .ts/.tsx 走插件自己的 vite watch。
-//   - reload 失败只 log warn，不 panic——dev 体验下不能因一次 build 失败让 watcher 死。
-//
-// 启动方式：Manager.LoadDev 成功后调一次 add(name, srcPath)，把 srcPath 加入
-// 轮询集合。stopPlugin 时 remove。
+// Poll portable source fingerprints, including deletions and embedded assets.
+// Development produces an executable and then uses the production activation
+// pipeline. Changes arriving during a build remain pending for the next poll.
 
 type devWatcher struct {
 	mgr      *Manager
@@ -51,9 +35,9 @@ type devWatcher struct {
 }
 
 type devWatchEntry struct {
-	srcPath   string
-	lastMtime time.Time
-	reloading bool // 防止 reload 期间 polling 又触发一次
+	srcPath     string
+	fingerprint string
+	reloading   bool // 防止 reload 期间 polling 又触发一次
 }
 
 const devWatcherInterval = 1500 * time.Millisecond
@@ -77,14 +61,18 @@ func newDevWatcher(mgr *Manager) *devWatcher {
 // 第一次扫描会把当前 max mtime 记下作为基线；这意味着 add 之后的下一次轮询
 // 不会立刻 reload（防止 LoadDev 刚结束就被自己触发）。
 func (dw *devWatcher) add(name, srcPath string) {
-	baseline, _ := scanMaxGoMtime(srcPath)
+	baseline, _ := scanSourceFingerprint(srcPath)
 
 	dw.mu.Lock()
 	if dw.closed {
 		dw.mu.Unlock()
 		return
 	}
-	dw.plugins[name] = &devWatchEntry{srcPath: srcPath, lastMtime: baseline}
+	if existing := dw.plugins[name]; existing != nil && existing.srcPath == srcPath {
+		dw.mu.Unlock()
+		return
+	}
+	dw.plugins[name] = &devWatchEntry{srcPath: srcPath, fingerprint: baseline}
 	dw.mu.Unlock()
 
 	slog.Info("dev 插件源码 watch 已就绪 (mtime polling)",
@@ -142,21 +130,21 @@ func (dw *devWatcher) loop() {
 func (dw *devWatcher) tick() {
 	// 拷贝一份快照，避免长时间持锁扫描磁盘
 	dw.mu.Lock()
-	snapshot := make(map[string]*devWatchEntry, len(dw.plugins))
+	snapshot := make(map[string]devWatchEntry, len(dw.plugins))
 	for k, v := range dw.plugins {
 		if v.reloading {
 			continue
 		}
-		snapshot[k] = v
+		snapshot[k] = *v
 	}
 	dw.mu.Unlock()
 
 	for name, entry := range snapshot {
-		latest, ok := scanMaxGoMtime(entry.srcPath)
+		latest, ok := scanSourceFingerprint(entry.srcPath)
 		if !ok {
 			continue
 		}
-		if !latest.After(entry.lastMtime) {
+		if latest == entry.fingerprint {
 			continue
 		}
 
@@ -167,7 +155,7 @@ func (dw *devWatcher) tick() {
 			dw.mu.Unlock()
 			continue
 		}
-		current.lastMtime = latest
+		current.fingerprint = latest
 		current.reloading = true
 		dw.mu.Unlock()
 
@@ -181,63 +169,63 @@ func (dw *devWatcher) tick() {
 	}
 }
 
-func (dw *devWatcher) doReload(name string, trigger time.Time) {
+func (dw *devWatcher) doReload(name string, trigger string) {
 	defer func() {
 		dw.mu.Lock()
 		if e, ok := dw.plugins[name]; ok {
 			e.reloading = false
-			// reload 完之后再次扫一次，把 reload 期间产生的新 mtime 也吞掉，
-			// 否则用户在 reload 还在跑的时候继续编辑，下次 tick 又会立刻触发
-			// 一次（其实也无害，只是多一次 build）。
-			if latest, ok := scanMaxGoMtime(e.srcPath); ok && latest.After(e.lastMtime) {
-				e.lastMtime = latest
-			}
+
 		}
 		dw.mu.Unlock()
 	}()
 
-	slog.Info("dev 插件源码变更，触发热重载", "plugin", name, "trigger_mtime", trigger)
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	slog.Info("dev 插件源码变更，触发热重载", "plugin", name, "source_fingerprint", trigger)
+	ctx, cancel := context.WithTimeout(dw.mgr.runtimeCtx, pluginBuildTimeout)
 	defer cancel()
-	if err := dw.mgr.ReloadInstance(ctx, name); err != nil {
+	var err error
+	if dw.mgr.GetInstance(name) == nil {
+		err = dw.mgr.ReloadDev(ctx, name)
+	} else {
+		err = dw.mgr.ReloadInstance(ctx, name)
+	}
+	if err != nil {
+		if errors.Is(err, ErrPluginUpdateBusy) {
+			dw.mu.Lock()
+			if e := dw.plugins[name]; e != nil {
+				e.fingerprint = ""
+			}
+			dw.mu.Unlock()
+		}
 		slog.Warn("dev 插件热重载失败", "plugin", name, "error", err)
 		return
 	}
 	slog.Info("dev 插件热重载完成", "plugin", name)
 }
 
-// scanMaxGoMtime 递归扫描 root 下所有 .go 文件（排除 _test.go 与噪声目录），
-// 返回最大 mtime。如果一个 .go 都没有，返回 (zero, false)。
-//
-// 排除规则与原 fsnotify 版本一致：vendor / node_modules / .git / tmp / dist /
-// webdist / 隐藏目录。
-func scanMaxGoMtime(root string) (time.Time, bool) {
-	var max time.Time
+// Fingerprints include names, sizes and mtimes, so deletions and edits during a
+// build schedule a subsequent build. Embedded assets use the same artifact path.
+func scanSourceFingerprint(root string) (string, bool) {
+	hash := sha256.New()
 	found := false
-	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info == nil {
-			return nil
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
 		if info.IsDir() {
-			base := filepath.Base(path)
-			if base == "vendor" || base == "node_modules" || base == "tmp" ||
-				base == "dist" || base == "webdist" || base == ".git" {
-				return filepath.SkipDir
-			}
-			if strings.HasPrefix(base, ".") && path != root {
+			base := info.Name()
+			if base == "vendor" || base == "node_modules" || base == "tmp" || base == ".git" || (strings.HasPrefix(base, ".") && path != root) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		name := info.Name()
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		if strings.HasSuffix(info.Name(), "_test.go") {
 			return nil
 		}
-		if mt := info.ModTime(); mt.After(max) {
-			max = mt
+		if strings.HasSuffix(info.Name(), ".go") || info.Name() == "go.mod" || info.Name() == "go.sum" || strings.Contains(filepath.ToSlash(path), "/webdist/") {
+			fmt.Fprintf(hash, "%s:%d:%d\\n", path, info.Size(), info.ModTime().UnixNano())
 			found = true
 		}
 		return nil
 	})
-	return max, found
+	return fmt.Sprintf("%x", hash.Sum(nil)), found && err == nil
 }

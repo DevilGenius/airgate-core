@@ -2,15 +2,18 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	goplugin "github.com/hashicorp/go-plugin"
+	"github.com/lib/pq"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,14 +34,9 @@ const pluginGRPCMaxMessageBytes = 64 * 1024 * 1024
 
 // pluginStartTimeout 限制插件子进程握手与 Start RPC 的最长耗时，避免坏插件把 core
 // 的启动或后台加载协程长期卡死。
-const pluginStartTimeout = 15 * time.Second
+const pluginStartTimeout = 30 * time.Second
 
-// pluginStopDrainTimeout 是显式 stop 前等待已开始 Forward 调用自然结束的最长时间。
-// 0 表示立即 Stop/Kill；stopPlugin 已经摘掉实例并 beginDrain，后续新请求不会再进入旧实例。
-const pluginStopDrainTimeout = 0
-
-// pluginReloadDrainTimeout 是热重载替换旧实例前等待已开始 Forward 调用自然结束的最长时间。
-const pluginReloadDrainTimeout = 5 * time.Minute
+const pluginRetirementTimeout = 30 * time.Minute
 
 // newPluginClientConfig 构造与插件子进程通信的 go-plugin ClientConfig。
 //
@@ -99,911 +97,608 @@ func (m *Manager) newPluginClientConfig(cmd *exec.Cmd, forwardOutput bool, hostH
 	return cfg
 }
 
-// buildInitConfig 构造传递给插件 Init() 的配置 map。
-//
-// 内容来源（优先级从低到高）：
-//  1. 系统自动注入（管理员不必填、也不允许覆盖）：
-//     - sdk.ConfigKeyLogLevel  来自 core 配置 log.level
-//     - db_dsn                 admin DSN（可访问 core 业务表）—— 兼容老插件，
-//     将来下线（详见 ADR-0001 Decision 5 迁移路径）
-//     - plugin_dsn             受限 DSN（只能访问 plugin_<id> schema），新插件首选
-//  2. 用户配置：DB ent.Plugin.Config (JSONB) — 由管理员通过 UI 写入
-//
-// 用户配置不允许覆盖系统字段（防止管理员误填把 db_dsn 改成不可用的串）。
-// 当 DB 中没有该插件记录或 config 为空时，仅返回系统字段。
-// 这里刻意不报错：缺配置只是让插件以"未配置态"加载，UI 仍然可见。
-//
-// Step 2 变更：下线 core_base_url / admin_api_key 注入。插件要调 core 能力一律走
-// HostService（hashicorp/go-plugin GRPCBroker 反向 gRPC），不再需要 HTTP + Bearer。
-//
-// Step 3 变更：新增 plugin_dsn（受限 DSN + 独立 schema）。db_dsn 暂时保留以兼容
-// 尚未迁移的 epay/health/openai 插件，等它们逐个迁过来后再下线 db_dsn。
-func (m *Manager) buildInitConfig(ctx context.Context, name string) map[string]interface{} {
-	cfg := map[string]interface{}{
-		sdk.ConfigKeyLogLevel: m.logLevel,
-	}
+// Candidate preparation fails if its configuration or database provisioning is
+// unavailable; optional isolated storage can remain disabled, as before.
+func (m *Manager) buildInitConfig(ctx context.Context, name string) (map[string]interface{}, error) {
+	cfg := map[string]interface{}{sdk.ConfigKeyLogLevel: m.logLevel}
 	if m.coreDSN != "" {
 		cfg["db_dsn"] = m.coreDSN
 	}
-	// 给插件准备一个独立 schema + 受限 role，注入 plugin_dsn
 	if m.pluginDB != nil {
-		if pluginDSN, err := m.pluginDB.EnsureFor(ctx, name); err != nil {
-			slog.Warn("plugin_db_provision_failed",
-				sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
+		dsn, err := m.pluginDB.EnsureFor(ctx, name)
+		if err != nil {
+			var denied *pq.Error
+			if !errors.As(err, &denied) || denied.Code != "42501" {
+				return nil, err
+			}
+			// Do not substitute the Core DSN. PluginDSNAware receives an empty
+			// DSN; optional private storage keeps its established disabled mode.
+			cfg[sdk.PluginDSNConfigKey] = ""
+			slog.Warn("plugin_private_storage_disabled", "plugin", name, "reason", "provisioning permission unavailable")
 		} else {
-			cfg["plugin_dsn"] = pluginDSN
+			cfg[sdk.PluginDSNConfigKey] = dsn
 		}
 	}
 	if m.db == nil {
-		return cfg
+		return cfg, nil
 	}
 	row, err := m.db.Plugin.Query().Where(pluginent.NameEQ(name)).Only(ctx)
-	if err != nil {
-		// not found 是常态，不打 warn
-		if !ent.IsNotFound(err) {
-			slog.Warn("plugin_config_load_failed",
-				sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
-		}
-	} else {
-		for k, v := range row.Config {
-			if _, exists := cfg[k]; exists {
-				continue // 系统字段不被用户覆盖
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, err
+	}
+	if row != nil {
+		for key, value := range row.Config {
+			if _, exists := cfg[key]; !exists {
+				cfg[key] = value
 			}
-			cfg[k] = v
 		}
 	}
-	m.injectGlobalStorageConfig(ctx, name, cfg)
-	return cfg
+	if err := m.injectGlobalStorageConfig(ctx, name, cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
-func (m *Manager) injectGlobalStorageConfig(ctx context.Context, pluginName string, cfg map[string]interface{}) {
+func (m *Manager) injectGlobalStorageConfig(ctx context.Context, name string, cfg map[string]interface{}) error {
 	items, err := m.db.Setting.Query().Where(settingent.GroupEQ("storage")).All(ctx)
 	if err != nil {
-		slog.Warn("global_storage_config_load_failed", sdk.LogFieldPluginID, pluginName, sdk.LogFieldError, err)
-		return
+		return err
 	}
 	for _, item := range items {
 		cfg[item.Key] = item.Value
 	}
-}
-
-// LoadAll 启动时扫描插件目录，发现可执行二进制则直接加载。
-func (m *Manager) LoadAll(ctx context.Context) error {
-	entries, err := os.ReadDir(m.pluginDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("读取插件目录失败: %w", err)
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		binaryPath := filepath.Join(m.pluginDir, name, name)
-		info, err := os.Stat(binaryPath)
-		if err != nil || info.IsDir() {
-			continue
-		}
-
-		slog.Debug("plugin_load_start", sdk.LogFieldPluginID, name)
-		canonicalName, err := m.startPlugin(ctx, name, exec.Command(binaryPath), name)
-		if err != nil {
-			slog.Error("plugin_load_failed", sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
-			continue
-		}
-		slog.Info("plugin_load_completed", sdk.LogFieldPluginID, canonicalName, "source", name)
-	}
-
 	return nil
 }
 
-// LoadDev 加载开发模式插件。
-func (m *Manager) LoadDev(ctx context.Context, name, srcPath string) error {
-	if _, err := os.Stat(srcPath); err != nil {
-		return fmt.Errorf("插件源码目录不存在: %s", srcPath)
-	}
+// Updates serialize per canonical plugin. A retiring process blocks another
+// update, so each plugin has at most two live generations.
+const pluginBuildTimeout = 3 * time.Minute
 
-	requestedName := normalizePluginName(name)
-	if requestedName == "" {
-		dir := filepath.Base(srcPath)
-		if dir == "backend" || dir == "." {
-			dir = filepath.Base(filepath.Dir(srcPath))
-		}
-		requestedName = dir
-	}
+var ErrPluginUpdateBusy = errors.New("插件正在更新或旧进程仍在完成请求，请稍后重试")
 
-	cmd := exec.Command("go", "run", ".")
-	cmd.Dir = srcPath
+type pluginUpdate struct {
+	done     chan struct{}
+	cancel   context.CancelFunc
+	previous *PluginInstance
+}
+type preparedPlugin struct {
+	detachPreparation func() bool
+	instance          *PluginInstance
+	info              sdk.PluginInfo
+	models            []sdk.ModelInfo
+	routes            []sdk.RouteDefinition
+}
+type lifecycleClient interface {
+	DescribeRuntime(context.Context) (sdk.RuntimeSpec, error)
+	BeginDrain(context.Context) error
+	ApplyRuntimeSettings(context.Context, map[string]string) error
+	HandleRuntimeCallback(context.Context, sdk.CallbackRequest) (sdk.CallbackResponse, error)
+	InfoContext(context.Context) (sdk.PluginInfo, error)
+	InitContext(context.Context, sdk.PluginContext) error
+	Start(context.Context) error
+	Stop(context.Context) error
+	HealthCheck(context.Context) error
+	WebAssetsContext(context.Context) (map[string][]byte, error)
+}
 
-	canonicalName, err := m.startPlugin(ctx, requestedName, cmd, "")
-	if err != nil {
-		return fmt.Errorf("加载开发插件失败: %w", err)
-	}
-
+func (m *Manager) beginUpdate(parent context.Context, name string) (context.Context, *pluginUpdate, error) {
 	m.mu.Lock()
-	m.devPaths[canonicalName] = srcPath
-	m.registerAliasesLocked(canonicalName, requestedName)
-	m.mu.Unlock()
-
-	// 注册 dev watcher：mtime 轮询源码 .go 改动后自动 ReloadDev，无需重启 core
-	if m.devWatcher != nil {
-		m.devWatcher.add(canonicalName, srcPath)
+	defer m.mu.Unlock()
+	name = m.resolveNameLocked(name)
+	if !pluginIDPattern.MatchString(name) {
+		return nil, nil, errors.New("invalid plugin name")
 	}
-
-	slog.Debug("plugin_dev_load_completed",
-		sdk.LogFieldPluginID, canonicalName,
-		"requested_name", requestedName,
-		"src", srcPath,
-	)
-	return nil
+	if m.closing {
+		return nil, nil, errors.New("plugin manager is stopping")
+	}
+	if m.activeUpdates >= 8 || m.updates[name] != nil || m.retiring[name] != nil {
+		return nil, nil, ErrPluginUpdateBusy
+	}
+	ctx, cancel := context.WithTimeout(parent, pluginBuildTimeout)
+	op := &pluginUpdate{done: make(chan struct{}), cancel: cancel, previous: m.instances[name]}
+	if m.updates == nil {
+		m.updates = make(map[string]*pluginUpdate)
+	}
+	m.updates[name] = op
+	m.activeUpdates++
+	return ctx, op, nil
 }
-
-// ReloadDev 热加载开发模式插件。
-func (m *Manager) ReloadDev(ctx context.Context, name string) error {
-	m.mu.RLock()
-	resolvedName := m.resolveNameLocked(name)
-	srcPath, isDev := m.devPaths[resolvedName]
-	m.mu.RUnlock()
-
-	if !isDev {
-		return fmt.Errorf("插件 %s 不是开发模式插件，无法热加载", name)
-	}
-
-	slog.Debug("plugin_dev_reload_start", sdk.LogFieldPluginID, resolvedName, "src", srcPath)
-	if m.devWatcher != nil {
-		m.devWatcher.remove(resolvedName)
-	}
-
-	cmd := exec.Command("go", "run", ".")
-	cmd.Dir = srcPath
-
-	canonicalName, err := m.startPluginWithOptions(ctx, resolvedName, cmd, "", pluginStartOptions{replaceExisting: true})
-	if err != nil {
-		if m.devWatcher != nil {
-			m.devWatcher.add(resolvedName, srcPath)
-		}
-		return fmt.Errorf("热加载开发插件失败: %w", err)
-	}
-
+func (m *Manager) bindUpdate(op *pluginUpdate, name string) error {
 	m.mu.Lock()
-	m.devPaths[canonicalName] = srcPath
-	m.registerAliasesLocked(canonicalName, resolvedName)
-	m.mu.Unlock()
-
-	if m.devWatcher != nil {
-		m.devWatcher.add(canonicalName, srcPath)
+	defer m.mu.Unlock()
+	if m.closing {
+		return errors.New("plugin manager is stopping")
 	}
-
-	slog.Debug("plugin_dev_load_completed",
-		sdk.LogFieldPluginID, canonicalName,
-		"requested_name", resolvedName,
-		"src", srcPath,
-	)
+	if op.previous != nil && op.previous.Name != name {
+		return errors.New("replacement plugin ID changed")
+	}
+	if other := m.updates[name]; other != nil && other != op {
+		return ErrPluginUpdateBusy
+	}
+	if m.retiring[name] != nil {
+		return ErrPluginUpdateBusy
+	}
+	if op.previous == nil {
+		op.previous = m.instances[name]
+	}
+	m.updates[name] = op
 	return nil
 }
-
-// IsDev 检查插件是否为开发模式。
-func (m *Manager) IsDev(name string) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	_, ok := m.devPaths[m.resolveNameLocked(name)]
-	return ok
-}
-
-type pluginStartOptions struct {
-	replaceExisting bool
-}
-
-type pluginStartRuntime struct {
-	replaceExisting bool
-	hostHandle      *pluginHostHandle
-}
-
-func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
-	return m.startPluginWithOptions(ctx, requestedName, cmd, binaryDir, pluginStartOptions{})
-}
-
-func (m *Manager) startPluginWithOptions(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string, opts pluginStartOptions) (string, error) {
-	if !opts.replaceExisting {
-		if err := m.waitForPluginStop(ctx, requestedName); err != nil {
-			return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+func (m *Manager) finishUpdate(op *pluginUpdate) {
+	op.cancel()
+	m.mu.Lock()
+	for key, value := range m.updates {
+		if value == op {
+			delete(m.updates, key)
 		}
 	}
+	close(op.done)
+	m.activeUpdates--
+	m.mu.Unlock()
+}
 
-	hostHandle := m.prepareStartHostHandle(requestedName, opts)
-	startRuntime := pluginStartRuntime{replaceExisting: opts.replaceExisting, hostHandle: hostHandle}
-
-	// 在 spawn 之前先用 requestedName 占位创建 host handle。
-	// canonical name 可能在 Info() 之后才确定；spawn 完成后会用 canonicalName 重新注册 handle。
-	client := goplugin.NewClient(m.newPluginClientConfig(cmd, true, hostHandle))
-
-	cleanupHost := func(name string) {
-		m.cleanupStartHostHandle(name, startRuntime)
+// updatePlugin is the single installation/reload pipeline in both environments.
+func (m *Manager) updatePlugin(parent context.Context, name string, binary []byte, source string, meta *installMetadata, installed *pluginArtifact) error {
+	m.artifactMu.RLock()
+	defer m.artifactMu.RUnlock()
+	if int64(len(binary)) > MaxPluginBinarySize {
+		return pluginBinaryTooLargeError(int64(len(binary)))
 	}
-
-	rpcClient, err := client.Client()
+	ctx, op, err := m.beginUpdate(parent, name)
 	if err != nil {
-		client.Kill()
-		cleanupHost(requestedName)
-		return "", fmt.Errorf("连接插件进程失败: %w", err)
+		return err
 	}
-
-	raw, err := rpcClient.Dispense(sdkgrpc.PluginKeyGateway)
-	if err != nil {
-		client.Kill()
-		cleanupHost(requestedName)
-		return "", fmt.Errorf("获取插件接口失败: %w", err)
-	}
-	probe, ok := raw.(*sdkgrpc.GatewayGRPCClient)
-	if !ok {
-		client.Kill()
-		cleanupHost(requestedName)
-		return "", fmt.Errorf("插件类型断言失败")
-	}
-
-	info := probe.Info()
-	switch info.Type {
-	case sdk.PluginTypeExtension:
-		extRaw, err := rpcClient.Dispense(sdkgrpc.PluginKeyExtension)
+	defer m.finishUpdate(op)
+	a := installed
+	if a == nil {
+		a, err = m.prepareArtifact(ctx, binary, source, meta)
 		if err != nil {
-			client.Kill()
-			cleanupHost(requestedName)
-			return "", fmt.Errorf("获取 extension 插件接口失败: %w", err)
-		}
-		ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient)
-		if !ok {
-			client.Kill()
-			cleanupHost(requestedName)
-			return "", fmt.Errorf("extension 插件类型断言失败")
-		}
-		return m.startExtensionPlugin(ctx, client, ext, requestedName, binaryDir, startRuntime)
-
-	case sdk.PluginTypeMiddleware:
-		mwRaw, err := rpcClient.Dispense(sdkgrpc.PluginKeyMiddleware)
-		if err != nil {
-			client.Kill()
-			cleanupHost(requestedName)
-			return "", fmt.Errorf("获取 middleware 插件接口失败: %w", err)
-		}
-		mw, ok := mwRaw.(*sdkgrpc.MiddlewareGRPCClient)
-		if !ok {
-			client.Kill()
-			cleanupHost(requestedName)
-			return "", fmt.Errorf("middleware 插件类型断言失败")
-		}
-		return m.startMiddlewarePlugin(ctx, client, mw, requestedName, binaryDir, startRuntime)
-
-	default:
-		// 默认按 gateway 处理（包括 info.Type == "" 的极老插件）
-		return m.startGatewayPlugin(ctx, client, probe, requestedName, binaryDir, startRuntime)
-	}
-}
-
-func (m *Manager) prepareStartHostHandle(requestedName string, opts pluginStartOptions) *pluginHostHandle {
-	if m.hostFactory == nil {
-		return nil
-	}
-	if opts.replaceExisting {
-		return m.hostFactory.NewPluginHandle(requestedName)
-	}
-	return m.prepareHostHandle(requestedName)
-}
-
-func (m *Manager) cleanupStartHostHandle(name string, start pluginStartRuntime) {
-	if start.replaceExisting {
-		return
-	}
-	m.removeHostHandle(name)
-}
-
-func startRuntimeFromOptions(opts []pluginStartRuntime) pluginStartRuntime {
-	if len(opts) == 0 {
-		return pluginStartRuntime{}
-	}
-	return opts[0]
-}
-
-func (m *Manager) bindStartHostHandle(requestedName, canonicalName string, info sdk.PluginInfo, start pluginStartRuntime) {
-	if start.replaceExisting {
-		if start.hostHandle == nil {
-			return
-		}
-		start.hostHandle.pluginName = canonicalName
-		caps := make(map[sdk.Capability]bool, len(info.Capabilities))
-		for _, c := range info.Capabilities {
-			caps[c] = true
-		}
-		start.hostHandle.SetCapabilities(caps)
-		slog.Info("plugin capability 已绑定",
-			"plugin", canonicalName, "sdk_version", info.SDKVersion, "capabilities", info.Capabilities)
-		return
-	}
-	m.relocateHostHandle(requestedName, canonicalName)
-	m.finalizeHostHandle(canonicalName, info)
-}
-
-func (m *Manager) installStartHostHandleLocked(canonicalName string, start pluginStartRuntime) {
-	if start.replaceExisting && start.hostHandle != nil {
-		m.hostHandles[canonicalName] = start.hostHandle
-	}
-}
-
-func (m *Manager) replaceInstanceLocked(canonicalName string, instance *PluginInstance, start pluginStartRuntime) (*PluginInstance, <-chan struct{}) {
-	var old *PluginInstance
-	var oldIdle <-chan struct{}
-	if start.replaceExisting {
-		old = m.instances[canonicalName]
-		if old != nil && old != instance {
-			oldIdle = old.beginDrain()
+			return err
 		}
 	}
-	m.instances[canonicalName] = instance
-	m.installStartHostHandleLocked(canonicalName, start)
-	return old, oldIdle
-}
-
-func (m *Manager) retireReplacedPlugin(old *PluginInstance, idle <-chan struct{}) {
-	if old == nil {
-		return
-	}
-	go m.stopPluginRuntime(old, idle, pluginReloadDrainTimeout)
-}
-
-func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Client, gateway *sdkgrpc.GatewayGRPCClient, requestedName, binaryDir string, opts ...pluginStartRuntime) (string, error) {
-	start := startRuntimeFromOptions(opts)
-	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
+	published := false
+	defer func() {
+		if !published && installed == nil {
+			m.removeArtifact(a.Generation)
+		}
+	}()
+	prepCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
 	defer cancel()
-
-	info := gateway.Info()
-	canonicalName := canonicalPluginName(info, requestedName)
-	if canonicalName == "" {
-		client.Kill()
-		m.cleanupStartHostHandle(requestedName, start)
-		return "", fmt.Errorf("插件未提供有效的 ID/name")
+	p, err := m.preparePlugin(prepCtx, op, name, a)
+	if err != nil {
+		return err
 	}
-	if !start.replaceExisting {
-		if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
-			client.Kill()
-			m.cleanupStartHostHandle(requestedName, start)
-			return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	defer p.detachPreparation()
+	defer func() {
+		if !published {
+			m.stopRuntime(p.instance, context.Background())
 		}
+	}()
+	if installed != nil && p.instance.Name != name {
+		return errors.New("installed manifest plugin ID mismatch")
 	}
-
-	m.bindStartHostHandle(requestedName, canonicalName, info, start)
-
-	initConfig := m.buildInitConfig(ctx, canonicalName)
-	pluginCtx := newCorePluginContext(initConfig, canonicalName)
-	if err := gateway.Init(pluginCtx); err != nil {
-		client.Kill()
-		m.cleanupStartHostHandle(canonicalName, start)
-		return "", fmt.Errorf("初始化插件失败: %w", err)
+	if err = m.publishPlugin(prepCtx, op, p); err != nil {
+		return err
 	}
-	if err := gateway.Start(startCtx); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			slog.Error("plugin_start_timeout",
-				sdk.LogFieldPluginID, canonicalName,
-				"timeout_ms", pluginStartTimeout.Milliseconds(),
-				sdk.LogFieldError, err,
-			)
-		}
-		client.Kill()
-		m.cleanupStartHostHandle(canonicalName, start)
-		return "", fmt.Errorf("启动插件失败: %w", err)
+	published = true
+	return nil
+}
+func (m *Manager) preparePlugin(ctx context.Context, op *pluginUpdate, requested string, a *pluginArtifact) (_ *preparedPlugin, err error) {
+	var host *pluginHostHandle
+	if m.hostFactory != nil {
+		host = m.hostFactory.NewPluginHandle(requested)
 	}
-
-	platform := gateway.Platform()
-	models := gateway.Models()
-	routes := gateway.Routes()
-	pluginType := string(info.Type)
-	if pluginType == "" {
-		pluginType = "gateway"
-	}
-
-	instance := &PluginInstance{
-		Name:               canonicalName,
-		SourceName:         normalizePluginName(requestedName),
-		BinaryDir:          normalizePluginName(binaryDir),
-		DisplayName:        info.Name,
-		Version:            info.Version,
-		Author:             info.Author,
-		Platform:           platform,
-		Type:               pluginType,
-		InstructionPresets: info.InstructionPresets,
-		ConfigSchema:       cloneConfigSchema(info.ConfigSchema),
-		Metadata:           cloneMetadata(info.Metadata),
-		Capabilities:       sdkCapabilitiesToStrings(info.Capabilities),
-		Priority:           info.Priority,
-		Client:             client,
-		Gateway:            gateway,
-	}
-
-	// 网关插件可以可选暴露 ExtensionService 来接收任务分发。
-	// Dispense 只会构造客户端，不代表服务端真的注册了 ExtensionService；
-	// 必须实际调用 GetTaskTypes 成功且返回非空类型后，才把它接入任务分发。
-	if client != nil {
-		rpc, err := client.Client()
+	client := goplugin.NewClient(m.newPluginClientConfig(exec.Command(m.artifactBinary(a)), true, host))
+	var killOnce sync.Once
+	kill := func() { killOnce.Do(client.Kill) }
+	stopCancel := context.AfterFunc(ctx, kill)
+	defer func() {
 		if err != nil {
-			rpc = nil
+			stopCancel()
+			kill()
 		}
-		if rpc != nil {
-			if extRaw, err := rpc.Dispense(sdkgrpc.PluginKeyExtension); err == nil {
-				if ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient); ok {
-					taskCtx, taskCancel := context.WithTimeout(ctx, 2*time.Second)
-					taskTypes, err := ext.GetTaskTypes(taskCtx)
-					taskCancel()
-					if err == nil && len(taskTypes) > 0 {
-						instance.Extension = ext
-						slog.Info("gateway_plugin_task_support_enabled",
-							sdk.LogFieldPluginID, canonicalName,
-							"task_types", taskTypes,
-						)
-					} else if err != nil && !isOptionalTaskExtensionUnavailable(err) {
-						slog.Debug("gateway_plugin_task_support_unavailable",
-							sdk.LogFieldPluginID, canonicalName,
-							sdk.LogFieldError, err,
-						)
-					}
-				}
+	}()
+	rpc, err := client.Client()
+	if err != nil {
+		return nil, fmt.Errorf("连接候选插件失败: %w", err)
+	}
+	raw, err := rpc.Dispense(sdkgrpc.PluginKeyGateway)
+	if err != nil {
+		return nil, err
+	}
+	probe := raw.(*sdkgrpc.GatewayGRPCClient)
+	info, err := probe.InfoContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !pluginIDPattern.MatchString(info.ID) {
+		return nil, errors.New("plugin must declare a valid canonical ID")
+	}
+	if err := m.bindUpdate(op, info.ID); err != nil {
+		return nil, err
+	}
+	if host != nil {
+		host.pluginName = info.ID
+		caps := make(map[sdk.Capability]bool, len(info.Capabilities))
+		for _, cap := range info.Capabilities {
+			caps[cap] = true
+		}
+		host.SetCapabilities(caps)
+	}
+	inst := &PluginInstance{Name: info.ID, SourceName: requested, Generation: a.Generation, Artifact: a,
+		DisplayName: info.Name, Version: info.Version, Author: info.Author, Type: string(info.Type),
+		InstructionPresets: info.InstructionPresets, ConfigSchema: cloneConfigSchema(info.ConfigSchema), Metadata: cloneMetadata(info.Metadata),
+		Capabilities: sdkCapabilitiesToStrings(info.Capabilities), Priority: info.Priority, Client: client, stopped: make(chan struct{})}
+	p := &preparedPlugin{instance: inst, info: info, detachPreparation: stopCancel}
+	var lifecycle lifecycleClient
+	switch info.Type {
+	case sdk.PluginTypeGateway:
+		inst.Gateway, lifecycle = probe, probe
+	case sdk.PluginTypeExtension:
+		raw, err := rpc.Dispense(sdkgrpc.PluginKeyExtension)
+		if err != nil {
+			return nil, err
+		}
+		inst.Extension = raw.(*sdkgrpc.ExtensionGRPCClient)
+		lifecycle = inst.Extension
+	case sdk.PluginTypeMiddleware:
+		raw, err := rpc.Dispense(sdkgrpc.PluginKeyMiddleware)
+		if err != nil {
+			return nil, err
+		}
+		inst.Middleware = raw.(*sdkgrpc.MiddlewareGRPCClient)
+		lifecycle = inst.Middleware
+	default:
+		return nil, fmt.Errorf("unsupported plugin type %q", info.Type)
+	}
+	initConfig, err := m.buildInitConfig(ctx, info.ID)
+	if err != nil {
+		return nil, fmt.Errorf("加载候选配置失败: %w", err)
+	}
+	inst.runtime = lifecycle
+	spec, err := lifecycle.DescribeRuntime(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("SDK runtime contract unavailable: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			m.releaseRuntimeResources(inst)
+		}
+	}()
+	runtimeInfo, err := m.prepareRuntimeResources(ctx, inst, spec)
+	if err != nil {
+		return nil, err
+	}
+	runtimeJSON, err := json.Marshal(runtimeInfo)
+	if err != nil {
+		return nil, err
+	}
+	initConfig[sdk.RuntimeContextConfigKey] = string(runtimeJSON)
+	if err := lifecycle.InitContext(ctx, newCorePluginContext(initConfig, info.ID)); err != nil {
+		return nil, fmt.Errorf("初始化候选插件失败: %w", err)
+	}
+	if inst.Extension != nil {
+		if err := inst.Extension.MigrateContext(ctx); err != nil {
+			return nil, err
+		}
+		inst.backgroundTasks, err = inst.Extension.BackgroundTasksContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := lifecycle.Start(ctx); err != nil {
+		return nil, fmt.Errorf("启动候选插件失败: %w", err)
+	}
+	if err := lifecycle.HealthCheck(ctx); err != nil {
+		return nil, fmt.Errorf("候选插件健康检查失败: %w", err)
+	}
+	if inst.Gateway != nil {
+		inst.Platform, p.models, p.routes, err = inst.Gateway.Catalog(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(inst.Platform) == "" {
+			return nil, errors.New("gateway platform is empty")
+		}
+		if raw, dispenseErr := rpc.Dispense(sdkgrpc.PluginKeyExtension); dispenseErr == nil {
+			ext := raw.(*sdkgrpc.ExtensionGRPCClient)
+			types, taskErr := ext.GetTaskTypes(ctx)
+			if taskErr == nil && len(types) > 0 {
+				inst.Extension = ext
+			} else if taskErr != nil && !isOptionalTaskExtensionUnavailable(taskErr) {
+				return nil, taskErr
 			}
 		}
 	}
-
-	releaseRuntimeHashState, err := m.prepareRuntimeHashForPublish(ctx, gateway, platform)
+	assets, err := lifecycle.WebAssetsContext(ctx)
 	if err != nil {
-		client.Kill()
-		m.cleanupStartHostHandle(canonicalName, start)
-		return "", fmt.Errorf("配置插件运行时 Hash 失败: %w", err)
+		return nil, err
 	}
-
+	if err := m.prepareGenerationAssets(ctx, inst, assets); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+func (m *Manager) publishPlugin(ctx context.Context, op *pluginUpdate, p *preparedPlugin) error {
+	inst, old := p.instance, op.previous
+	var prior *pluginArtifact
+	if old != nil {
+		prior = old.Artifact
+	} else {
+		prior, _ = m.loadArtifact(inst.Name)
+	}
+	if old != nil && (old.Type != inst.Type || old.Platform != inst.Platform) {
+		return errors.New("replacement cannot change plugin type or platform")
+	}
+	releaseHash, err := m.prepareRuntimeSettingsForPublish(ctx, inst.runtimeClient())
+	if err != nil {
+		return err
+	}
+	defer releaseHash()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	var older string
+	if prior != nil && prior.Generation != inst.Generation {
+		inst.Artifact.Previous = prior.Generation
+		older = prior.Previous
+	}
+	if err := m.writeActiveArtifact(inst.Name, inst.Artifact); err != nil {
+		if prior != nil {
+			_ = m.writeActiveArtifact(inst.Name, prior)
+		}
+		return err
+	}
 	m.mu.Lock()
-	old, oldIdle := m.replaceInstanceLocked(canonicalName, instance, start)
-	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
-	m.modelCache[platform] = cloneModels(models)
-	m.routeCache[canonicalName] = cloneRoutes(routes)
-	if len(info.AccountTypes) > 0 {
-		m.credCache[platform] = cloneCredentialFields(info.AccountTypes[0].Fields)
-	} else {
-		delete(m.credCache, platform)
+	if m.closing || ctx.Err() != nil || !p.detachPreparation() {
+		m.mu.Unlock()
+		if prior != nil {
+			_ = m.writeActiveArtifact(inst.Name, prior)
+		} else {
+			_ = os.Remove(m.manifestPath(inst.Name))
+		}
+		return errors.New("plugin publication canceled")
 	}
-	m.accountTypeCache[platform] = cloneAccountTypes(info.AccountTypes)
-	// 注意：不能用 `if len > 0` 守卫，必须无条件 delete + set。否则插件从"有 frontend pages"
-	// 改成"无"后，旧的 cache 永远不会被清掉（airgate-health 删 admin tab 时踩到过这个坑）。
-	if len(info.FrontendPages) > 0 {
-		m.frontendPageCache[canonicalName] = cloneFrontendPages(info.FrontendPages)
+	inst.owner = m
+	m.instances[inst.Name] = inst
+	m.registerAliasesLocked(inst.Name, inst.SourceName)
+	m.frontendPageCache[inst.Name] = cloneFrontendPages(p.info.FrontendPages)
+	if inst.Gateway != nil {
+		m.modelCache[inst.Platform], m.routeCache[inst.Name] = cloneModels(p.models), cloneRoutes(p.routes)
+		m.accountTypeCache[inst.Platform] = cloneAccountTypes(p.info.AccountTypes)
+		delete(m.credCache, inst.Platform)
+		if len(p.info.AccountTypes) > 0 {
+			m.credCache[inst.Platform] = cloneCredentialFields(p.info.AccountTypes[0].Fields)
+		}
+		dispatchresolver.RegisterPlatformDSL(inst.Platform, p.info.DispatchDSL)
+	}
+	if inst.Artifact.SourcePath != "" {
+		m.devPaths[inst.Name] = inst.Artifact.SourcePath
 	} else {
-		delete(m.frontendPageCache, canonicalName)
+		delete(m.devPaths, inst.Name)
+	}
+	var idle <-chan struct{}
+	if old != nil {
+		idle = old.beginDrain()
+		if m.retiring == nil {
+			m.retiring = make(map[string]*PluginInstance)
+		}
+		m.retiring[inst.Name] = old
 	}
 	m.mu.Unlock()
-	releaseRuntimeHashState()
-	m.retireReplacedPlugin(old, oldIdle)
-
-	dispatchresolver.RegisterPlatformDSL(platform, info.DispatchDSL)
-
-	m.extractPluginWebAssets(canonicalName, gateway)
-
-	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
-		slog.Info("plugin_name_canonicalized",
-			"requested_name", requestedName,
-			"canonical_name", canonicalName,
-		)
+	if old != nil {
+		old.cancelBackground()
+		go m.retireGeneration(old, idle)
 	}
-
-	slog.Info("plugin_runtime_started",
-		sdk.LogFieldPluginID, canonicalName,
-		sdk.LogFieldPlatform, platform,
-		"kind", pluginType,
-	)
-
-	return canonicalName, nil
+	if inst.Type == string(sdk.PluginTypeExtension) {
+		m.startExtensionBackgroundTasks(inst)
+	}
+	if inst.Artifact.SourcePath != "" && m.devWatcher != nil {
+		m.devWatcher.add(inst.Name, inst.Artifact.SourcePath)
+	}
+	if older != "" && older != inst.Generation && (old == nil || older != old.Generation) {
+		m.removeArtifact(older)
+	}
+	slog.Info("plugin_generation_activated", "plugin", inst.Name, "generation", inst.Generation, "version", inst.Version)
+	return nil
+}
+func (m *Manager) retireGeneration(inst *PluginInstance, idle <-chan struct{}) {
+	m.retireGenerationWithin(inst, idle, pluginRetirementTimeout)
 }
 
-func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Client, ext *sdkgrpc.ExtensionGRPCClient, requestedName, binaryDir string, opts ...pluginStartRuntime) (string, error) {
-	start := startRuntimeFromOptions(opts)
-	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
+func (m *Manager) retireGenerationWithin(inst *PluginInstance, idle <-chan struct{}, limit time.Duration) {
+	ctx, cancel := context.WithTimeout(m.runtimeCtx, limit)
 	defer cancel()
-
-	info := ext.Info()
-	canonicalName := canonicalPluginName(info, requestedName)
-	if canonicalName == "" {
-		client.Kill()
-		m.cleanupStartHostHandle(requestedName, start)
-		return "", fmt.Errorf("插件未提供有效的 ID/name")
-	}
-	if !start.replaceExisting {
-		if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
-			client.Kill()
-			m.cleanupStartHostHandle(requestedName, start)
-			return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	m.beginRuntimeDrain(inst, ctx)
+	select {
+	case <-idle:
+	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			slog.Warn("plugin_retirement_timeout", "plugin", inst.Name, "active_requests", inst.activeRequestCount(), "timeout", limit)
 		}
 	}
-
-	m.bindStartHostHandle(requestedName, canonicalName, info, start)
-
-	initConfig := m.buildInitConfig(ctx, canonicalName)
-	pluginCtx := newCorePluginContext(initConfig, canonicalName)
-	if err := ext.Init(pluginCtx); err != nil {
-		client.Kill()
-		m.cleanupStartHostHandle(canonicalName, start)
-		return "", fmt.Errorf("初始化 extension 插件失败: %w", err)
-	}
-	if err := ext.Start(startCtx); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			slog.Error("plugin_start_timeout",
-				sdk.LogFieldPluginID, canonicalName,
-				"timeout_ms", pluginStartTimeout.Milliseconds(),
-				"kind", "extension",
-				sdk.LogFieldError, err,
-			)
-		}
-		client.Kill()
-		m.cleanupStartHostHandle(canonicalName, start)
-		return "", fmt.Errorf("启动 extension 插件失败: %w", err)
-	}
-	if err := ext.Migrate(); err != nil {
-		slog.Warn("plugin_extension_migrate_failed",
-			sdk.LogFieldPluginID, canonicalName, sdk.LogFieldError, err)
-	}
-
-	pluginType := string(info.Type)
-	if pluginType == "" {
-		pluginType = "extension"
-	}
-
-	instance := &PluginInstance{
-		Name:         canonicalName,
-		SourceName:   normalizePluginName(requestedName),
-		BinaryDir:    normalizePluginName(binaryDir),
-		DisplayName:  info.Name,
-		Version:      info.Version,
-		Author:       info.Author,
-		Type:         pluginType,
-		ConfigSchema: cloneConfigSchema(info.ConfigSchema),
-		Metadata:     cloneMetadata(info.Metadata),
-		Capabilities: sdkCapabilitiesToStrings(info.Capabilities),
-		Priority:     info.Priority,
-		Client:       client,
-		Extension:    ext,
-	}
-
+	m.stopRuntime(inst, ctx)
 	m.mu.Lock()
-	old, oldIdle := m.replaceInstanceLocked(canonicalName, instance, start)
-	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
-	// 必须无条件 delete + set，避免插件移除 frontend pages 后旧 cache 残留。
-	if len(info.FrontendPages) > 0 {
-		m.frontendPageCache[canonicalName] = cloneFrontendPages(info.FrontendPages)
-	} else {
-		delete(m.frontendPageCache, canonicalName)
+	if m.retiring[inst.Name] == inst {
+		delete(m.retiring, inst.Name)
 	}
 	m.mu.Unlock()
-	m.retireReplacedPlugin(old, oldIdle)
-
-	m.extractPluginWebAssets(canonicalName, ext)
-
-	// 启动插件声明的后台任务调度（如 epay 的 expire_pending_orders）。
-	// 必须在 instance 已写入 m.instances 之后，因为 stopPlugin 通过 instance 取消。
-	m.startExtensionBackgroundTasks(instance)
-
-	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
-		slog.Info("plugin_name_canonicalized",
-			"requested_name", requestedName,
-			"canonical_name", canonicalName,
-		)
-	}
-
-	slog.Info("plugin_runtime_started",
-		sdk.LogFieldPluginID, canonicalName,
-		"kind", pluginType,
-	)
-
-	return canonicalName, nil
 }
-
-// startMiddlewarePlugin 处理 type=middleware 的插件。
-//
-// 与 extension 的区别：
-//   - 不暴露自定义 HTTP 路由（middleware 完全围绕 forward chain 工作）
-//   - 不声明 BackgroundTask
-//   - 实例存到 m.instances 后会被 forwarder 的 middleware chain 自动 pickup
-//
-// 与 gateway 的区别：
-//   - 不替代 upstream（不需要 Platform / Models / Routes）
-func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Client, mw *sdkgrpc.MiddlewareGRPCClient, requestedName, binaryDir string, opts ...pluginStartRuntime) (string, error) {
-	start := startRuntimeFromOptions(opts)
-	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
-	defer cancel()
-
-	info := mw.Info()
-	canonicalName := canonicalPluginName(info, requestedName)
-	if canonicalName == "" {
-		client.Kill()
-		m.cleanupStartHostHandle(requestedName, start)
-		return "", fmt.Errorf("插件未提供有效的 ID/name")
+func (m *Manager) stopRuntime(inst *PluginInstance, parent context.Context) {
+	if inst == nil {
+		return
 	}
-	if !start.replaceExisting {
-		if err := m.waitForPluginStop(ctx, canonicalName); err != nil {
-			client.Kill()
-			m.cleanupStartHostHandle(requestedName, start)
-			return "", fmt.Errorf("等待旧插件停止失败: %w", err)
+	inst.stopOnce.Do(func() {
+		m.beginRuntimeDrain(inst, parent)
+		defer m.releaseRuntimeResources(inst)
+		inst.cancelBackground()
+		ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+		defer cancel()
+		var client lifecycleClient
+		switch {
+		case inst.Gateway != nil:
+			client = inst.Gateway
+		case inst.Extension != nil:
+			client = inst.Extension
+		case inst.Middleware != nil:
+			client = inst.Middleware
 		}
-	}
-
-	m.bindStartHostHandle(requestedName, canonicalName, info, start)
-
-	initConfig := m.buildInitConfig(ctx, canonicalName)
-	pluginCtx := newCorePluginContext(initConfig, canonicalName)
-	if err := mw.Init(pluginCtx); err != nil {
-		client.Kill()
-		m.cleanupStartHostHandle(canonicalName, start)
-		return "", fmt.Errorf("初始化 middleware 插件失败: %w", err)
-	}
-	if err := mw.Start(startCtx); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			slog.Error("plugin_start_timeout",
-				sdk.LogFieldPluginID, canonicalName,
-				"timeout_ms", pluginStartTimeout.Milliseconds(),
-				"kind", "middleware",
-				sdk.LogFieldError, err,
-			)
+		if client != nil {
+			if err := client.Stop(ctx); err != nil {
+				slog.Warn("plugin_stop_failed", "plugin", inst.Name, "error", err)
+			}
 		}
-		client.Kill()
-		m.cleanupStartHostHandle(canonicalName, start)
-		return "", fmt.Errorf("启动 middleware 插件失败: %w", err)
-	}
-
-	instance := &PluginInstance{
-		Name:         canonicalName,
-		SourceName:   normalizePluginName(requestedName),
-		BinaryDir:    normalizePluginName(binaryDir),
-		DisplayName:  info.Name,
-		Version:      info.Version,
-		Author:       info.Author,
-		Type:         string(sdk.PluginTypeMiddleware),
-		ConfigSchema: cloneConfigSchema(info.ConfigSchema),
-		Metadata:     cloneMetadata(info.Metadata),
-		Capabilities: sdkCapabilitiesToStrings(info.Capabilities),
-		Priority:     info.Priority,
-		Client:       client,
-		Middleware:   mw,
-	}
-
-	m.mu.Lock()
-	old, oldIdle := m.replaceInstanceLocked(canonicalName, instance, start)
-	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
-	// 必须无条件 delete + set，避免插件移除 frontend pages 后旧 cache 残留。
-	if len(info.FrontendPages) > 0 {
-		m.frontendPageCache[canonicalName] = cloneFrontendPages(info.FrontendPages)
-	} else {
-		delete(m.frontendPageCache, canonicalName)
-	}
-	m.mu.Unlock()
-	m.retireReplacedPlugin(old, oldIdle)
-
-	m.extractPluginWebAssets(canonicalName, mw)
-
-	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
-		slog.Info("plugin_name_canonicalized",
-			"requested_name", requestedName,
-			"canonical_name", canonicalName,
-		)
-	}
-
-	slog.Info("plugin_runtime_started",
-		sdk.LogFieldPluginID, canonicalName,
-		"kind", "middleware",
-		"priority", info.Priority,
-		"capabilities", info.Capabilities,
-	)
-
-	return canonicalName, nil
+		if inst.Client != nil {
+			inst.Client.Kill()
+		}
+		ttCache.remove(inst.Name + ":" + inst.Generation)
+		if inst.stopped != nil {
+			close(inst.stopped)
+		}
+		slog.Info("plugin_generation_stopped", "plugin", inst.Name, "generation", inst.Generation)
+	})
 }
-
 func (m *Manager) stopPlugin(name string, parents ...context.Context) {
 	ctx := context.Background()
 	if len(parents) > 0 {
 		ctx = parents[0]
 	}
 	m.mu.Lock()
-	resolvedName := m.resolveNameLocked(name)
-	inst, ok := m.instances[resolvedName]
-	if !ok {
-		wait := m.stopping[resolvedName]
-		if wait == nil {
-			wait = m.stopping[normalizePluginName(name)]
-		}
+	name = m.resolveNameLocked(name)
+	inst := m.instances[name]
+	if inst == nil {
 		m.mu.Unlock()
-		if wait != nil {
-			select {
-			case <-wait:
-			case <-ctx.Done():
-			}
-		}
 		return
 	}
-	stopKeys := pluginStopKeys(name, resolvedName, inst)
-	stopDone := make(chan struct{})
-	for _, key := range stopKeys {
-		m.stopping[key] = stopDone
-	}
 	idle := inst.beginDrain()
-	delete(m.instances, resolvedName)
+	delete(m.instances, name)
 	delete(m.modelCache, inst.Platform)
-	delete(m.routeCache, inst.Name)
+	delete(m.routeCache, name)
 	delete(m.credCache, inst.Platform)
 	delete(m.accountTypeCache, inst.Platform)
-	delete(m.frontendPageCache, inst.Name)
-	delete(m.hostHandles, inst.Name)
-	m.unregisterAliasesLocked(inst.Name, inst.SourceName, inst.BinaryDir)
-	m.mu.Unlock()
+	delete(m.frontendPageCache, name)
+	m.unregisterAliasesLocked(name, inst.SourceName)
 	if inst.Platform != "" {
 		dispatchresolver.UnregisterPlatformDSL(inst.Platform)
 	}
-	defer m.finishPluginStop(stopKeys, stopDone)
-
-	// 摘掉 dev watcher 上的注册（ReloadDev 内部会再 add 回来）
+	m.mu.Unlock()
 	if m.devWatcher != nil {
-		m.devWatcher.remove(inst.Name)
+		m.devWatcher.remove(name)
 	}
-
-	m.stopPluginRuntime(inst, idle, pluginStopDrainTimeout, ctx)
-}
-
-func (m *Manager) stopPluginRuntime(inst *PluginInstance, idle <-chan struct{}, drainTimeout time.Duration, parents ...context.Context) {
-	if inst == nil {
-		return
-	}
-	parent := context.Background()
-	if len(parents) > 0 {
-		parent = parents[0]
-	}
-
-	// Caller must begin drain before unlinking/replacing the instance so new
-	// requests stop at the lifecycle boundary and in-flight requests are counted.
-	// 先停后台任务调度器，再走插件 Stop —— 避免 ticker 在 plugin 进程被 Kill
-	// 之后还往 dead client 发 RPC，造成一堆 connection refused 噪音。
-	if inst.stopBackground != nil {
-		inst.stopBackground()
-	}
-
-	if !waitPluginDrain(inst, idle, drainTimeout) {
-		slog.Warn("plugin_drain_timeout",
-			sdk.LogFieldPluginID, inst.Name,
-			"active_requests", inst.activeRequestCount(),
-			"timeout_ms", drainTimeout.Milliseconds(),
-		)
-	}
-	stopCtx, stopCancel := context.WithTimeout(parent, 10*time.Second)
-	defer stopCancel()
-
-	if inst.Gateway != nil {
-		if err := inst.Gateway.Stop(stopCtx); err != nil {
-			slog.Warn("plugin_stop_failed",
-				sdk.LogFieldPluginID, inst.Name, "kind", "gateway", sdk.LogFieldError, err)
-		}
-	}
-	if inst.Extension != nil {
-		if err := inst.Extension.Stop(stopCtx); err != nil {
-			slog.Warn("plugin_stop_failed",
-				sdk.LogFieldPluginID, inst.Name, "kind", "extension", sdk.LogFieldError, err)
-		}
-	}
-	if inst.Middleware != nil {
-		if err := inst.Middleware.Stop(stopCtx); err != nil {
-			slog.Warn("plugin_stop_failed",
-				sdk.LogFieldPluginID, inst.Name, "kind", "middleware", sdk.LogFieldError, err)
-		}
-	}
-	if inst.Client != nil {
-		inst.Client.Kill()
-	}
-
-	slog.Info("plugin_runtime_stopped", sdk.LogFieldPluginID, inst.Name)
-}
-
-func waitPluginDrain(inst *PluginInstance, idle <-chan struct{}, timeout time.Duration) bool {
-	if idle == nil {
-		return true
-	}
-	if timeout < 0 {
-		<-idle
-		return true
-	}
-	if timeout == 0 {
-		select {
-		case <-idle:
-			return true
-		default:
-			return false
-		}
-	}
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
+	inst.cancelBackground()
+	m.beginRuntimeDrain(inst, ctx)
 	select {
 	case <-idle:
-		return true
-	case <-timer.C:
-		return false
+	case <-ctx.Done():
 	}
+	m.stopRuntime(inst, ctx)
 }
-
-func (m *Manager) waitForPluginStop(ctx context.Context, name string) error {
-	key := normalizePluginName(name)
-	if key == "" {
-		return nil
-	}
-	for {
-		m.mu.RLock()
-		resolvedName := m.resolveNameLocked(key)
-		wait := m.stopping[resolvedName]
-		if wait == nil {
-			wait = m.stopping[key]
-		}
-		m.mu.RUnlock()
-		if wait == nil {
-			return nil
-		}
-		select {
-		case <-wait:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-}
-
-func (m *Manager) finishPluginStop(keys []string, done chan struct{}) {
+func (m *Manager) StopAll(ctx context.Context) {
 	m.mu.Lock()
-	for _, key := range keys {
-		if m.stopping[key] == done {
-			delete(m.stopping, key)
-		}
+	m.closing = true
+	operations := make(map[*pluginUpdate]bool)
+	for _, op := range m.updates {
+		operations[op] = true
+		op.cancel()
+	}
+	all := make(map[*PluginInstance]bool)
+	for _, inst := range m.instances {
+		inst.beginDrain()
+		all[inst] = true
+	}
+	for _, inst := range m.retiring {
+		all[inst] = true
+	}
+	if m.runtimeCancel != nil {
+		m.runtimeCancel()
 	}
 	m.mu.Unlock()
-	close(done)
-}
-
-func pluginStopKeys(requestedName, resolvedName string, inst *PluginInstance) []string {
-	seen := map[string]struct{}{}
-	names := []string{requestedName, resolvedName}
-	if inst != nil {
-		names = append(names, inst.Name, inst.SourceName, inst.BinaryDir)
-	}
-	keys := make([]string, 0, len(names))
-	for _, name := range names {
-		key := normalizePluginName(name)
-		if key == "" {
-			continue
-		}
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		keys = append(keys, key)
-	}
-	return keys
-}
-
-// StopAll 停止所有插件。
-func (m *Manager) StopAll(ctx context.Context) {
 	if m.devWatcher != nil {
-		if err := m.devWatcher.CloseContext(ctx); err != nil {
-			slog.Warn("plugin_watcher_shutdown_pending", "error", err)
+		_ = m.devWatcher.CloseContext(ctx)
+	}
+	var wg sync.WaitGroup
+	for inst := range all {
+		wg.Add(1)
+		go func() { defer wg.Done(); m.stopRuntime(inst, ctx) }()
+	}
+	for op := range operations {
+		select {
+		case <-op.done:
+		case <-ctx.Done():
 		}
 	}
-
-	m.mu.RLock()
-	names := make([]string, 0, len(m.instances))
-	for name := range m.instances {
-		names = append(names, name)
-	}
-	m.mu.RUnlock()
-
-	for _, name := range names {
-		m.stopPlugin(name, ctx)
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-ctx.Done():
 	}
 }
-
+func (m *Manager) LoadAll(ctx context.Context) error {
+	defer m.pruneArtifacts()
+	entries, err := os.ReadDir(m.pluginDir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("读取插件目录失败: %w", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || !pluginIDPattern.MatchString(entry.Name()) {
+			continue
+		}
+		a, err := m.loadArtifact(entry.Name())
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			slog.Error("plugin_manifest_invalid", "plugin", entry.Name(), "error", err)
+			continue
+		}
+		if a.SourcePath != "" {
+			continue
+		}
+		if err := m.updatePlugin(ctx, entry.Name(), nil, "", nil, a); err != nil {
+			slog.Error("plugin_load_failed", "plugin", entry.Name(), "error", err)
+		}
+	}
+	return nil
+}
+func (m *Manager) LoadDev(ctx context.Context, name, source string) error {
+	if info, err := os.Stat(source); err != nil || !info.IsDir() {
+		return fmt.Errorf("plugin source directory unavailable")
+	}
+	m.mu.Lock()
+	if m.closing {
+		m.mu.Unlock()
+		return errors.New("plugin manager is stopping")
+	}
+	name = m.resolveNameLocked(name)
+	m.devPaths[name] = source
+	m.mu.Unlock()
+	if m.devWatcher != nil {
+		m.devWatcher.add(name, source)
+	}
+	return m.updatePlugin(ctx, name, nil, source, nil, nil)
+}
+func (m *Manager) ReloadDev(ctx context.Context, name string) error {
+	m.mu.RLock()
+	name = m.resolveNameLocked(name)
+	source := m.devPaths[name]
+	m.mu.RUnlock()
+	if source == "" {
+		return errors.New("plugin has no development source")
+	}
+	return m.updatePlugin(ctx, name, nil, source, nil, nil)
+}
+func (m *Manager) IsDev(name string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.devPaths[m.resolveNameLocked(name)] != ""
+}
 func isOptionalTaskExtensionUnavailable(err error) bool {
 	return status.Code(err) == codes.Unimplemented
 }

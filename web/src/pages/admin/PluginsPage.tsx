@@ -59,6 +59,7 @@ export default function PluginsPage() {
   const { data: pluginsData, isLoading: pluginsLoading, refetch: refetchPlugins } = useQuery({
     queryKey: queryKeys.plugins(),
     queryFn: () => pluginsApi.list(FETCH_ALL_PARAMS),
+    refetchInterval: (query) => query.state.data?.list.some((plugin) => plugin.update_state === 'preparing' || plugin.update_state === 'draining') ? 1000 : false,
   });
 
   // 插件市场列表
@@ -260,6 +261,8 @@ export default function PluginsPage() {
                           {row.platform && (
                             <span className="text-xs text-text-tertiary">{row.platform}</span>
                           )}
+                          {row.update_state === 'preparing' && <Chip size="sm" variant="soft" color="warning">正在准备新版本</Chip>}
+                          {row.update_state === 'draining' && <Chip size="sm" variant="soft" color="warning">旧版本还有 {row.draining_requests} 个请求</Chip>}
                           {row.version && (
                             <span className="text-xs text-text-tertiary">
                               {t('common.version')}: {row.version}
@@ -284,7 +287,7 @@ export default function PluginsPage() {
                               配置
                             </Button>
                           )}
-                          {row.is_dev && (() => {
+                          {(() => {
                             // 只在当前正在重载的这一行显示 loading；用 mutation.variables 区分
                             // 哪个 plugin 在途，避免点一个插件转全部
                             const isReloadingThis =
@@ -293,7 +296,7 @@ export default function PluginsPage() {
                               <Button
                                 size="sm"
                                 variant="secondary"
-                                isDisabled={reloadMutation.isPending}
+                                isDisabled={reloadMutation.isPending || row.update_state === 'preparing' || row.update_state === 'draining'}
                                 onPress={() => reloadMutation.mutate(row.name)}
                               >
                                 <RefreshCw className={`w-3.5 h-3.5 ${isReloadingThis ? 'animate-spin' : ''}`} />

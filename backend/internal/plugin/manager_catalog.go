@@ -6,29 +6,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
-	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/ent"
 	pluginent "github.com/DevilGenius/airgate-core/ent/plugin"
 )
-
-// GetExtensionByName 根据插件名查找 extension 类型插件。
-func (m *Manager) GetExtensionByName(name string) *sdkgrpc.ExtensionGRPCClient {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	inst := m.instances[m.resolveNameLocked(name)]
-	if inst == nil {
-		return nil
-	}
-	return inst.Extension
-}
 
 // GetPluginByPlatform 根据平台查找运行中的插件实例。
 func (m *Manager) GetPluginByPlatform(platform string) *PluginInstance {
@@ -194,30 +179,6 @@ func (m *Manager) GetFrontendPages(pluginName string) []sdk.FrontendPage {
 	return cloneFrontendPages(m.frontendPageCache[m.resolveNameLocked(pluginName)])
 }
 
-// DevWebDistPath 返回某个 dev 模式插件前端构建产物的本地路径。
-//
-// 约定：插件的源码 root 都遵循 `<plugin>/backend` + `<plugin>/web` 平级布局，
-// 因此 web/dist 在 srcPath 的父目录下的 web/dist 子目录。
-//
-// 用途：core router 的 plugin assets handler 在 dev 模式下从这个路径直读
-// vite 实时构建的产物，让"改插件前端 → 浏览器刷新立即生效"成为可能，
-// 不必再让 vite watch 写到 core 的 data/plugins/<id>/assets/。
-//
-// 返回 (path, true) 表示该插件是 dev 模式且 web/dist 路径已计算好（不保证目录存在）。
-// 返回 ("", false) 表示该插件是 production 模式，调用方应 fallback 到
-// data/plugins/<id>/assets。
-func (m *Manager) DevWebDistPath(pluginName string) (string, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	src, ok := m.devPaths[m.resolveNameLocked(pluginName)]
-	if !ok || src == "" {
-		return "", false
-	}
-	// srcPath 例如 /path/to/airgate-health/backend
-	// web/dist 例如 /path/to/airgate-health/web/dist
-	return filepath.Join(filepath.Dir(src), "web", "dist"), true
-}
-
 // GetAllPluginMeta 获取所有运行中插件的元信息。
 func (m *Manager) GetAllPluginMeta() []PluginMeta {
 	m.mu.RLock()
@@ -227,6 +188,8 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 	for _, inst := range m.instances {
 		_, isDev := m.devPaths[inst.Name]
 		meta := PluginMeta{
+			Generation:         inst.Generation,
+			UpdateState:        "active",
 			Name:               inst.Name,
 			DisplayName:        inst.DisplayName,
 			Version:            inst.Version,
@@ -238,6 +201,13 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 			Metadata:           cloneMetadata(inst.Metadata),
 			IsDev:              isDev,
 		}
+		if m.updates[inst.Name] != nil {
+			meta.UpdateState = "preparing"
+		}
+		if retiring := m.retiring[inst.Name]; retiring != nil {
+			meta.UpdateState = "draining"
+			meta.DrainingRequests = retiring.activeRequestCount()
+		}
 		if !isDev {
 			meta.BinarySHA256 = m.installedBinarySHA256Locked(inst)
 			meta.CommitSHA = m.readInstallMetadataLocked(inst).CommitSHA
@@ -248,8 +218,7 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 		if pages, ok := m.frontendPageCache[inst.Name]; ok {
 			meta.FrontendPages = cloneFrontendPages(pages)
 		}
-		assetsDir := filepath.Join(m.pluginDir, inst.Name, "assets")
-		if _, err := os.Stat(assetsDir); err == nil {
+		if len(inst.frontendAssets) > 0 {
 			meta.HasWebAssets = true
 		}
 		metas = append(metas, meta)
@@ -258,16 +227,10 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 }
 
 func (m *Manager) installedBinarySHA256Locked(inst *PluginInstance) string {
-	if inst == nil || inst.BinaryDir == "" {
+	if inst == nil || inst.Artifact == nil {
 		return ""
 	}
-	binaryPath := filepath.Join(m.pluginDir, inst.BinaryDir, inst.BinaryDir)
-	sum, err := fileSHA256(binaryPath)
-	if err != nil {
-		slog.Debug("plugin_binary_hash_failed", sdk.LogFieldPluginID, inst.Name, "path", binaryPath, sdk.LogFieldError, err)
-		return ""
-	}
-	return sum
+	return inst.Artifact.SHA256
 }
 
 func fileSHA256(path string) (string, error) {
@@ -351,11 +314,14 @@ func (m *Manager) UpdatePluginConfigLive(ctx context.Context, name string, confi
 	if inst == nil || inst.Gateway == nil {
 		return false, nil
 	}
-	initConfig := m.buildInitConfig(ctx, m.resolveName(name))
+	initConfig, err := m.buildInitConfig(ctx, m.resolveName(name))
+	if err != nil {
+		return false, err
+	}
 	for key, value := range config {
 		initConfig[key] = value
 	}
-	if err := inst.Gateway.UpdateConfig(newCorePluginContext(initConfig, m.resolveName(name))); err != nil {
+	if err := inst.UpdateConfig(newCorePluginContext(initConfig, m.resolveName(name))); err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unimplemented") || strings.Contains(strings.ToLower(err.Error()), "does not support config hot reload") {
 			return false, nil
 		}
@@ -364,37 +330,25 @@ func (m *Manager) UpdatePluginConfigLive(ctx context.Context, name string, confi
 	return true, nil
 }
 
-// ReloadInstance 用最新 DB 配置重启一个已加载的插件实例（dev 与正式都支持）。
-// dev 插件走 ReloadDev（重新 go run）；正式插件走 stopPlugin + 重新启动二进制。
+// ReloadInstance uses the same candidate pipeline for source and installed artifacts.
 func (m *Manager) ReloadInstance(ctx context.Context, name string) error {
-	resolved := m.resolveName(name)
-	if m.IsDev(resolved) {
-		return m.ReloadDev(ctx, resolved)
+	inst := m.GetInstance(name)
+	if inst == nil || inst.Artifact == nil {
+		return fmt.Errorf("plugin %s has no installed artifact", name)
 	}
-	inst := m.GetInstance(resolved)
-	if inst == nil {
-		return fmt.Errorf("插件 %s 不存在或未运行", name)
+	if inst.Artifact.SourcePath != "" {
+		return m.ReloadDev(ctx, name)
 	}
-	binaryDir := inst.BinaryDir
-	if binaryDir == "" {
-		binaryDir = resolved
+	binary, err := os.ReadFile(m.artifactBinary(inst.Artifact))
+	if err != nil {
+		return err
 	}
-	binaryPath := filepath.Join(m.pluginDir, binaryDir, binaryDir)
-	if _, err := os.Stat(binaryPath); err != nil {
-		return fmt.Errorf("插件二进制不存在: %s", binaryPath)
-	}
-	m.stopPlugin(resolved)
-	if _, err := m.startPlugin(ctx, binaryDir, exec.Command(binaryPath), binaryDir); err != nil {
-		return fmt.Errorf("重启插件失败: %w", err)
-	}
-	return nil
+	return m.updatePlugin(ctx, inst.Name, binary, "", &inst.Artifact.Metadata, nil)
 }
 
-// HasWebAssets 检查插件是否有前端资源。
-func (m *Manager) HasWebAssets(pluginName string) bool {
-	assetsDir := filepath.Join(m.pluginDir, m.resolveName(pluginName), "assets")
-	_, err := os.Stat(assetsDir)
-	return err == nil
+func (m *Manager) HasWebAssets(name string) bool {
+	inst := m.GetInstance(name)
+	return inst != nil && inst.Artifact != nil && len(inst.frontendAssets) > 0
 }
 
 func (m *Manager) resolveName(name string) string {

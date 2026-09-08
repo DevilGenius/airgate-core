@@ -39,6 +39,7 @@ func (s *Service) List() []PluginMeta {
 			commitSHA = commitLookup[releaseCommitKey(item.Name, item.Version, item.BinarySHA256)]
 		}
 		result = append(result, PluginMeta{
+			Generation: item.Generation, UpdateState: item.UpdateState, DrainingRequests: item.DrainingRequests,
 			Name:               item.Name,
 			DisplayName:        item.DisplayName,
 			Version:            installedDisplayVersion(item.Version, item.IsDev, commitSHA, item.BinarySHA256),
@@ -163,13 +164,7 @@ func (s *Service) Uninstall(ctx context.Context, name string) error {
 // Reload 热加载插件。
 func (s *Service) Reload(ctx context.Context, name string) error {
 	logger := sdk.LoggerFromContext(ctx)
-	if !s.manager.IsDev(name) {
-		logger.Warn("plugin_admin_reload_failed",
-			sdk.LogFieldPluginID, name,
-			sdk.LogFieldReason, "not_dev_plugin")
-		return ErrPluginNotDev
-	}
-	if err := s.manager.ReloadDev(ctx, name); err != nil {
+	if err := s.manager.ReloadInstance(ctx, name); err != nil {
 		logger.Error("plugin_admin_reload_failed",
 			sdk.LogFieldPluginID, name,
 			sdk.LogFieldError, err)
@@ -177,7 +172,7 @@ func (s *Service) Reload(ctx context.Context, name string) error {
 	}
 	logger.Info("plugin_admin_enabled",
 		sdk.LogFieldPluginID, name,
-		"op", "dev_reload")
+		"op", "reload")
 	return nil
 }
 
@@ -188,8 +183,13 @@ func (s *Service) Proxy(ctx context.Context, input ProxyInput) (ProxyResult, err
 		return ProxyResult{}, ErrPluginUnavailable
 	}
 
+	current, release, acquireErr := inst.Acquire()
+	if acquireErr != nil {
+		return ProxyResult{}, acquireErr
+	}
+	defer release()
 	status, headers, body, err := pluginAdminProxyHandleHTTPRequest(
-		inst.Gateway,
+		current.Gateway,
 		ctx,
 		input.Method,
 		input.Action,

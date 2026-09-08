@@ -11,42 +11,35 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
-
-	goplugin "github.com/hashicorp/go-plugin"
-
-	sdkgrpc "github.com/DevilGenius/airgate-sdk/runtimego/grpc"
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 const MaxPluginBinarySize int64 = 200 << 20
 
 // Uninstall 卸载插件。
 func (m *Manager) Uninstall(ctx context.Context, name string) error {
-	resolvedName := m.resolveName(name)
-	inst := m.GetInstance(resolvedName)
-
-	m.stopPlugin(resolvedName)
-
+	m.artifactMu.RLock()
+	defer m.artifactMu.RUnlock()
+	ctx, op, err := m.beginUpdate(ctx, name)
+	if err != nil {
+		return err
+	}
+	defer m.finishUpdate(op)
+	resolved := m.resolveName(name)
+	inst := m.GetInstance(resolved)
+	m.stopPlugin(resolved, ctx)
 	m.mu.Lock()
-	delete(m.devPaths, resolvedName)
+	delete(m.devPaths, resolved)
 	m.mu.Unlock()
-
-	targetDirs := []string{filepath.Join(m.pluginDir, resolvedName)}
-	if inst != nil && inst.BinaryDir != "" && inst.BinaryDir != resolvedName {
-		targetDirs = append(targetDirs, filepath.Join(m.pluginDir, inst.BinaryDir))
+	if err := os.Remove(m.manifestPath(resolved)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("删除插件清单失败: %w", err)
 	}
-
-	for _, targetDir := range targetDirs {
-		if err := os.RemoveAll(targetDir); err != nil {
-			return fmt.Errorf("删除插件目录失败: %w", err)
-		}
+	if inst != nil && inst.Artifact != nil {
+		m.removeArtifact(inst.Generation)
+		m.removeArtifact(inst.Artifact.Previous)
 	}
-
-	slog.Info("插件已卸载", "name", resolvedName)
+	slog.Info("插件已卸载", "name", resolved)
 	return nil
 }
 
@@ -69,103 +62,7 @@ func (m *Manager) InstallFromBinaryWithSHA256(ctx context.Context, name string, 
 }
 
 func (m *Manager) installFromBinary(ctx context.Context, name string, binary []byte, meta *installMetadata) error {
-	realName, err := m.probePluginName(name, binary)
-	if err != nil {
-		slog.Warn("探测插件名称失败，使用传入名称", "name", name, "error", err)
-		realName = name
-	}
-
-	targetDir := filepath.Join(m.pluginDir, realName)
-	binaryPath := filepath.Join(targetDir, realName)
-	previousBinary, previousErr := os.ReadFile(binaryPath)
-
-	m.stopPlugin(realName)
-
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		return fmt.Errorf("创建插件目录失败: %w", err)
-	}
-	if err := os.WriteFile(binaryPath, binary, 0755); err != nil {
-		return fmt.Errorf("写入插件二进制失败: %w", err)
-	}
-
-	canonicalName, err := m.startPlugin(ctx, realName, exec.Command(binaryPath), realName)
-	if err != nil {
-		if previousErr == nil {
-			if restoreErr := m.restorePreviousBinary(ctx, realName, binaryPath, previousBinary); restoreErr != nil {
-				return fmt.Errorf("启动插件失败: %w；恢复旧版本也失败: %v", err, restoreErr)
-			}
-			slog.Warn("新插件启动失败，已恢复旧版本", "name", realName, "error", err)
-		}
-		return fmt.Errorf("启动插件失败: %w", err)
-	}
-
-	m.writeInstallMetadata(realName, meta)
-	slog.Info("插件从二进制安装成功", "name", canonicalName)
-	return nil
-}
-
-func (m *Manager) restorePreviousBinary(ctx context.Context, name, binaryPath string, previousBinary []byte) error {
-	if err := os.WriteFile(binaryPath, previousBinary, 0755); err != nil {
-		return fmt.Errorf("写回旧插件二进制失败: %w", err)
-	}
-	if _, err := m.startPlugin(ctx, name, exec.Command(binaryPath), name); err != nil {
-		return fmt.Errorf("重启旧插件失败: %w", err)
-	}
-	return nil
-}
-
-func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, error) {
-	tmpDir, err := os.MkdirTemp("", "airgate-probe-*")
-	if err != nil {
-		return "", fmt.Errorf("创建临时目录失败: %w", err)
-	}
-	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			slog.Warn("清理插件探测临时目录失败", "dir", tmpDir, "error", err)
-		}
-	}()
-
-	tmpBinary := filepath.Join(tmpDir, fallbackName)
-	if err := os.WriteFile(tmpBinary, binary, 0755); err != nil {
-		return "", fmt.Errorf("写入临时二进制失败: %w", err)
-	}
-
-	// 探测式 spawn：只是为了拿 Info()，不挂 host handle（capability 校验不适用）
-	client := goplugin.NewClient(m.newPluginClientConfig(exec.Command(tmpBinary), false, nil))
-	defer client.Kill()
-
-	rpcClient, err := client.Client()
-	if err != nil {
-		return "", fmt.Errorf("连接探测进程失败: %w", err)
-	}
-
-	raw, err := rpcClient.Dispense(sdkgrpc.PluginKeyGateway)
-	if err != nil {
-		return "", fmt.Errorf("获取探测接口失败: %w", err)
-	}
-	probe, ok := raw.(*sdkgrpc.GatewayGRPCClient)
-	if !ok {
-		return "", fmt.Errorf("探测类型断言失败")
-	}
-
-	info := probe.Info()
-	if info.Type == sdk.PluginTypeExtension {
-		extRaw, err := rpcClient.Dispense(sdkgrpc.PluginKeyExtension)
-		if err != nil {
-			return "", fmt.Errorf("获取 extension 探测接口失败: %w", err)
-		}
-		if ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient); ok {
-			if extInfo := ext.Info(); extInfo.ID != "" {
-				return extInfo.ID, nil
-			}
-		}
-		return fallbackName, nil
-	}
-
-	if info.ID != "" {
-		return info.ID, nil
-	}
-	return fallbackName, nil
+	return m.updatePlugin(ctx, name, binary, "", meta, nil)
 }
 
 // InstallFromGithub 从 GitHub Release 下载并安装插件。
