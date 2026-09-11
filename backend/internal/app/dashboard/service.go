@@ -35,9 +35,9 @@ func NewService(repo Repository, rdb ...*redis.Client) *Service {
 }
 
 const (
-	trendCacheTTL       = 15 * time.Second
-	trendLockTTL        = 5 * time.Second
-	trendLockWait       = 1 * time.Second
+	trendCacheTTL = 15 * time.Second
+	trendLockTTL  = 5 * time.Second
+	trendLockWait = 1 * time.Second
 	// 缓存键版本随 payload 结构变化递增，避免旧缓存缺少新增字段（如 Key Top 12 的 billed_cost）。
 	trendCacheKeyPrefix = "ag:dashboard:trend:v3"
 	// tpmPerRPMBaseline is the reference workload of 1 RPM and 100k TPM.
