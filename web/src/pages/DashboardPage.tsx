@@ -167,7 +167,8 @@ function UsageEstimateCell({ window }: { window: DashboardUsageEstimateWindow })
   const cost = fmtUsageEstimateCost(window.remaining_cost);
   if (!duration) return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
   return (
-    <span className="ag-dashboard-usage-estimate-value font-mono text-base font-semibold leading-none text-text">
+    // 估算数据字号比标题大一号会显得过重，这里收到 text-xs（宽屏下由 layout.css 的容器查询统一放大一档）。
+    <span className="ag-dashboard-usage-estimate-value font-mono text-xs font-semibold leading-none text-text">
       {duration}-<GreenCost text={cost} />
     </span>
   );
@@ -524,7 +525,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
                 <span className="text-text-tertiary">-</span>
               </div>
             ) : (
-              <div className="mt-auto flex min-h-7 flex-col justify-center gap-0.5 pt-1 font-mono text-sm font-semibold leading-none text-text">
+              <div className="mt-auto flex min-h-7 flex-col justify-center gap-0.5 pt-1 font-mono text-xs font-semibold leading-none text-text">
                 {usageEstimateWindows.map((windowKey) => {
                   const estimatesForWindow = orderedUsageEstimates
                     .flatMap((estimate) => {
@@ -536,7 +537,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
                       {estimatesForWindow.map(({ estimate, window }, index) => (
                         <Fragment key={estimate.plan}>
                           {index > 0 ? (
-                            <span aria-hidden="true" className="font-mono text-sm leading-none text-text-tertiary">/</span>
+                            <span aria-hidden="true" className="font-mono text-xs leading-none text-text-tertiary">/</span>
                           ) : null}
                           <span className="shrink-0"><UsageEstimateCell window={window} /></span>
                         </Fragment>
