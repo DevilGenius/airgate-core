@@ -78,7 +78,7 @@ func toDashboardAPIKeyTrends(items []appdashboard.APIKeyTrend) []dto.DashboardAP
 	for _, item := range items {
 		trend := make([]dto.DashboardAPIKeyTrendPoint, 0, len(item.Trend))
 		for _, point := range item.Trend {
-			trend = append(trend, dto.DashboardAPIKeyTrendPoint{Time: point.Time, Tokens: point.Tokens})
+			trend = append(trend, dto.DashboardAPIKeyTrendPoint{Time: point.Time, Tokens: point.Tokens, BilledCost: point.BilledCost})
 		}
 		result = append(result, dto.DashboardAPIKeyTrend{APIKeyID: item.APIKeyID, Name: item.Name, Trend: trend})
 	}

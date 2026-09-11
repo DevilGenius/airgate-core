@@ -140,6 +140,8 @@ type APIKeyTrendLog struct {
 	APIKeyName string
 	Requests   int64
 	Tokens     int64
+	// BilledCost 是该时间桶内该 Key 的计费金额（sum(billed_cost)，已含 sell_rate）。
+	BilledCost float64
 	CreatedAt  time.Time
 }
 
@@ -196,4 +198,6 @@ type APIKeyTrend struct {
 type APIKeyTrendPoint struct {
 	Time   string
 	Tokens int64
+	// BilledCost 是该时间桶内该 Key 的计费金额，与 Tokens 同桶聚合，供仪表盘 Key Top 12 悬浮提示展示。
+	BilledCost float64
 }

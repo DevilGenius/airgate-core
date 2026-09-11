@@ -1005,6 +1005,8 @@ export interface DashboardAPIKeyTrend {
 export interface DashboardAPIKeyTrendPoint {
   time: string;
   tokens: number;
+  /** 该时间桶内该 Key 的计费金额（sum(billed_cost)，已含 sell_rate）。 */
+  billed_cost: number;
 }
 
 // ==================== Monitor ====================

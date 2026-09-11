@@ -157,6 +157,7 @@ SELECT
 	COALESCE(k.name, ''),
 	COALESCE(SUM(r.requests), 0)::bigint,
 	COALESCE(SUM(r.input_tokens + r.output_tokens + r.cached_input_tokens + r.cache_creation_tokens), 0)::bigint,
+	COALESCE(SUM(r.billed_cost), 0)::double precision,
 	r.bucket_start
 FROM public.usage_api_key_hourly_rollups r
 LEFT JOIN public.api_keys k ON k.id = r.api_key_id
@@ -177,7 +178,7 @@ ORDER BY r.bucket_start`
 	result := make([]appdashboard.APIKeyTrendLog, 0)
 	for rows.Next() {
 		var item appdashboard.APIKeyTrendLog
-		if err := rows.Scan(&item.APIKeyID, &item.APIKeyName, &item.Requests, &item.Tokens, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.APIKeyID, &item.APIKeyName, &item.Requests, &item.Tokens, &item.BilledCost, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, item)

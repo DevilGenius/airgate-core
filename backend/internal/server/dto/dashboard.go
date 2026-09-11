@@ -150,4 +150,6 @@ type DashboardAPIKeyTrend struct {
 type DashboardAPIKeyTrendPoint struct {
 	Time   string `json:"time"`
 	Tokens int64  `json:"tokens"`
+	// BilledCost 是该时间桶内该 Key 的计费金额（sum(billed_cost)，已含 sell_rate）。
+	BilledCost float64 `json:"billed_cost"`
 }

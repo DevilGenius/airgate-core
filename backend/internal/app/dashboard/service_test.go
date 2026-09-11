@@ -608,15 +608,23 @@ func TestAggregateTopAPIKeysLimitsAndSortsDailyPoints(t *testing.T) {
 	base := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	logs := make([]APIKeyTrendLog, 0, 14)
 	for i := 1; i <= 13; i++ {
-		logs = append(logs, APIKeyTrendLog{APIKeyID: i, APIKeyName: "key", Tokens: int64(i), CreatedAt: base.Add(time.Duration(i) * time.Hour)})
+		// 金额取 0.125 的整数倍，保证浮点累加结果可精确比较。
+		logs = append(logs, APIKeyTrendLog{APIKeyID: i, APIKeyName: "key", Tokens: int64(i), BilledCost: float64(i) * 0.125, CreatedAt: base.Add(time.Duration(i) * time.Hour)})
 	}
 	logs = append(logs,
-		APIKeyTrendLog{APIKeyID: 13, APIKeyName: "top-key", Tokens: 100, CreatedAt: base},
-		APIKeyTrendLog{APIKeyID: 13, APIKeyName: "top-key", Tokens: 100, CreatedAt: base.AddDate(0, 0, 1)},
+		APIKeyTrendLog{APIKeyID: 13, APIKeyName: "top-key", Tokens: 100, BilledCost: 1.25, CreatedAt: base},
+		APIKeyTrendLog{APIKeyID: 13, APIKeyName: "top-key", Tokens: 100, BilledCost: 2.5, CreatedAt: base.AddDate(0, 0, 1)},
 	)
 	result := aggregateTopAPIKeys(logs, "day", time.UTC)
 	if len(result) != 12 || result[0].APIKeyID != 13 || result[0].Name != "top-key" || len(result[0].Trend) != 2 {
 		t.Fatalf("top API keys = %+v", result)
+	}
+	// Key 13 在 2026-04-01 桶内还有循环产生的记录（BilledCost 13*0.125=1.625），金额必须按桶累加。
+	if result[0].Trend[0].Time != "2026-04-01" || result[0].Trend[0].Tokens != 113 || result[0].Trend[0].BilledCost != 2.875 {
+		t.Fatalf("top API key first bucket = %+v", result[0].Trend[0])
+	}
+	if result[0].Trend[1].Time != "2026-04-02" || result[0].Trend[1].Tokens != 100 || result[0].Trend[1].BilledCost != 2.5 {
+		t.Fatalf("top API key second bucket = %+v", result[0].Trend[1])
 	}
 }
 

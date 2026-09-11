@@ -38,7 +38,8 @@ const (
 	trendCacheTTL       = 15 * time.Second
 	trendLockTTL        = 5 * time.Second
 	trendLockWait       = 1 * time.Second
-	trendCacheKeyPrefix = "ag:dashboard:trend:v2"
+	// 缓存键版本随 payload 结构变化递增，避免旧缓存缺少新增字段（如 Key Top 12 的 billed_cost）。
+	trendCacheKeyPrefix = "ag:dashboard:trend:v3"
 	// tpmPerRPMBaseline is the reference workload of 1 RPM and 100k TPM.
 	tpmPerRPMBaseline = 100000.0
 )
@@ -481,6 +482,12 @@ func aggregateTopUsers(logs []TrendLog, granularity string, loc *time.Location) 
 	return result
 }
 
+// apiKeyBucket 汇总单个 API Key 在一个时间桶内的 Token 与计费金额。
+type apiKeyBucket struct {
+	Tokens     int64
+	BilledCost float64
+}
+
 func aggregateTopAPIKeys(logs []APIKeyTrendLog, granularity string, loc *time.Location) []APIKeyTrend {
 	if len(logs) == 0 {
 		return nil
@@ -521,23 +528,29 @@ func aggregateTopAPIKeys(logs []APIKeyTrendLog, granularity string, loc *time.Lo
 	for _, item := range totals {
 		topSet[item.ID] = true
 	}
-	buckets := make(map[int]map[string]int64)
+	buckets := make(map[int]map[string]*apiKeyBucket)
 	for _, item := range logs {
 		if !topSet[item.APIKeyID] {
 			continue
 		}
 		key := item.CreatedAt.In(loc).Format(layout)
 		if buckets[item.APIKeyID] == nil {
-			buckets[item.APIKeyID] = make(map[string]int64)
+			buckets[item.APIKeyID] = make(map[string]*apiKeyBucket)
 		}
-		buckets[item.APIKeyID][key] += item.Tokens
+		bucket := buckets[item.APIKeyID][key]
+		if bucket == nil {
+			bucket = &apiKeyBucket{}
+			buckets[item.APIKeyID][key] = bucket
+		}
+		bucket.Tokens += item.Tokens
+		bucket.BilledCost += item.BilledCost
 	}
 
 	result := make([]APIKeyTrend, 0, len(totals))
 	for _, item := range totals {
 		points := make([]APIKeyTrendPoint, 0, len(buckets[item.ID]))
-		for key, tokens := range buckets[item.ID] {
-			points = append(points, APIKeyTrendPoint{Time: key, Tokens: tokens})
+		for key, bucket := range buckets[item.ID] {
+			points = append(points, APIKeyTrendPoint{Time: key, Tokens: bucket.Tokens, BilledCost: bucket.BilledCost})
 		}
 		sort.Slice(points, func(i, j int) bool { return points[i].Time < points[j].Time })
 		result = append(result, APIKeyTrend{APIKeyID: int64(item.ID), Name: item.Name, Trend: points})
