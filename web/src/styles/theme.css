@@ -26,7 +26,7 @@ html.dark,
 html[data-theme="light"],
 html[data-theme="default"],
 html[data-theme="dark"] {
-  --ag-reliable-font-sans: "AirGate CJK Punctuation", "Fira Code", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ag-reliable-font-sans: "AirGate CJK Punctuation", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --ag-reliable-font-mono: "Fira Code", ui-monospace, "SFMono-Regular", "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, Monaco, "Courier New", monospace;
   --ag-font-sans: var(--ag-reliable-font-sans);
   --ag-font-mono: var(--ag-reliable-font-mono);

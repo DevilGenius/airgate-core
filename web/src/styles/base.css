@@ -52,8 +52,9 @@ body {
   letter-spacing: 0;
 }
 
-#root :where(code, pre, kbd, samp, .font-mono),
-.ag-elevation-modal :where(code, pre, kbd, samp, .font-mono) {
+:where(input, textarea, select),
+#root :where(code, pre, kbd, samp, .font-mono, input, textarea, select),
+.ag-elevation-modal :where(code, pre, kbd, samp, .font-mono, input, textarea, select) {
   font-variant-ligatures: none;
   font-feature-settings: "liga" 0, "calt" 0;
 }

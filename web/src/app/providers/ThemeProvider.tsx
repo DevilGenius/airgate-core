@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { injectThemeStyle, setTheme, getStoredTheme, type ThemeName } from '@devilgenius/airgate-theme';
 
-const RELIABLE_SANS_FONT = '"AirGate CJK Punctuation", "Fira Code", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const RELIABLE_SANS_FONT = '"AirGate CJK Punctuation", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 const RELIABLE_MONO_FONT = '"Fira Code", ui-monospace, "SFMono-Regular", "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, Monaco, "Courier New", monospace';
 
 interface ThemeContextValue {
