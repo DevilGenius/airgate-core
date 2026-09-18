@@ -261,6 +261,15 @@
   text-align: left !important;
 }
 
+.ag-usage-model-cell {
+  line-height: normal;
+}
+
+.ag-usage-model-cell > span {
+  line-height: normal;
+  padding-block: 0.125rem;
+}
+
 .ag-usage-table-desktop .ag-usage-model-meta-slot {
   --ag-usage-image-dot-size: 0.375rem;
   width: 5.5rem !important;

@@ -978,7 +978,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
                 />
               ) : null)}
             </div>
-            <span className="min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
+            <span className="min-w-0 truncate text-sm font-medium leading-normal py-0.5 text-text" title={row.model}>
               {row.model}
             </span>
           </div>
