@@ -177,6 +177,21 @@ func (m *Manager) prepareArtifact(ctx context.Context, binary []byte, source str
 			return nil, err
 		}
 		cmd := exec.CommandContext(ctx, "go", "build", "-o", path, ".")
+		if runtime.GOOS == "windows" {
+			pluginBuildRoot, err := filepath.Abs(m.pluginDir)
+			if err != nil {
+				return nil, fmt.Errorf("解析插件构建目录失败: %w", err)
+			}
+			goTmpDir := filepath.Join(pluginBuildRoot, ".go-tmp")
+			goCacheDir := filepath.Join(pluginBuildRoot, ".go-cache")
+			if err := os.MkdirAll(goTmpDir, 0755); err != nil {
+				return nil, fmt.Errorf("创建插件构建临时目录失败: %w", err)
+			}
+			if err := os.MkdirAll(goCacheDir, 0755); err != nil {
+				return nil, fmt.Errorf("创建插件构建缓存目录失败: %w", err)
+			}
+			cmd.Env = append(os.Environ(), "GOTMPDIR="+goTmpDir, "GOCACHE="+goCacheDir)
+		}
 		before, _ := scanSourceFingerprint(a.SourcePath)
 		cmd.Dir = a.SourcePath
 		var output limitedBuildOutput
