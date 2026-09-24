@@ -109,7 +109,7 @@ export const AppHeader = memo(function AppHeader({
         <div className="hidden items-center gap-2.5 pl-1 sm:flex">
           {!shell.isAPIKeySession && shell.balanceValue !== null && (
             <div
-              className="flex h-7 items-center rounded-[calc(var(--radius)-2px)] bg-success-subtle px-2.5 text-text"
+              className="flex h-7 items-center rounded-[calc(var(--radius)-2px)] px-2.5 text-text"
               title={`${t('user_overview.balance', 'Balance')}: ${shell.balanceText}`}
             >
               <span className="font-mono text-sm font-bold tabular-nums">

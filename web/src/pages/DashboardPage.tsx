@@ -285,11 +285,11 @@ function MetricCard({
     <Card className="ag-dashboard-metric min-h-[72px]">
       <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
-          <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
+          <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">{title}</div>
           <div className="mt-auto flex min-w-0 items-baseline gap-2 pt-1">
             <div className="ag-dashboard-metric-value flex min-w-0 items-baseline font-mono text-xl font-semibold leading-none text-text">
               {value}
-              {valueSuffix ? <span className="ml-1.5 text-[11px] font-medium leading-none text-text-tertiary">{valueSuffix}</span> : null}
+              {valueSuffix ? <span className="ml-1.5 text-[11px] font-medium leading-none text-text">{valueSuffix}</span> : null}
             </div>
             <div className={`min-w-0 truncate text-xs font-semibold ${META_TONE_CLASSES[metaTone]}`}>{meta}</div>
           </div>
@@ -367,7 +367,7 @@ function PerformanceMetricCard({
     <Card className="ag-dashboard-metric min-h-[72px]">
       <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
-          <div className="flex h-5 min-w-0 items-center gap-1 text-sm font-semibold tracking-normal text-text-tertiary">
+          <div className="flex h-5 min-w-0 items-center gap-1 text-sm font-semibold tracking-normal text-text">
             <span className="truncate">{title}</span>
             {rpmTrend === 'up' ? (
               <MoveUp className="h-3.5 w-3.5 shrink-0 text-success" />
@@ -381,20 +381,20 @@ function PerformanceMetricCard({
             {rpmTexts.map((rpmText, index) => (
               <Fragment key={index}>
                 {index > 0 ? (
-                  <span aria-hidden="true" className="font-mono text-base leading-none text-text-tertiary">/</span>
+                  <span aria-hidden="true" className="font-mono text-base leading-none text-text">/</span>
                 ) : null}
                 <span className="flex items-baseline gap-x-1.5">
                   <span className="flex items-baseline gap-1">
                     <span className="ag-dashboard-metric-value font-mono text-xl font-semibold leading-none text-text">
                       {rpmText}
                     </span>
-                    <span className="text-[11px] font-medium leading-none text-text-tertiary">{t('dashboard.rpm')}</span>
+                    <span className="text-[11px] font-medium leading-none text-text">{t('dashboard.rpm')}</span>
                   </span>
                   <span className="flex items-baseline gap-1">
                     <span className="font-mono text-sm font-semibold leading-none text-text">
                       {tpmTexts[index]}
                     </span>
-                    <span className="text-[11px] font-medium leading-none text-text-tertiary">{t('dashboard.tpm')}</span>
+                    <span className="text-[11px] font-medium leading-none text-text">{t('dashboard.tpm')}</span>
                   </span>
                 </span>
               </Fragment>
@@ -455,7 +455,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       <Card className="ag-dashboard-metric min-h-[72px]">
         <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
-          <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">
+          <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">
             {t('dashboard.users_summary', { active: stats.active_users, total: stats.total_users })} {t('dashboard.new_users', { count: stats.new_users_today })}
           </div>
           <div className="mt-auto flex min-w-0 items-baseline gap-x-2 whitespace-nowrap pt-1">
@@ -517,12 +517,12 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       <Card className="ag-dashboard-metric min-h-[72px]">
         <Card.Content className="ag-dashboard-metric-content p-3">
           <div className="ag-dashboard-metric-copy flex min-h-12 flex-col self-stretch">
-            <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text-tertiary">
+            <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">
               {t('dashboard.usage_estimate')} (1min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_1m)} />/10min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_10m)} />)
             </div>
             {usageEstimates.length === 0 ? (
               <div className="mt-auto flex min-h-7 items-center pt-1 font-mono text-xs font-semibold leading-none text-text">
-                <span className="text-text-tertiary">-</span>
+                <span className="text-text">-</span>
               </div>
             ) : (
               <div className="mt-auto flex min-h-7 flex-col justify-center gap-0.5 pt-1 font-mono text-xs font-semibold leading-none text-text">
@@ -537,12 +537,12 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
                       {estimatesForWindow.map(({ estimate, window }, index) => (
                         <Fragment key={estimate.plan}>
                           {index > 0 ? (
-                            <span aria-hidden="true" className="font-mono text-xs leading-none text-text-tertiary">/</span>
+                            <span aria-hidden="true" className="font-mono text-xs leading-none text-text">/</span>
                           ) : null}
                           <span className="shrink-0"><UsageEstimateCell window={window} /></span>
                         </Fragment>
                       ))}
-                      <span className="shrink-0 text-[10px] font-medium leading-none text-text-tertiary">{windowKey}</span>
+                      <span className="shrink-0 text-[10px] font-medium leading-none text-text">{windowKey}</span>
                     </div>
                   );
                 })}

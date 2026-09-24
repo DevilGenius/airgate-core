@@ -318,7 +318,7 @@ function RuntimeCard({
       <Card.Content className="flex h-full flex-col p-3">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text-tertiary">{label}</div>
+            <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text">{label}</div>
             <div className="ag-monitor-runtime-value mt-1 h-6 min-w-0 truncate font-mono text-[21px] font-semibold leading-6 text-text">
               {value}
             </div>
@@ -388,7 +388,7 @@ function SummaryMiniStat({
   return (
     <div className="grid min-h-8 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-[var(--field-radius)] bg-surface-secondary px-2 py-0.5">
       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ring-1 ${tone}`} />
-      <span className="min-w-0 truncate text-xs font-medium leading-4 text-text-tertiary">{label}</span>
+      <span className="min-w-0 truncate text-xs font-medium leading-4 text-text">{label}</span>
       <span className="truncate font-mono text-sm font-semibold leading-5 text-text">{value}</span>
     </div>
   );
@@ -407,7 +407,7 @@ function MonitorSummaryCard({
       <Card.Content className="flex h-full flex-col p-3">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text-tertiary">
+            <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text">
               {t('monitor.runtime_event_counts')}
             </div>
           </div>
