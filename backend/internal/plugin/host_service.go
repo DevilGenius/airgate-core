@@ -1022,10 +1022,20 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			releaseCapacity()
 			duration := time.Since(start)
 			h.scheduler.RecordModelOutcome(acc.ID, schedulingModel, outcome)
+			// Host callers (including Playground) may close as soon as terminal
+			// data arrives. Persist confirmed usage before cancellation/error exits,
+			// with a bounded context independent of that downstream connection.
+			if outcome.Usage != nil && (outcome.Kind == sdk.OutcomeSuccess || outcome.Kind == sdk.OutcomeClientError || outcome.Kind == sdk.OutcomeStreamAborted) {
+				recordCtx, recordCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+				_, recordErr := h.recordHostForwardUsage(recordCtx, req, route, acc.ID, route.Platform, clientModel, accFull, userEmail, outcome, duration)
+				recordCancel()
+				if recordErr != nil {
+					slog.Error("host_forward_stream_record_usage_failed", sdk.LogFieldUserID, req.UserID, sdk.LogFieldAccountID, acc.ID, sdk.LogFieldError, recordErr)
+				}
+			}
 			if cerr := hostContextError(fwdErr); cerr != nil {
 				return cerr
 			}
-
 			if !fw.committed && fwdErr == nil && modelReroutes < maxModelReroutes {
 				if targetClientModel, requested := outcome.ModelRerouteClientTarget(); requested {
 					if plans, ok := hostModelReroutePlans(route, req, plan.ClientModel, targetClientModel); ok {
@@ -1112,23 +1122,11 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 				return hostForwardGenericError()
 			}
 
-			var usage *sdk.Usage
-			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-				if _, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, clientModel, accFull, userEmail, outcome, duration); err != nil {
-					slog.Error("host_forward_stream_record_usage_failed",
-						sdk.LogFieldUserID, req.UserID,
-						sdk.LogFieldAccountID, acc.ID,
-						sdk.LogFieldError, err,
-					)
-				}
-				usage = outcome.Usage
-			}
-
 			return stream.Send(&pb.HostStreamFrame{
 				Event:  "done",
 				Status: "ok",
 				Payload: mustHostPayload(map[string]interface{}{
-					"usage": usage,
+					"usage": outcome.Usage,
 				}),
 				Done: true,
 			})

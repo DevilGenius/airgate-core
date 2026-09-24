@@ -181,16 +181,9 @@ function Invoke-CoreUnusedLint {
   Push-Location $CoreRoot
   try {
     Set-GoEnvVars
-    $lintOutput = @(& go run ./backend/cmd/local-lint -unused 2>&1)
-    $lintExitCode = $LASTEXITCODE
-    $lintOutput | ForEach-Object { Write-Host $_ }
-    if ($lintExitCode -ne 0) {
-      $lintText = $lintOutput -join [Environment]::NewLine
-      if ($lintText -match "parallel golangci-lint is running") {
-        Write-Step "golangci-lint is already running; skipping unused/staticcheck for this startup"
-      } else {
-        throw "Command failed with exit code ${lintExitCode}: go run ./backend/cmd/local-lint -unused"
-      }
+    & go run ./backend/cmd/local-lint -unused
+    if ($LASTEXITCODE -ne 0) {
+      throw "Command failed with exit code ${LASTEXITCODE}: go run ./backend/cmd/local-lint -unused"
     }
     $script:LocalUnusedLintRan = $true
   } finally {

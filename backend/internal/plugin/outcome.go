@@ -79,6 +79,12 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 	f.applyOutcome(ctx, state, execution)
 	f.recordPluginExecutionFinalFailure(ctx, state, execution, forwardAttemptsFromGinContext(c))
 	f.persistUpdatedCredentials(state.account.ID, execution.outcome.UpdatedCredentials)
+	// Delivery errors must not discard confirmed upstream consumption. Record
+	// once, before the transport-error return, using the detached billing context.
+	switch execution.outcome.Kind {
+	case sdk.OutcomeSuccess, sdk.OutcomeClientError, sdk.OutcomeStreamAborted:
+		f.recordUsage(c, state, execution)
+	}
 
 	if execution.err != nil && execution.outcome.Kind != sdk.OutcomeClientError {
 		slog.Error("插件转发失败",
@@ -92,7 +98,6 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 	switch execution.outcome.Kind {
 	case sdk.OutcomeSuccess:
 		f.bindResponseAffinity(ctx, state, execution)
-		f.recordUsage(c, state, execution)
 		if !state.stream {
 			writeUpstream(c, execution.outcome.Upstream)
 		}
@@ -106,9 +111,6 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 		f.recordClientRequestError(c, state, execution)
 		if !state.stream || !c.Writer.Written() {
 			writeClientErrorResponse(c, execution.outcome)
-		}
-		if execution.outcome.Usage != nil {
-			f.recordUsage(c, state, execution)
 		}
 	default:
 		writeFailureResponse(c, state, execution)

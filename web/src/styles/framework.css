@@ -1,6 +1,7 @@
-/* External framework CSS only.
-   Local AirGate styles are linked individually from index.html. */
+/* Tailwind compilation entry, including AirGate's @theme definitions.
+   Other local styles are linked individually from index.html. */
 
 @import "tailwindcss";
 @import "@heroui/styles";
 @import "@fontsource/fira-code/latin.css";
+@import "./theme.css";

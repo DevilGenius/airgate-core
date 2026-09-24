@@ -27,12 +27,12 @@ func main() {
 		exitError(err)
 	}
 
-	args := []string{"run"}
-	if *unusedOnly {
-		args = append(args, "--enable-only=unused,staticcheck")
+	cmd, err := lintCommand(linter, repoRoot, backendDir, *unusedOnly)
+	if err != nil {
+		exitError(err)
 	}
-	args = append(args, "./...")
-	if err := run(linter, args, backendDir, nil); err != nil {
+	fmt.Printf("Go lint state: %s (concurrent checks in this repo wait for the lock)\n", filepath.Join(repoRoot, ".tools", "golangci-lint"))
+	if err := cmd.Run(); err != nil {
 		exitError(err)
 	}
 	if *unusedOnly {
@@ -40,6 +40,40 @@ func main() {
 	} else {
 		fmt.Println("Go lint checks passed")
 	}
+}
+
+func lintCommand(linter, repoRoot, backendDir string, unusedOnly bool) (*exec.Cmd, error) {
+	stateDir := filepath.Join(repoRoot, ".tools", "golangci-lint")
+	tmpDir := filepath.Join(stateDir, "tmp")
+	cacheDir := filepath.Join(stateDir, "cache")
+	goCacheDir := filepath.Join(stateDir, "go-build")
+	for _, dir := range []string{tmpDir, cacheDir, goCacheDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("create lint state directory %s: %w", dir, err)
+		}
+	}
+
+	args := []string{"run", "--allow-serial-runners"}
+	if unusedOnly {
+		args = append(args, "--enable-only=unused,staticcheck")
+	}
+	args = append(args, "./...")
+	cmd := exec.Command(linter, args...)
+	cmd.Dir = backendDir
+	// golangci-lint uses os.TempDir()/golangci-lint.lock, not its cache directory,
+	// for locking. Its go list subprocess also needs a writable Go build cache;
+	// inaccessible shared cache entries otherwise surface as "no go files".
+	// Isolate all three for the linter and its children, not the caller's Go env.
+	cmd.Env = append(os.Environ(),
+		"TMP="+tmpDir,
+		"TEMP="+tmpDir,
+		"TMPDIR="+tmpDir,
+		"GOLANGCI_LINT_CACHE="+cacheDir,
+		"GOCACHE="+goCacheDir,
+	)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd, nil
 }
 
 func findRepoDirs() (string, string, error) {
