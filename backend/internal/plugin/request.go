@@ -29,7 +29,8 @@ import (
 
 const (
 	defaultGatewayBodyLimit = 10 << 20
-	largeGatewayBodyLimit   = 32 << 20
+	// Multimodal bodies include base64 images, text and their JSON envelope.
+	largeGatewayBodyLimit = 96 << 20
 )
 
 // parseRequest 从 HTTP 请求构造 forwardState。认证 / body 读取 / 插件匹配失败时

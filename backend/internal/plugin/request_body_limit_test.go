@@ -1,6 +1,35 @@
 package plugin
 
-import "testing"
+import (
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+type requestBodyFillReader struct{}
+
+func (requestBodyFillReader) Read(p []byte) (int, error) { return len(p), nil }
+
+func TestMultimodalRequestBodyBoundary(t *testing.T) {
+	for _, path := range []string{"/v1/responses", "/v1/responses/compact", "/v1/chat/completions", "/v1/messages", "/v1/images/edits"} {
+		for _, size := range []int64{96 << 20, (96 << 20) + 1} {
+			// Exercise chunked bodies too: admission must not depend on Content-Length.
+			body := io.NopCloser(io.LimitReader(requestBodyFillReader{}, size))
+			limited := http.MaxBytesReader(httptest.NewRecorder(), body, gatewayBodyLimit(path, "application/json"))
+			_, err := io.Copy(io.Discard, limited)
+			_ = limited.Close()
+			var tooLarge *http.MaxBytesError
+			if size == 96<<20 && err != nil {
+				t.Fatalf("%s rejected 96 MiB: %v", path, err)
+			}
+			if size > 96<<20 && !errors.As(err, &tooLarge) {
+				t.Fatalf("%s accepted oversized body: %v", path, err)
+			}
+		}
+	}
+}
 
 func TestGatewayBodyLimit(t *testing.T) {
 	t.Parallel()

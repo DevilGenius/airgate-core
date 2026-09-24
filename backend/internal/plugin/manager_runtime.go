@@ -29,8 +29,8 @@ import (
 )
 
 // pluginGRPCMaxMessageBytes 是与插件之间 gRPC 单条消息的最大字节数（收/发同值）。
-// 默认值 4 MB 经常被大段 LLM 响应或翻译后的 SSE 事件击穿，统一抬到 64 MB。
-const pluginGRPCMaxMessageBytes = 64 * 1024 * 1024
+// 直接复用 SDK 常量，确保 Core 接收端与插件发送端使用相同上限。
+const pluginGRPCMaxMessageBytes = sdkgrpc.PluginGRPCMaxMessageBytes
 
 // pluginStartTimeout 限制插件子进程握手与 Start RPC 的最长耗时，避免坏插件把 core
 // 的启动或后台加载协程长期卡死。
