@@ -892,7 +892,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       width: '70px',
       hideOnMobile: true,
       render: (row) => (
-        <span className="block text-center font-mono text-[13px] text-text-secondary">
+        <span className="block text-center font-mono text-[13px] text-text-tertiary">
           {formatTimingMs(row.first_token_ms)}
         </span>
       ),

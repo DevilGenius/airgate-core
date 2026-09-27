@@ -1048,6 +1048,8 @@
     "first_event": "响应",
     "first_token": "首字",
     "ws_dial": "握手",
+    "tps": "TPS",
+    "tps_hint": "输出 Token/秒：输出 Token ÷（耗时 − 首字时间）；无首字时间时按总耗时计算。",
     "stream": "流式",
     "type": "类型",
     "type_sync": "同步",

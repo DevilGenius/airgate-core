@@ -1046,6 +1046,8 @@
     "image_size": "Image Size",
     "metrics": "Metrics",
     "endpoint": "Endpoint",
+    "tps": "TPS",
+    "tps_hint": "Output tokens/sec: output tokens ÷ (duration − time to first token); uses total duration when first-token timing is unavailable.",
     "first_event": "FRT",
     "first_token": "TTFT",
     "ws_dial": "WS",

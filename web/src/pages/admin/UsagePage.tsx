@@ -31,6 +31,7 @@ import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { createPagedRowsStructuralSharing } from '../../shared/utils/structuralSharing';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../shared/ui/metricTones';
+import { combineUsageTimingColumns, readUsageColumnSelection, usageTokensPerSecond } from './usage/usageTimingColumns';
 
 const UsageTokenTrendChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsageTokenTrendChart })),
@@ -186,6 +187,7 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'first_event_ms',
   'first_token_ms',
   'duration_ms',
+  'tps',
   'tokens',
   'cost',
   'endpoint',
@@ -298,9 +300,7 @@ function readAdminUsageColumnKeys() {
     const raw = window.localStorage.getItem(ADMIN_USAGE_COLUMN_STORAGE_KEY);
     if (!raw) return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
-    const keys = parsed.filter((key): key is string => typeof key === 'string' && key.length > 0);
-    return keys.length > 0 ? new Set(keys) : new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
+    return readUsageColumnSelection(parsed, ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
   } catch {
     return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
   }
@@ -308,7 +308,7 @@ function readAdminUsageColumnKeys() {
 
 function writeAdminUsageColumnKeys(keys: Set<string>) {
   try {
-    window.localStorage.setItem(ADMIN_USAGE_COLUMN_STORAGE_KEY, JSON.stringify(Array.from(keys)));
+    window.localStorage.setItem(ADMIN_USAGE_COLUMN_STORAGE_KEY, JSON.stringify({ version: 2, keys: Array.from(keys) }));
   } catch {
     // localStorage may be unavailable in restricted browser modes.
   }
@@ -971,10 +971,24 @@ export default function UsagePage() {
       width: '64px',
       hideOnMobile: true,
       render: (row) => (
-        <span className="block text-center font-mono text-[13px] text-text-secondary">
+        <span className="block text-center font-mono text-[13px] text-text-tertiary">
           {formatUsageTimingMs(row.ws_dial_ms)}
         </span>
       ),
+    };
+    const tpsColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'tps',
+      title: t('usage.tps'),
+      width: '72px',
+      hideOnMobile: true,
+      render: (row) => {
+        const rate = usageTokensPerSecond(row);
+        return (
+          <span className="block text-center font-mono text-[13px] tabular-nums text-text-secondary" title={t('usage.tps_hint')}>
+            {rate == null ? '-' : rate.toFixed(1)}
+          </span>
+        );
+      },
     };
     return [
       ...adminColumns,
@@ -982,6 +996,7 @@ export default function UsagePage() {
       ...(streamColumn ? [streamColumn] : []),
       wsDialColumn,
       ...timingColumns,
+      tpsColumn,
       ...sharedColumnsAfterModel,
       endpointColumn,
       apiKeyColumn,
@@ -1026,10 +1041,10 @@ export default function UsagePage() {
 
   const columns = useMemo(() => {
     const visible = allColumns.filter((column) => selectedVisibleColumnKeys.has(column.key));
-    return visible.length > 0 ? visible : allColumns.slice(0, 1);
+    return combineUsageTimingColumns(visible.length > 0 ? visible : allColumns.slice(0, 1));
   }, [allColumns, selectedVisibleColumnKeys]);
 
-  const selectedColumnCount = columns.length;
+  const selectedColumnCount = selectedVisibleColumnKeys.size;
   const handleColumnToggle = useCallback((key: string) => {
     setSelectedColumnKeys((current) => {
       const next = new Set(current);

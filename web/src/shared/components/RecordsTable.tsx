@@ -258,7 +258,7 @@ export function RecordsTable<T extends RecordRow>({
       const columnByKey = new Map(mobileColumns.map((column) => [column.key, column]));
       const userColumn = columnByKey.get('user_id');
       const timeColumn = columnByKey.get('created_at');
-      const fieldColumns = ['api_key', 'model', 'first_event_ms', 'duration_ms', 'tokens', 'cost']
+      const fieldColumns = ['api_key', 'model', 'first_event_ms', 'duration_ms', 'tps', 'tokens', 'cost']
         .map((key) => columnByKey.get(key))
         .filter((column): column is RecordColumnConfig<T> => Boolean(column));
       const hasAPIKeyColumn = Boolean(columnByKey.get('api_key'));
