@@ -5039,7 +5039,6 @@ type GroupMutation struct {
 	operation_policies          *map[string]bool
 	plugin_settings             *map[string]map[string]string
 	service_tier                *string
-	force_instructions          *string
 	note                        *string
 	sort_weight                 *int
 	addsort_weight              *int
@@ -5779,42 +5778,6 @@ func (m *GroupMutation) ResetServiceTier() {
 	m.service_tier = nil
 }
 
-// SetForceInstructions sets the "force_instructions" field.
-func (m *GroupMutation) SetForceInstructions(s string) {
-	m.force_instructions = &s
-}
-
-// ForceInstructions returns the value of the "force_instructions" field in the mutation.
-func (m *GroupMutation) ForceInstructions() (r string, exists bool) {
-	v := m.force_instructions
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldForceInstructions returns the old "force_instructions" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldForceInstructions(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldForceInstructions is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldForceInstructions requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldForceInstructions: %w", err)
-	}
-	return oldValue.ForceInstructions, nil
-}
-
-// ResetForceInstructions resets all changes to the "force_instructions" field.
-func (m *GroupMutation) ResetForceInstructions() {
-	m.force_instructions = nil
-}
-
 // SetNote sets the "note" field.
 func (m *GroupMutation) SetNote(s string) {
 	m.note = &s
@@ -6283,7 +6246,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 18)
 	if m.name != nil {
 		fields = append(fields, group.FieldName)
 	}
@@ -6325,9 +6288,6 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.service_tier != nil {
 		fields = append(fields, group.FieldServiceTier)
-	}
-	if m.force_instructions != nil {
-		fields = append(fields, group.FieldForceInstructions)
 	}
 	if m.note != nil {
 		fields = append(fields, group.FieldNote)
@@ -6377,8 +6337,6 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.PluginSettings()
 	case group.FieldServiceTier:
 		return m.ServiceTier()
-	case group.FieldForceInstructions:
-		return m.ForceInstructions()
 	case group.FieldNote:
 		return m.Note()
 	case group.FieldSortWeight:
@@ -6424,8 +6382,6 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldPluginSettings(ctx)
 	case group.FieldServiceTier:
 		return m.OldServiceTier(ctx)
-	case group.FieldForceInstructions:
-		return m.OldForceInstructions(ctx)
 	case group.FieldNote:
 		return m.OldNote(ctx)
 	case group.FieldSortWeight:
@@ -6540,13 +6496,6 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetServiceTier(v)
-		return nil
-	case group.FieldForceInstructions:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetForceInstructions(v)
 		return nil
 	case group.FieldNote:
 		v, ok := value.(string)
@@ -6738,9 +6687,6 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldServiceTier:
 		m.ResetServiceTier()
-		return nil
-	case group.FieldForceInstructions:
-		m.ResetForceInstructions()
 		return nil
 	case group.FieldNote:
 		m.ResetNote()

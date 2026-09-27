@@ -168,7 +168,6 @@ var (
 		{Name: "operation_policies", Type: field.TypeJSON, Nullable: true},
 		{Name: "plugin_settings", Type: field.TypeJSON, Nullable: true},
 		{Name: "service_tier", Type: field.TypeString, Default: ""},
-		{Name: "force_instructions", Type: field.TypeString, Default: ""},
 		{Name: "note", Type: field.TypeString, Default: ""},
 		{Name: "sort_weight", Type: field.TypeInt, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},

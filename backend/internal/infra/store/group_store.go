@@ -109,7 +109,6 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 			SetStatusVisible(input.StatusVisible).
 			SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
 			SetServiceTier(input.ServiceTier).
-			SetForceInstructions(input.ForceInstructions).
 			SetNote(input.Note).
 			SetSortWeight(input.SortWeight)
 
@@ -192,7 +191,6 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		SetStatusVisible(input.StatusVisible).
 		SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
 		SetServiceTier(input.ServiceTier).
-		SetForceInstructions(input.ForceInstructions).
 		SetNote(input.Note).
 		SetSortWeight(input.SortWeight)
 
@@ -273,9 +271,6 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.ServiceTier != nil {
 		builder = builder.SetServiceTier(*input.ServiceTier)
-	}
-	if input.ForceInstructions != nil {
-		builder = builder.SetForceInstructions(*input.ForceInstructions)
 	}
 	if input.Note != nil {
 		builder = builder.SetNote(*input.Note)
@@ -554,7 +549,6 @@ func mapGroup(item *ent.Group) appgroup.Group {
 		OperationPolicies:        appgroupCloneOperationPolicies(item.OperationPolicies),
 		PluginSettings:           appgroupClonePluginSettings(item.PluginSettings),
 		ServiceTier:              item.ServiceTier,
-		ForceInstructions:        item.ForceInstructions,
 		Note:                     item.Note,
 		SortWeight:               item.SortWeight,
 		CreatedAt:                item.CreatedAt,

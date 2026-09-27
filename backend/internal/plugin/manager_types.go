@@ -34,7 +34,6 @@ type PluginInstance struct {
 	Author             string
 	Platform           string
 	Type               string // "gateway", "extension", "middleware"
-	InstructionPresets []string
 	ConfigSchema       []sdk.ConfigField
 	Metadata           map[string]string
 	Capabilities       []string // 插件声明的 host capability 列表（仅展示用）
@@ -210,7 +209,6 @@ type PluginMeta struct {
 	Platform           string
 	AccountTypes       []sdk.AccountType
 	FrontendPages      []sdk.FrontendPage
-	InstructionPresets []string
 	ConfigSchema       []sdk.ConfigField
 	Metadata           map[string]string
 	Config             map[string]string

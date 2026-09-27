@@ -48,7 +48,6 @@ func (s *Service) List() []PluginMeta {
 			Platform:           item.Platform,
 			AccountTypes:       append([]sdk.AccountType(nil), item.AccountTypes...),
 			FrontendPages:      append([]sdk.FrontendPage(nil), item.FrontendPages...),
-			InstructionPresets: append([]string(nil), item.InstructionPresets...),
 			ConfigSchema:       append([]sdk.ConfigField(nil), item.ConfigSchema...),
 			Metadata:           cloneStringMap(item.Metadata),
 			HasWebAssets:       item.HasWebAssets,

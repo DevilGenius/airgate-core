@@ -43,8 +43,6 @@ const (
 	FieldPluginSettings = "plugin_settings"
 	// FieldServiceTier holds the string denoting the service_tier field in the database.
 	FieldServiceTier = "service_tier"
-	// FieldForceInstructions holds the string denoting the force_instructions field in the database.
-	FieldForceInstructions = "force_instructions"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldSortWeight holds the string denoting the sort_weight field in the database.
@@ -115,7 +113,6 @@ var Columns = []string{
 	FieldOperationPolicies,
 	FieldPluginSettings,
 	FieldServiceTier,
-	FieldForceInstructions,
 	FieldNote,
 	FieldSortWeight,
 	FieldCreatedAt,
@@ -156,8 +153,6 @@ var (
 	DefaultStatusVisible bool
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
 	DefaultServiceTier string
-	// DefaultForceInstructions holds the default value on creation for the "force_instructions" field.
-	DefaultForceInstructions string
 	// DefaultNote holds the default value on creation for the "note" field.
 	DefaultNote string
 	// DefaultSortWeight holds the default value on creation for the "sort_weight" field.
@@ -237,11 +232,6 @@ func BySubscriptionType(opts ...sql.OrderTermOption) OrderOption {
 // ByServiceTier orders the results by the service_tier field.
 func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldServiceTier, opts...).ToFunc()
-}
-
-// ByForceInstructions orders the results by the force_instructions field.
-func ByForceInstructions(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldForceInstructions, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

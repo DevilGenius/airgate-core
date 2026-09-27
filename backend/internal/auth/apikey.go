@@ -137,7 +137,6 @@ type APIKeyInfo struct {
 	UserGroupRates         map[int64]float64                  // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
 	GroupRateMultiplier    float64                            // 分组倍率
 	GroupServiceTier       string                             // 分组 service tier
-	GroupForceInstructions string                             // 分组强制 instructions
 	GroupDispatchDSL       sdk.DispatchDSL                    // 分组级 dispatch 规则覆盖
 	GroupDispatchResolver  *dispatchresolver.CompiledResolver `json:"-"` // 预编译 dispatch 规则
 	GroupOperationPolicies map[string]bool                    // 分组操作开关
@@ -344,7 +343,6 @@ func validateAPIKeyUncached(ctx context.Context, db *ent.Client, hash string) (*
 		UserGroupRates:         u.GroupRates,
 		GroupRateMultiplier:    g.RateMultiplier,
 		GroupServiceTier:       g.ServiceTier,
-		GroupForceInstructions: g.ForceInstructions,
 		GroupDispatchDSL:       g.DispatchDsl,
 		GroupOperationPolicies: g.OperationPolicies,
 		GroupPluginSettings:    g.PluginSettings,

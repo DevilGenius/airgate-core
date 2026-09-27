@@ -70,7 +70,6 @@ export function usePlatforms() {
       const resp = await pluginsApi.list(FETCH_ALL_PARAMS);
       const platformSet = new Set<string>();
       const nameMap: Record<string, string> = {};
-      const presetsMap: Record<string, string[]> = {};
       const oauthPlanFilters: OAuthPlanFilterOption[] = [];
       const oauthPlanFilterIDs = new Set<string>();
       const iconPlugins: Array<{ name: string; platform: string }> = [];
@@ -90,11 +89,8 @@ export function usePlatforms() {
           oauthPlanFilterIDs.add(option.id);
           oauthPlanFilters.push(option);
         }
-        if (p.instruction_presets?.length && !presetsMap[p.platform]) {
-          presetsMap[p.platform] = p.instruction_presets;
-        }
       }
-      return { platforms: [...platformSet], nameMap, presetsMap, oauthPlanFilters, iconPlugins };
+      return { platforms: [...platformSet], nameMap, oauthPlanFilters, iconPlugins };
     },
     staleTime: 60_000,
     enabled: !authLoading && !isAPIKeySession,
@@ -122,8 +118,6 @@ export function usePlatforms() {
     platforms: data?.platforms ?? [],
     /** platform 标识符 → 显示名（如 "openai" → "OpenAI"） */
     platformName: (platform: string) => data?.nameMap[platform] || capitalize(platform),
-    /** platform → 插件声明的 instruction 预设列表 */
-    instructionPresets: (platform: string) => data?.presetsMap[platform] ?? [],
     /** 插件声明的 OAuth 套餐筛选项，id 可直接作为 account_type 查询值 */
     oauthPlanFilters: data?.oauthPlanFilters ?? EMPTY_OAUTH_PLAN_FILTERS,
     isLoading: authLoading || isLoading,

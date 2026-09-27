@@ -16,7 +16,6 @@ func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
 		Author:             item.Author,
 		Type:               item.Type,
 		Platform:           item.Platform,
-		InstructionPresets: item.InstructionPresets,
 		Metadata:           item.Metadata,
 		HasWebAssets:       item.HasWebAssets,
 		IsDev:              item.IsDev,

@@ -22,7 +22,6 @@ type GroupResp struct {
 	OperationPolicies        map[string]bool               `json:"operation_policies,omitempty"`
 	PluginSettings           map[string]map[string]string  `json:"plugin_settings,omitempty"` // 插件命名空间开关
 	ServiceTier              string                        `json:"service_tier,omitempty"`
-	ForceInstructions        string                        `json:"force_instructions,omitempty"`
 	Note                     string                        `json:"note,omitempty"`
 	SortWeight               int                           `json:"sort_weight"`
 	TimeMixin
@@ -64,7 +63,6 @@ type CreateGroupReq struct {
 	OperationPolicies        map[string]bool               `json:"operation_policies"`
 	PluginSettings           map[string]map[string]string  `json:"plugin_settings"`
 	ServiceTier              string                        `json:"service_tier" binding:"omitempty,oneof=fast flex"`
-	ForceInstructions        string                        `json:"force_instructions"`
 	Note                     string                        `json:"note"`
 	SortWeight               int                           `json:"sort_weight"`
 	// CopyAccountsFromGroupIDs 创建时从指定分组复制账号绑定（同平台，自动去重）。
@@ -86,7 +84,6 @@ type UpdateGroupReq struct {
 	OperationPolicies        map[string]bool               `json:"operation_policies"`
 	PluginSettings           map[string]map[string]string  `json:"plugin_settings"`
 	ServiceTier              *string                       `json:"service_tier" binding:"omitempty,oneof=fast flex"`
-	ForceInstructions        *string                       `json:"force_instructions"`
 	Note                     *string                       `json:"note"`
 	SortWeight               *int                          `json:"sort_weight"`
 }

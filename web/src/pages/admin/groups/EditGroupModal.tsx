@@ -200,7 +200,6 @@ export function GroupFormModal({
   onSubmit,
   loading,
   platforms,
-  instructionPresets,
 }: {
   open: boolean;
   title: string;
@@ -209,13 +208,11 @@ export function GroupFormModal({
   onSubmit: (data: CreateGroupReq | UpdateGroupReq) => void;
   loading: boolean;
   platforms: string[];
-  instructionPresets: (platform: string) => string[];
 }) {
   const { t } = useTranslation();
   const isEdit = !!group;
 
   const [form, setForm] = useState({
-    force_instructions: group?.force_instructions ?? '',
     is_exclusive: group?.is_exclusive ?? false,
     name: group?.name ?? '',
     note: group?.note ?? '',
@@ -225,6 +222,7 @@ export function GroupFormModal({
     status_visible: group?.status_visible ?? true,
     subscription_type: group?.subscription_type ?? 'standard' as const,
   });
+  const [basispointsEnabled, setBasispointsEnabled] = useState(group?.plugin_settings?.openai?.basispoints === 'true');
   const [quotas, setQuotas] = useState(parseQuotas(group?.quotas as Record<string, unknown> | undefined));
   const [claudeCodeOnly, setClaudeCodeOnly] = useState(group?.plugin_settings?.claude?.claude_code_only === 'true');
   const [openaiOperations, setOpenAIOperations] = useState<OpenAIOperations>(() => parseOpenAIOperations(group?.operation_policies));
@@ -289,6 +287,7 @@ export function GroupFormModal({
     }
     if (form.platform === 'openai') {
       pluginSettings.openai = buildOpenAISettings(pluginSettings.openai, imagePrices);
+      pluginSettings.openai.basispoints = String(basispointsEnabled);
     }
     const operationPolicies = form.platform === 'openai'
       ? buildOperationPolicies(group?.operation_policies, openaiOperations)
@@ -299,7 +298,6 @@ export function GroupFormModal({
 
     onSubmit({
       ...form,
-      force_instructions: form.force_instructions ?? '',
       note: form.note,
       rate_multiplier: rateMultiplier,
       operation_policies: operationPolicies,
@@ -313,7 +311,6 @@ export function GroupFormModal({
     });
   };
 
-  const presets = instructionPresets(form.platform);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -479,35 +476,16 @@ export function GroupFormModal({
           <Description>{t('groups.note_hint')}</Description>
         </HeroTextField>
 
-        {presets.length > 0 ? (
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
-              {t('groups.force_instructions')}
-            </p>
-            <p className="mb-2 text-[11px] text-text-tertiary">{t('groups.force_instructions_hint')}</p>
-            <div className="mb-2 flex flex-wrap gap-2">
-              {['', ...presets].map((preset) => (
-                <Button
-                  key={preset}
-                  size="sm"
-                  variant={form.force_instructions === preset ? 'primary' : 'secondary'}
-                  onPress={() => setForm({ ...form, force_instructions: preset })}
-                >
-                  {preset || t('groups.instructions_none')}
-                </Button>
-              ))}
-            </div>
-            {form.force_instructions && !presets.includes(form.force_instructions) ? (
-              <HeroTextField fullWidth>
-                <TextArea
-                  rows={4}
-                  value={form.force_instructions}
-                  onChange={(e) => setForm({ ...form, force_instructions: e.target.value })}
-                  placeholder={t('groups.instructions_custom_placeholder')}
-                />
-              </HeroTextField>
-            ) : null}
-          </div>
+        {form.platform === 'openai' ? (
+          <NativeCheckbox
+            isSelected={basispointsEnabled}
+            onChange={setBasispointsEnabled}
+          >
+            <span>
+              <span className="block text-sm text-text">{t('groups.openai_basispoints')}</span>
+              <span className="mt-1 block text-[11px] text-text-tertiary">{t('groups.openai_basispoints_hint')}</span>
+            </span>
+          </NativeCheckbox>
         ) : null}
 
         {form.platform === 'claude' ? (

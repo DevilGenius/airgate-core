@@ -207,7 +207,7 @@ func TestValidateAPIKeyCoversCacheAndFailureBranches(t *testing.T) {
 	if info.QuotaUSD != 10 || info.UsedQuota != 2.5 || info.SellRate != 1.25 || info.KeyMaxConcurrency != 4 || info.UserMaxConcurrency != 6 {
 		t.Fatalf("api key limits = %+v", info)
 	}
-	if info.GroupRateMultiplier != 2 || info.GroupServiceTier != "priority" || info.GroupForceInstructions != "be concise" {
+	if info.GroupRateMultiplier != 2 || info.GroupServiceTier != "priority" {
 		t.Fatalf("group fields = %+v", info)
 	}
 	if info.GroupOperationPolicies["responses"] != true || info.GroupPluginSettings["claude"]["claude_code_only"] != "true" {
@@ -385,7 +385,6 @@ func createAPIKeyTestGroup(t *testing.T, ctx context.Context, db *ent.Client, na
 		SetPlatform(platform).
 		SetRateMultiplier(2).
 		SetServiceTier("priority").
-		SetForceInstructions("be concise").
 		SetOperationPolicies(map[string]bool{"responses": true}).
 		SetPluginSettings(map[string]map[string]string{"claude": {"claude_code_only": "true"}}).
 		Save(ctx)

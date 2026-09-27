@@ -44,7 +44,6 @@ type GroupNode struct {
 	OperationPolicies        map[string]bool
 	PluginSettings           map[string]map[string]string
 	ServiceTier              string
-	ForceInstructions        string
 	SortWeight               int
 	UpdatedAt                time.Time
 	Accounts                 []*AccountNode
@@ -578,7 +577,6 @@ func buildGroupNode(group *ent.Group) *GroupNode {
 		OperationPolicies:        cloneOperationPolicies(group.OperationPolicies),
 		PluginSettings:           clonePluginSettings(group.PluginSettings),
 		ServiceTier:              group.ServiceTier,
-		ForceInstructions:        group.ForceInstructions,
 		SortWeight:               group.SortWeight,
 		UpdatedAt:                group.UpdatedAt,
 	}

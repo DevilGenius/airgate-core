@@ -38,7 +38,6 @@ func (Group) Fields() []ent.Field {
 		// 保持 string→string 嵌套是为了不侵入 SDK（零 SDK bump）。
 		field.JSON("plugin_settings", map[string]map[string]string{}).Optional(),
 		field.String("service_tier").Default(""),
-		field.String("force_instructions").Default(""),
 		field.String("note").Default(""),
 		field.Int("sort_weight").Default(0),
 		field.Time("created_at").Default(timeNow).Immutable(),

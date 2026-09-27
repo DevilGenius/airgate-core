@@ -48,8 +48,6 @@ type Group struct {
 	PluginSettings map[string]map[string]string `json:"plugin_settings,omitempty"`
 	// ServiceTier holds the value of the "service_tier" field.
 	ServiceTier string `json:"service_tier,omitempty"`
-	// ForceInstructions holds the value of the "force_instructions" field.
-	ForceInstructions string `json:"force_instructions,omitempty"`
 	// Note holds the value of the "note" field.
 	Note string `json:"note,omitempty"`
 	// SortWeight holds the value of the "sort_weight" field.
@@ -139,7 +137,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldSortWeight:
 			values[i] = new(sql.NullInt64)
-		case group.FieldName, group.FieldPlatform, group.FieldSubscriptionType, group.FieldServiceTier, group.FieldForceInstructions, group.FieldNote:
+		case group.FieldName, group.FieldPlatform, group.FieldSubscriptionType, group.FieldServiceTier, group.FieldNote:
 			values[i] = new(sql.NullString)
 		case group.FieldCreatedAt, group.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -261,12 +259,6 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field service_tier", values[i])
 			} else if value.Valid {
 				gr.ServiceTier = value.String
-			}
-		case group.FieldForceInstructions:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field force_instructions", values[i])
-			} else if value.Valid {
-				gr.ForceInstructions = value.String
 			}
 		case group.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -394,9 +386,6 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("service_tier=")
 	builder.WriteString(gr.ServiceTier)
-	builder.WriteString(", ")
-	builder.WriteString("force_instructions=")
-	builder.WriteString(gr.ForceInstructions)
 	builder.WriteString(", ")
 	builder.WriteString("note=")
 	builder.WriteString(gr.Note)

@@ -258,7 +258,6 @@ func TestForwarderRouteAndOutcomeTinyHelpers(t *testing.T) {
 		GroupPlatform:          "openai",
 		GroupRateMultiplier:    1.2,
 		GroupServiceTier:       "priority",
-		GroupForceInstructions: "force",
 		GroupOperationPolicies: basePolicies,
 		GroupPluginSettings:    baseSettings,
 	}
@@ -267,13 +266,12 @@ func TestForwarderRouteAndOutcomeTinyHelpers(t *testing.T) {
 		Platform:               "anthropic",
 		GroupRateMultiplier:    2,
 		GroupServiceTier:       "standard",
-		GroupForceInstructions: "route",
 		GroupOperationPolicies: map[string]bool{"chat": true},
 		GroupPluginSettings:    map[string]map[string]string{"claude": {"code_only": "true"}},
 	}
 	got := keyInfoForRoute(base, route)
 	if got.GroupID != 4 || got.GroupPlatform != "anthropic" || got.GroupRateMultiplier != 2 ||
-		got.GroupServiceTier != "standard" || got.GroupForceInstructions != "route" {
+		got.GroupServiceTier != "standard" {
 		t.Fatalf("keyInfoForRoute = %+v", got)
 	}
 	got.GroupPluginSettings["claude"]["code_only"] = "false"

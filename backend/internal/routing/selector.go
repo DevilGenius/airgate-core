@@ -25,7 +25,6 @@ type Candidate struct {
 	EffectiveRate          float64
 	GroupRateMultiplier    float64
 	GroupServiceTier       string
-	GroupForceInstructions string
 	GroupPluginSettings    map[string]map[string]string
 	GroupOperationPolicies map[string]bool
 	DispatchPlans          []sdk.DispatchPlan
@@ -68,7 +67,6 @@ func ListEligibleGroups(ctx context.Context, _ *ent.Client, userID int, platform
 			EffectiveRate:          billing.ResolveBillingRateForGroup(userGroupRates, g.ID, g.RateMultiplier),
 			GroupRateMultiplier:    g.RateMultiplier,
 			GroupServiceTier:       g.ServiceTier,
-			GroupForceInstructions: g.ForceInstructions,
 			GroupPluginSettings:    clonePluginSettings(g.PluginSettings),
 			GroupOperationPolicies: cloneOperationPolicies(g.OperationPolicies),
 			DispatchPlans:          cloneDispatchPlans(plans),

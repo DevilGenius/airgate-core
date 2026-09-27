@@ -44,7 +44,6 @@ type PluginMeta struct {
 	Platform           string
 	AccountTypes       []sdk.AccountType
 	FrontendPages      []sdk.FrontendPage
-	InstructionPresets []string
 	ConfigSchema       []sdk.ConfigField
 	Metadata           map[string]string
 	HasWebAssets       bool

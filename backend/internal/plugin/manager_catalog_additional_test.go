@@ -36,7 +36,6 @@ func TestManagerCatalogClonesAliasesAndMeta(t *testing.T) {
 				Author:             "AirGate",
 				Type:               "gateway",
 				Platform:           "openai",
-				InstructionPresets: []string{"concise"},
 				ConfigSchema:       []sdk.ConfigField{{Key: "api_base", Label: "API Base"}},
 				Metadata:           map[string]string{"tier": "official"},
 			},

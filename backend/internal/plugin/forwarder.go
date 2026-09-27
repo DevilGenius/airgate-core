@@ -902,7 +902,6 @@ func keyInfoRoute(keyInfo *auth.APIKeyInfo) routing.Candidate {
 		EffectiveRate:          billing.ResolveBillingRateForGroup(keyInfo.UserGroupRates, keyInfo.GroupID, keyInfo.GroupRateMultiplier),
 		GroupRateMultiplier:    keyInfo.GroupRateMultiplier,
 		GroupServiceTier:       keyInfo.GroupServiceTier,
-		GroupForceInstructions: keyInfo.GroupForceInstructions,
 		GroupOperationPolicies: cloneOperationPolicies(keyInfo.GroupOperationPolicies),
 		GroupPluginSettings:    clonePluginSettings(keyInfo.GroupPluginSettings),
 	}
@@ -914,7 +913,6 @@ func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKe
 	info.GroupPlatform = route.Platform
 	info.GroupRateMultiplier = route.GroupRateMultiplier
 	info.GroupServiceTier = route.GroupServiceTier
-	info.GroupForceInstructions = route.GroupForceInstructions
 	info.GroupOperationPolicies = cloneOperationPolicies(route.GroupOperationPolicies)
 	info.GroupPluginSettings = clonePluginSettings(route.GroupPluginSettings)
 	return &info

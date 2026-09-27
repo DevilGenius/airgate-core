@@ -152,7 +152,6 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		OperationPolicies:        req.OperationPolicies,
 		PluginSettings:           req.PluginSettings,
 		ServiceTier:              req.ServiceTier,
-		ForceInstructions:        req.ForceInstructions,
 		Note:                     req.Note,
 		SortWeight:               req.SortWeight,
 		CopyAccountsFromGroupIDs: req.CopyAccountsFromGroupIDs,
@@ -195,7 +194,6 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		OperationPolicies:        req.OperationPolicies,
 		PluginSettings:           req.PluginSettings,
 		ServiceTier:              req.ServiceTier,
-		ForceInstructions:        req.ForceInstructions,
 		Note:                     req.Note,
 		SortWeight:               req.SortWeight,
 	})

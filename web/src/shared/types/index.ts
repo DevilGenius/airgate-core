@@ -362,7 +362,6 @@ export interface GroupResp {
   operation_policies?: Record<string, boolean>;
   plugin_settings?: Record<string, Record<string, string>>;
   service_tier?: 'fast' | 'flex';
-  force_instructions?: string;
   note?: string;
   sort_weight: number;
   created_at: string;
@@ -397,7 +396,6 @@ export interface CreateGroupReq {
   operation_policies?: Record<string, boolean>;
   plugin_settings?: Record<string, Record<string, string>>;
   service_tier?: 'fast' | 'flex';
-  force_instructions?: string;
   note?: string;
   sort_weight?: number;
   copy_accounts_from_group_ids?: number[];
@@ -424,7 +422,6 @@ export interface UpdateGroupReq {
   operation_policies?: Record<string, boolean>;
   plugin_settings?: Record<string, Record<string, string>>;
   service_tier?: 'fast' | 'flex';
-  force_instructions?: string;
   note?: string;
   sort_weight?: number;
 }
@@ -837,7 +834,6 @@ export interface PluginResp {
     options?: Array<{ value: string; label: string }>;
   }>;
   metadata?: Record<string, string>;
-  instruction_presets?: string[];
   has_web_assets?: boolean;
   is_dev?: boolean;
 }

@@ -196,7 +196,6 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 			Author:             inst.Author,
 			Type:               inst.Type,
 			Platform:           inst.Platform,
-			InstructionPresets: inst.InstructionPresets,
 			ConfigSchema:       cloneConfigSchema(inst.ConfigSchema),
 			Metadata:           cloneMetadata(inst.Metadata),
 			IsDev:              isDev,

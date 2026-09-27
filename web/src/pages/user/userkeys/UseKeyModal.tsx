@@ -50,30 +50,27 @@ function getUseKeyConfig(
         };
       }
     } else {
-      // Codex CLI 配置 — 写入 ~/.codex/config.toml 与 ~/.codex/auth.json
-      const configDir = shell === 'unix' ? '~/.codex' : '%userprofile%\\.codex';
-      const configToml = `model_provider = "airgate"
-model = "gpt-5.5"
+      // Provider 与密钥统一配置在 config.toml；JSON 字符串转义兼容 TOML basic string。
+      const configPath = shell === 'unix' ? '~/.codex/config.toml' : '%USERPROFILE%\\.codex\\config.toml';
+      const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, '');
+      const codexBaseUrl = trimmedBaseUrl.endsWith('/v1') ? trimmedBaseUrl : `${trimmedBaseUrl}/v1`;
+      const configToml = `model_provider = "custom"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
-disable_response_storage = true
 
-[model_providers]
-[model_providers.airgate]
-name = "airgate"
-base_url = "${baseUrl}"
+[model_providers.custom]
+name = "custom"
+base_url = ${JSON.stringify(codexBaseUrl)}
 wire_api = "responses"
-requires_openai_auth = true`;
-      const authJson = `{\n  "OPENAI_API_KEY": "${apiKey}"\n}`;
+requires_openai_auth = true
+experimental_bearer_token = ${JSON.stringify(apiKey)}
+`;
       return {
         files: [
           {
-            path: `${configDir}/config.toml`,
+            path: configPath,
             content: configToml,
             hint: t('user_keys.codex_config_toml_hint'),
-          },
-          {
-            path: `${configDir}/auth.json`,
-            content: authJson,
           },
         ],
       };
@@ -299,8 +296,8 @@ export function UseKeyModal({
                         {t('user_keys.copy')}
                       </Button>
                     </div>
-                    <pre className="p-3 text-sm font-mono text-text bg-surface overflow-x-auto whitespace-pre-wrap">
-                      {file.content}
+                    <pre className="m-0 overflow-x-auto whitespace-pre bg-surface p-3 font-mono text-sm leading-6 text-text">
+                      <code>{file.content}</code>
                     </pre>
                   </div>
                 </div>

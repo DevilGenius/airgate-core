@@ -22,7 +22,6 @@ func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {
 		OperationPolicies:        item.OperationPolicies,
 		PluginSettings:           item.PluginSettings,
 		ServiceTier:              item.ServiceTier,
-		ForceInstructions:        item.ForceInstructions,
 		Note:                     item.Note,
 		SortWeight:               item.SortWeight,
 		TimeMixin: dto.TimeMixin{

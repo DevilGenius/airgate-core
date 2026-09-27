@@ -327,7 +327,7 @@ func (m *Manager) preparePlugin(ctx context.Context, op *pluginUpdate, requested
 	}
 	inst := &PluginInstance{Name: info.ID, SourceName: requested, Generation: a.Generation, Artifact: a,
 		DisplayName: info.Name, Version: info.Version, Author: info.Author, Type: string(info.Type),
-		InstructionPresets: info.InstructionPresets, ConfigSchema: cloneConfigSchema(info.ConfigSchema), Metadata: cloneMetadata(info.Metadata),
+		ConfigSchema: cloneConfigSchema(info.ConfigSchema), Metadata: cloneMetadata(info.Metadata),
 		Capabilities: sdkCapabilitiesToStrings(info.Capabilities), Priority: info.Priority, Client: client, stopped: make(chan struct{})}
 	p := &preparedPlugin{instance: inst, info: info, detachPreparation: stopCancel}
 	var lifecycle lifecycleClient

@@ -42,7 +42,7 @@ func TestDomainMappersCopySimpleFields(t *testing.T) {
 	groupResp := toGroupRespFromDomain(appgroup.Group{
 		ID: 2, Name: "默认组", Platform: "openai", RateMultiplier: 1.2,
 		IsExclusive: true, StatusVisible: true, SubscriptionType: "monthly",
-		ServiceTier: "standard", ForceInstructions: "规则", SortWeight: 5,
+		ServiceTier: "standard", SortWeight: 5,
 		CreatedAt: now, UpdatedAt: now,
 	})
 	if groupResp.ID != 2 || groupResp.Platform != "openai" || !groupResp.IsExclusive || groupResp.CreatedAt != now {

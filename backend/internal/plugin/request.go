@@ -746,9 +746,6 @@ func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
 	if keyInfo.GroupServiceTier != "" {
 		headers.Set("X-Airgate-Service-Tier", keyInfo.GroupServiceTier)
 	}
-	if keyInfo.GroupForceInstructions != "" {
-		headers.Set("X-Airgate-Force-Instructions", keyInfo.GroupForceInstructions)
-	}
 	// 分组级操作开关：X-Airgate-Operation-{operation} 约定。
 	for operation, enabled := range keyInfo.GroupOperationPolicies {
 		headers.Set("X-Airgate-Operation-"+canonicalHeaderToken(operation), strconv.FormatBool(enabled))

@@ -662,6 +662,8 @@
   },
 
   "groups": {
+    "openai_basispoints": "OAuth Basispoints mode",
+    "openai_basispoints_hint": "Use Basispoints for compatible OAuth requests; unsupported requests use normal mode. Turn off to restore normal OAuth forwarding.",
     "title": "Groups",
     "description": "Manage model groups, routing and subscription policies",
     "create": "Create Group",
@@ -1415,7 +1417,7 @@
     "ccs_codex_desc": "OpenAI Codex CLI coding assistant",
     "ccs_not_installed": "CC-Switch not detected. Please install the CC-Switch client first.",
     "ccs_session_expired": "Session expired. Please log in with your API key again before importing.",
-    "codex_config_toml_hint": "Make sure the following content is at the beginning of the config.toml file",
+    "codex_config_toml_hint": "Place top-level settings at the beginning of the file and merge any existing custom provider configuration. No auth.json changes are needed.",
     "max_concurrency_label": "Max Concurrency",
     "max_concurrency_hint": "0 means unlimited",
     "max_rpm_label": "Total RPM",

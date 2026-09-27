@@ -64,7 +64,6 @@ type Group struct {
 	OperationPolicies        map[string]bool
 	PluginSettings           map[string]map[string]string
 	ServiceTier              string
-	ForceInstructions        string
 	Note                     string
 	SortWeight               int
 	CreatedAt                time.Time
@@ -113,7 +112,6 @@ type CreateInput struct {
 	OperationPolicies        map[string]bool
 	PluginSettings           map[string]map[string]string
 	ServiceTier              string
-	ForceInstructions        string
 	Note                     string
 	SortWeight               int
 	// CopyAccountsFromGroupIDs 指定在新分组创建后从这些分组复制账号绑定（同平台，自动去重）。
@@ -135,7 +133,6 @@ type UpdateInput struct {
 	OperationPolicies        map[string]bool
 	PluginSettings           map[string]map[string]string
 	ServiceTier              *string
-	ForceInstructions        *string
 	Note                     *string
 	SortWeight               *int
 }

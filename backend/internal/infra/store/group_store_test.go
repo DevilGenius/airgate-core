@@ -160,7 +160,6 @@ func TestGroupStoreCreateUpdateCopiesAndClonesConfig(t *testing.T) {
 		OperationPolicies:        map[string]bool{"images.generate": true},
 		PluginSettings:           map[string]map[string]string{"openai": {"images": "true"}},
 		ServiceTier:              "premium",
-		ForceInstructions:        "use paid tier",
 		Note:                     "created note",
 		SortWeight:               88,
 		CopyAccountsFromGroupIDs: []int{sourceGroup.ID, sourceGroup.ID},
@@ -197,7 +196,6 @@ func TestGroupStoreCreateUpdateCopiesAndClonesConfig(t *testing.T) {
 	modelPolicy := modelpolicy.Policy{Deny: []string{"o3*"}}
 	dispatchDSL := sdk.DispatchDSL{Rules: []sdk.DispatchRule{{ID: "rule-2", Operation: "responses"}}}
 	serviceTier := "standard"
-	forceInstructions := "updated instructions"
 	note := "updated note"
 	sortWeight := 9
 	updated, err := NewGroupStore(db).Update(ctx, created.ID, appgroup.UpdateInput{
@@ -214,7 +212,6 @@ func TestGroupStoreCreateUpdateCopiesAndClonesConfig(t *testing.T) {
 		OperationPolicies:        map[string]bool{"images.edit": true},
 		PluginSettings:           map[string]map[string]string{"claude": {"code": "true"}},
 		ServiceTier:              &serviceTier,
-		ForceInstructions:        &forceInstructions,
 		Note:                     &note,
 		SortWeight:               &sortWeight,
 	})
@@ -222,7 +219,7 @@ func TestGroupStoreCreateUpdateCopiesAndClonesConfig(t *testing.T) {
 		t.Fatalf("Update returned error: %v", err)
 	}
 	if updated.Name != name || updated.RateMultiplier != newRate || updated.StatusVisible || updated.ServiceTier != serviceTier ||
-		updated.ForceInstructions != forceInstructions || updated.Note != note || updated.SortWeight != sortWeight {
+		updated.Note != note || updated.SortWeight != sortWeight {
 		t.Fatalf("updated group missing scalar fields: %+v", updated)
 	}
 	if updated.Quotas["monthly"] != float64(500) || updated.ModelRouting["o3"][0] != int64(sourceAccount.ID) {
@@ -257,7 +254,6 @@ func TestGroupStoreCreateWithoutCopyPersistsConfig(t *testing.T) {
 		OperationPolicies:        map[string]bool{"responses.create": true},
 		PluginSettings:           map[string]map[string]string{"openai": {"mode": "fast"}},
 		ServiceTier:              "standard",
-		ForceInstructions:        "force",
 		Note:                     "note",
 		SortWeight:               7,
 	})

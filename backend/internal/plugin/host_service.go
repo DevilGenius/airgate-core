@@ -1584,7 +1584,6 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			EffectiveRate:          billing.ResolveBillingRateForGroup(u.GroupRates, g.ID, g.RateMultiplier),
 			GroupRateMultiplier:    g.RateMultiplier,
 			GroupServiceTier:       g.ServiceTier,
-			GroupForceInstructions: g.ForceInstructions,
 			GroupOperationPolicies: cloneOperationPolicies(g.OperationPolicies),
 			GroupPluginSettings:    clonePluginSettings(g.PluginSettings),
 			DispatchPlans:          cloneDispatchPlansHost(plans),
@@ -1719,9 +1718,6 @@ func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.He
 	}
 	if route.GroupServiceTier != "" {
 		headers.Set("X-Airgate-Service-Tier", route.GroupServiceTier)
-	}
-	if route.GroupForceInstructions != "" {
-		headers.Set("X-Airgate-Force-Instructions", route.GroupForceInstructions)
 	}
 	for operation, enabled := range route.GroupOperationPolicies {
 		headers.Set("X-Airgate-Operation-"+canonicalHeaderToken(operation), strconv.FormatBool(enabled))

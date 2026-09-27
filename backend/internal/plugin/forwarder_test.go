@@ -1230,7 +1230,6 @@ func TestBuildHeadersWritesTrustedAirgateControlsAfterStripping(t *testing.T) {
 
 	headers := buildHeaders(source, &auth.APIKeyInfo{
 		GroupServiceTier:       "priority",
-		GroupForceInstructions: "server-instructions",
 		GroupOperationPolicies: map[string]bool{"responses.image_generation": true},
 		GroupPluginSettings:    map[string]map[string]string{"openai": {"image_enabled": "true"}},
 	})
@@ -1241,8 +1240,8 @@ func TestBuildHeadersWritesTrustedAirgateControlsAfterStripping(t *testing.T) {
 	if got := headers.Get("X-Airgate-Service-Tier"); got != "priority" {
 		t.Fatalf("X-Airgate-Service-Tier = %q, want priority", got)
 	}
-	if got := headers.Get("X-Airgate-Force-Instructions"); got != "server-instructions" {
-		t.Fatalf("X-Airgate-Force-Instructions = %q, want server-instructions", got)
+	if got := headers.Get("X-Airgate-Force-Instructions"); got != "" {
+		t.Fatalf("X-Airgate-Force-Instructions = %q, want empty after retiring forced instructions", got)
 	}
 	if got := headers.Get("X-Airgate-Plugin-Openai-Image-Enabled"); got != "true" {
 		t.Fatalf("plugin setting header = %q, want true", got)
@@ -1271,7 +1270,6 @@ func TestRoutesForAPIKeyUsesBoundGroupOnly(t *testing.T) {
 			GroupOperationPolicies: map[string]bool{"responses.image_generation": true},
 			GroupPluginSettings:    settings,
 			GroupServiceTier:       "priority",
-			GroupForceInstructions: "stay concise",
 		},
 	}
 
