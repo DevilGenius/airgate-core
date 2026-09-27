@@ -205,48 +205,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     {
-      name: 'api-key-proxy',
+      name: 'optional-plugin-css',
       configureServer(server) {
         server.middlewares.use(proxyOptionalPluginCss);
-
-        // 携带 Bearer token 的请求一律代理到后端（API Key 调用），支持 SSE 流式
-        server.middlewares.use((req, res, next) => {
-          const auth = req.headers.authorization;
-          if (auth && auth.startsWith('Bearer ')) {
-            const headers = { ...req.headers, host: backendUrl.host };
-            const proxyReq = http.request(
-              {
-                hostname: backendUrl.hostname,
-                port: backendUrl.port,
-                path: req.url,
-                method: req.method,
-                headers,
-              },
-              (proxyRes) => {
-                // 流式响应：禁用压缩，逐块转发
-                res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
-                proxyRes.on('data', (chunk) => {
-                  res.write(chunk);
-                  // 强制刷新，确保 SSE 数据立即发送
-                  if (typeof (res as NodeJS.WritableStream & { flush?: () => void }).flush === 'function') {
-                    (res as NodeJS.WritableStream & { flush?: () => void }).flush!();
-                  }
-                });
-                proxyRes.on('end', () => res.end());
-                proxyRes.on('error', () => res.end());
-              },
-            );
-            proxyReq.on('error', () => {
-              if (res.destroyed || res.writableEnded) return;
-              if (res.headersSent) { res.destroy(); return; }
-              res.writeHead(502);
-              res.end('Backend unavailable');
-            });
-            req.pipe(proxyReq);
-            return;
-          }
-          next();
-        });
       },
     },
   ],
