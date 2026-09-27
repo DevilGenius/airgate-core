@@ -19,8 +19,8 @@ describe('admin usage timing columns', () => {
     expect(result.map(({ key, title }) => [key, title])).toEqual([
       ['model', '模型'], ['first_event_ms', '握手/响应'], ['duration_ms', '首字/耗时'], ['tps', 'TPS'],
     ]);
-    const response = renderToStaticMarkup(<div>{result[1].render(row)}</div>);
-    const duration = renderToStaticMarkup(<div>{result[2].render(row)}</div>);
+    const response = renderToStaticMarkup(<div>{result[1]!.render(row)}</div>);
+    const duration = renderToStaticMarkup(<div>{result[2]!.render(row)}</div>);
     expect(response.indexOf('ws_dial_ms')).toBeLessThan(response.indexOf('first_event_ms'));
     expect(duration.indexOf('first_token_ms')).toBeLessThan(duration.indexOf('duration_ms'));
   });
