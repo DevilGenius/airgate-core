@@ -17,27 +17,27 @@ import (
 
 // PluginInstance 运行中的插件实例。
 type PluginInstance struct {
-	Name               string
-	SourceName         string
-	Generation         string
-	Artifact           *pluginArtifact
-	owner              *Manager
-	stopOnce           sync.Once
-	drainOnce          sync.Once
-	stopped            chan struct{}
-	backgroundTasks    []sdk.BackgroundTask
-	frontendAssets     map[string]bool
-	runtime            lifecycleClient
-	callbacks          []*runtimeCallbackResource
-	DisplayName        string
-	Version            string
-	Author             string
-	Platform           string
-	Type               string // "gateway", "extension", "middleware"
-	ConfigSchema       []sdk.ConfigField
-	Metadata           map[string]string
-	Capabilities       []string // 插件声明的 host capability 列表（仅展示用）
-	Priority           int32    // 仅对 type=middleware 生效，决定 chain 顺序
+	Name            string
+	SourceName      string
+	Generation      string
+	Artifact        *pluginArtifact
+	owner           *Manager
+	stopOnce        sync.Once
+	drainOnce       sync.Once
+	stopped         chan struct{}
+	backgroundTasks []sdk.BackgroundTask
+	frontendAssets  map[string]bool
+	runtime         lifecycleClient
+	callbacks       []*runtimeCallbackResource
+	DisplayName     string
+	Version         string
+	Author          string
+	Platform        string
+	Type            string // "gateway", "extension", "middleware"
+	ConfigSchema    []sdk.ConfigField
+	Metadata        map[string]string
+	Capabilities    []string // 插件声明的 host capability 列表（仅展示用）
+	Priority        int32    // 仅对 type=middleware 生效，决定 chain 顺序
 
 	Client     *goplugin.Client
 	Gateway    *sdkgrpc.GatewayGRPCClient
@@ -198,24 +198,24 @@ func (m *Manager) IsLoading() bool {
 
 // PluginMeta 插件运行时元信息。
 type PluginMeta struct {
-	Generation         string
-	UpdateState        string
-	DrainingRequests   int
-	Name               string
-	DisplayName        string
-	Version            string
-	Author             string
-	Type               string
-	Platform           string
-	AccountTypes       []sdk.AccountType
-	FrontendPages      []sdk.FrontendPage
-	ConfigSchema       []sdk.ConfigField
-	Metadata           map[string]string
-	Config             map[string]string
-	HasWebAssets       bool
-	IsDev              bool
-	BinarySHA256       string
-	CommitSHA          string
+	Generation       string
+	UpdateState      string
+	DrainingRequests int
+	Name             string
+	DisplayName      string
+	Version          string
+	Author           string
+	Type             string
+	Platform         string
+	AccountTypes     []sdk.AccountType
+	FrontendPages    []sdk.FrontendPage
+	ConfigSchema     []sdk.ConfigField
+	Metadata         map[string]string
+	Config           map[string]string
+	HasWebAssets     bool
+	IsDev            bool
+	BinarySHA256     string
+	CommitSHA        string
 }
 
 // NewManager 创建插件管理器。

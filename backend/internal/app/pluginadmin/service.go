@@ -40,19 +40,19 @@ func (s *Service) List() []PluginMeta {
 		}
 		result = append(result, PluginMeta{
 			Generation: item.Generation, UpdateState: item.UpdateState, DrainingRequests: item.DrainingRequests,
-			Name:               item.Name,
-			DisplayName:        item.DisplayName,
-			Version:            installedDisplayVersion(item.Version, item.IsDev, commitSHA, item.BinarySHA256),
-			Author:             item.Author,
-			Type:               item.Type,
-			Platform:           item.Platform,
-			AccountTypes:       append([]sdk.AccountType(nil), item.AccountTypes...),
-			FrontendPages:      append([]sdk.FrontendPage(nil), item.FrontendPages...),
-			ConfigSchema:       append([]sdk.ConfigField(nil), item.ConfigSchema...),
-			Metadata:           cloneStringMap(item.Metadata),
-			HasWebAssets:       item.HasWebAssets,
-			IsDev:              item.IsDev,
-			CommitSHA:          commitSHA,
+			Name:          item.Name,
+			DisplayName:   item.DisplayName,
+			Version:       installedDisplayVersion(item.Version, item.IsDev, commitSHA, item.BinarySHA256),
+			Author:        item.Author,
+			Type:          item.Type,
+			Platform:      item.Platform,
+			AccountTypes:  append([]sdk.AccountType(nil), item.AccountTypes...),
+			FrontendPages: append([]sdk.FrontendPage(nil), item.FrontendPages...),
+			ConfigSchema:  append([]sdk.ConfigField(nil), item.ConfigSchema...),
+			Metadata:      cloneStringMap(item.Metadata),
+			HasWebAssets:  item.HasWebAssets,
+			IsDev:         item.IsDev,
+			CommitSHA:     commitSHA,
 		})
 	}
 	return result

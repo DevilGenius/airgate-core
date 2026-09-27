@@ -2,21 +2,21 @@ package dto
 
 // PluginResp 插件响应
 type PluginResp struct {
-	Generation         string             `json:"generation"`
-	UpdateState        string             `json:"update_state"`
-	DrainingRequests   int                `json:"draining_requests"`
-	Name               string             `json:"name"`
-	DisplayName        string             `json:"display_name,omitempty"`
-	Version            string             `json:"version,omitempty"`
-	Author             string             `json:"author,omitempty"`
-	Type               string             `json:"type,omitempty"`
-	Platform           string             `json:"platform"`
-	AccountTypes       []AccountTypeResp  `json:"account_types,omitempty"`
-	FrontendPages      []FrontendPageResp `json:"frontend_pages,omitempty"`
-	ConfigSchema       []ConfigFieldResp  `json:"config_schema,omitempty"`
-	Metadata           map[string]string  `json:"metadata,omitempty"`
-	HasWebAssets       bool               `json:"has_web_assets"`
-	IsDev              bool               `json:"is_dev"`
+	Generation       string             `json:"generation"`
+	UpdateState      string             `json:"update_state"`
+	DrainingRequests int                `json:"draining_requests"`
+	Name             string             `json:"name"`
+	DisplayName      string             `json:"display_name,omitempty"`
+	Version          string             `json:"version,omitempty"`
+	Author           string             `json:"author,omitempty"`
+	Type             string             `json:"type,omitempty"`
+	Platform         string             `json:"platform"`
+	AccountTypes     []AccountTypeResp  `json:"account_types,omitempty"`
+	FrontendPages    []FrontendPageResp `json:"frontend_pages,omitempty"`
+	ConfigSchema     []ConfigFieldResp  `json:"config_schema,omitempty"`
+	Metadata         map[string]string  `json:"metadata,omitempty"`
+	HasWebAssets     bool               `json:"has_web_assets"`
+	IsDev            bool               `json:"is_dev"`
 }
 
 // ConfigFieldResp 插件配置字段声明

@@ -7,18 +7,18 @@ import (
 
 func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
 	resp := dto.PluginResp{
-		Generation:         item.Generation,
-		UpdateState:        item.UpdateState,
-		DrainingRequests:   item.DrainingRequests,
-		Name:               item.Name,
-		DisplayName:        item.DisplayName,
-		Version:            item.Version,
-		Author:             item.Author,
-		Type:               item.Type,
-		Platform:           item.Platform,
-		Metadata:           item.Metadata,
-		HasWebAssets:       item.HasWebAssets,
-		IsDev:              item.IsDev,
+		Generation:       item.Generation,
+		UpdateState:      item.UpdateState,
+		DrainingRequests: item.DrainingRequests,
+		Name:             item.Name,
+		DisplayName:      item.DisplayName,
+		Version:          item.Version,
+		Author:           item.Author,
+		Type:             item.Type,
+		Platform:         item.Platform,
+		Metadata:         item.Metadata,
+		HasWebAssets:     item.HasWebAssets,
+		IsDev:            item.IsDev,
 	}
 	for _, accountType := range item.AccountTypes {
 		resp.AccountTypes = append(resp.AccountTypes, dto.AccountTypeResp{

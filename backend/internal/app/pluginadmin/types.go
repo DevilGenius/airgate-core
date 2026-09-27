@@ -33,22 +33,22 @@ type MarketplaceReader interface {
 
 // PluginMeta 插件元信息。
 type PluginMeta struct {
-	Generation         string
-	UpdateState        string
-	DrainingRequests   int
-	Name               string
-	DisplayName        string
-	Version            string
-	Author             string
-	Type               string
-	Platform           string
-	AccountTypes       []sdk.AccountType
-	FrontendPages      []sdk.FrontendPage
-	ConfigSchema       []sdk.ConfigField
-	Metadata           map[string]string
-	HasWebAssets       bool
-	IsDev              bool
-	CommitSHA          string
+	Generation       string
+	UpdateState      string
+	DrainingRequests int
+	Name             string
+	DisplayName      string
+	Version          string
+	Author           string
+	Type             string
+	Platform         string
+	AccountTypes     []sdk.AccountType
+	FrontendPages    []sdk.FrontendPage
+	ConfigSchema     []sdk.ConfigField
+	Metadata         map[string]string
+	HasWebAssets     bool
+	IsDev            bool
+	CommitSHA        string
 }
 
 // MarketplacePlugin 市场插件条目。

@@ -5,8 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"github.com/gin-gonic/gin"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestOAuthTransportDoesNotChangeCoreFailoverPolicy(t *testing.T) {

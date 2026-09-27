@@ -188,17 +188,17 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 	for _, inst := range m.instances {
 		_, isDev := m.devPaths[inst.Name]
 		meta := PluginMeta{
-			Generation:         inst.Generation,
-			UpdateState:        "active",
-			Name:               inst.Name,
-			DisplayName:        inst.DisplayName,
-			Version:            inst.Version,
-			Author:             inst.Author,
-			Type:               inst.Type,
-			Platform:           inst.Platform,
-			ConfigSchema:       cloneConfigSchema(inst.ConfigSchema),
-			Metadata:           cloneMetadata(inst.Metadata),
-			IsDev:              isDev,
+			Generation:   inst.Generation,
+			UpdateState:  "active",
+			Name:         inst.Name,
+			DisplayName:  inst.DisplayName,
+			Version:      inst.Version,
+			Author:       inst.Author,
+			Type:         inst.Type,
+			Platform:     inst.Platform,
+			ConfigSchema: cloneConfigSchema(inst.ConfigSchema),
+			Metadata:     cloneMetadata(inst.Metadata),
+			IsDev:        isDev,
 		}
 		if m.updates[inst.Name] != nil {
 			meta.UpdateState = "preparing"
