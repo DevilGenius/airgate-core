@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	entgo.io/ent v0.13.1
-	github.com/DevilGenius/airgate-sdk v0.2.16
+	github.com/DevilGenius/airgate-sdk v0.2.17
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -47,6 +47,7 @@ require (
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/hcl/v2 v2.13.0 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect
