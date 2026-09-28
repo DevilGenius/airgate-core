@@ -68,7 +68,7 @@ func TestFailedIngressReadsNeverQueuePartialBody(t *testing.T) {
 			} else {
 				c.Request.Body = io.NopCloser(ingressFailingReader{strings.NewReader(tc.partial), tc.readErr})
 			}
-			defer c.Request.Body.Close()
+			defer func() { _ = c.Request.Body.Close() }()
 			c.Set(middleware.CtxKeyKeyInfo, &auth.APIKeyInfo{})
 			recorder := &ingressReadTraceRecorder{}
 			f := &Forwarder{requestMonitor: recorder}

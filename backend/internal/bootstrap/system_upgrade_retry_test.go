@@ -94,12 +94,12 @@ func TestSystemUpgradeRetriesOnlyFailedStatement(t *testing.T) {
 			return nil
 		}}
 		db := openSystemUpgradeMockDB(t, state)
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 		conn, err := db.Conn(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		if err := executeSystemUpgradeSQL(t.Context(), conn, systemUpgrade{ID: "fixture", SQL: "SELECT 1; SELECT 2; SELECT 3;"}); err != nil {
 			t.Fatal(err)
 		}
@@ -137,7 +137,7 @@ func TestRequestTraceDropWaitsForLockBeforeRecordingUpgrade(t *testing.T) {
 			return nil
 		}
 		db := openSystemUpgradeMockDB(t, state)
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 		if err := RunSystemUpgrades(t.Context(), entsql.OpenDB("postgres", db)); err != nil {
 			t.Fatal(err)
 		}
@@ -181,7 +181,7 @@ func TestRequestTraceDropFailureDoesNotRecordCompletion(t *testing.T) {
 					}()
 				}
 				db := openSystemUpgradeMockDB(t, state)
-				defer db.Close()
+				defer func() { _ = db.Close() }()
 				err := RunSystemUpgrades(ctx, entsql.OpenDB("postgres", db))
 				if shutdown && !errors.Is(err, context.Canceled) || !shutdown && !errors.Is(err, failure) {
 					t.Fatalf("unexpected migration error: %v", err)
@@ -212,12 +212,12 @@ func TestSystemUpgradeRetriesWholeExplicitTransaction(t *testing.T) {
 					return nil
 				}}
 				db := openSystemUpgradeMockDB(t, state)
-				defer db.Close()
+				defer func() { _ = db.Close() }()
 				conn, err := db.Conn(t.Context())
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer conn.Close()
+				defer func() { _ = conn.Close() }()
 				source := "SELECT 0; BEGIN; SELECT 1; SELECT 2; COMMIT; SELECT 3;"
 				if err := executeSystemUpgradeSQL(t.Context(), conn, systemUpgrade{ID: "fixture", SQL: source}); err != nil {
 					t.Fatal(err)
@@ -242,12 +242,12 @@ func TestSystemUpgradeRollbackFailureStopsRetries(t *testing.T) {
 		return nil
 	}}
 	db := openSystemUpgradeMockDB(t, state)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	conn, err := db.Conn(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	err = executeSystemUpgradeSQL(t.Context(), conn, systemUpgrade{ID: "fixture", SQL: "BEGIN; SELECT 1; COMMIT;"})
 	if err == nil || !strings.Contains(err.Error(), "rollback failed") || state.execCount("BEGIN") != 1 || state.execCount("COMMIT") != 0 {
 		t.Fatalf("unsafe retry after failed rollback: %v / %v", err, state.execs)

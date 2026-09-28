@@ -7,7 +7,7 @@ import (
 
 func TestClearRequestTracesUsesStrictLastSeenCutoff(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	cutoff := time.Unix(1700000000, 0).UTC()
 	for _, row := range []struct {
 		hash     string
