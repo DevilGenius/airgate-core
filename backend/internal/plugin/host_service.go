@@ -1302,10 +1302,10 @@ func (h *HostService) recordHostForwardUsage(
 		SellRate:          sellRate,
 		AccountRate:       accFull.RateMultiplier,
 	}
-	applyImageBillingCostPolicy(&calcInput, usage, route.GroupPluginSettings, req.Path)
+	applyUsageBillingCostPolicy(&calcInput, usage, route.GroupPluginSettings, req.Path)
 	calc := h.calculator.Calculate(calcInput)
 	reasoningEffort := resolveReasoningEffort(hostForwardReasoningEffort(req), usage)
-	usageMetadata := usageMetadataFromSDK(usage, usageValues)
+	usageMetadata := usageBillingMetadata(usage, usageValues, calcInput)
 
 	h.scheduler.AddWindowCost(ctx, accountID, calc.AccountCost)
 

@@ -1,7 +1,10 @@
 // Package billing 提供费用计算和使用量异步记录
 package billing
 
-import "github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
+import (
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
+	"math"
+)
 
 // Calculator 费用计算器
 type Calculator struct{}
@@ -24,7 +27,8 @@ type CalculateInput struct {
 	BillingRate float64
 
 	// SellRate Reseller 设置的销售倍率（0 表示客户侧免费，1 表示不加价）。
-	// 用于在 actual_cost 基础上计算 billed_cost（对客户的账面消耗），累加到 APIKey.used_quota。
+	// 用于计算 billed_cost，累加到 APIKey.used_quota；基数默认取 actual_cost，
+	// 设置 APIKeyBaseCostOverride 时使用单独的 Key 计费基数。
 	// 平台余额扣费永远不读这个字段。
 	SellRate float64
 
@@ -43,6 +47,10 @@ type CalculateInput struct {
 	// 用于 Responses image_generation：文本 token 仍按 BillingRate 计费，
 	// 图片按分组 1K/2K/4K 固定价单独计费后加到同一条账单里。
 	BillingCostAddon *float64
+
+	// APIKeyBaseCostOverride replaces only the pre-multiplier base for billed_cost.
+	// User balance (actual_cost), upstream account cost and measured costs stay intact.
+	APIKeyBaseCostOverride *float64
 }
 
 // CalculateResult 计算结果
@@ -53,7 +61,7 @@ type CalculateResult struct {
 	CacheCreationCost     float64 // cache creation 费用（cache write）
 	TotalCost             float64 // 原始基础成本 = input + cached_input + cache_creation + output（未乘任何倍率）
 	ActualCost            float64 // 平台真实成本 = TotalCost × BillingRate（扣 reseller 余额）
-	BilledCost            float64 // 客户账面消耗 = ActualCost × SellRate
+	BilledCost            float64 // 客户账面消耗 = Key 计费基数 × SellRate，默认基数为 ActualCost
 	AccountCost           float64 // 账号实际成本 = TotalCost × AccountRate（仅服务于"账号计费"统计）
 	RateMultiplier        float64 // 快照：本次生效的 BillingRate
 	SellRate              float64 // 快照：本次生效的 SellRate
@@ -67,9 +75,10 @@ type CalculateResult struct {
 //	total_cost   = input_cost + cached_input_cost + output_cost
 //
 //	actual_cost  = total_cost × billing_rate          → 扣 User.balance（平台真实计费）
-//	billed_cost  = actual_cost × sell_rate            → 累加 APIKey.used_quota（end customer 可见）
+//	billed_cost  = key_charge_base × sell_rate        → 累加 APIKey.used_quota（end customer 可见）
 //	account_cost = total_cost × account_rate          → 写入 usage_log，仅服务"账号计费"统计
 //
+// key_charge_base 默认等于 actual_cost；Key 专用基数覆盖不改变 actual_cost。
 // 三者互不影响，各自存储在独立列里。
 func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 	totalCost := ratevalue.SafeAddNonNegative(
@@ -83,16 +92,13 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 	accountRate := ratevalue.NormalizeMultiplier(input.AccountRate, 1.0)
 	sellRate := ratevalue.NormalizeSellMultiplier(input.SellRate, 1.0)
 
-	actualCost := ratevalue.SafeMulNonNegative(totalCost, billingRate)
+	actualCost := calculateChargeBase(totalCost, billingRate, input.BillingCostOverride, input.BillingCostAddon)
 
-	if input.BillingCostOverride != nil {
-		actualCost = ratevalue.NormalizeNonNegative(*input.BillingCostOverride)
+	keyChargeBase := actualCost
+	if override := input.APIKeyBaseCostOverride; override != nil && *override >= 0 && !math.IsNaN(*override) && !math.IsInf(*override, 0) {
+		keyChargeBase = calculateChargeBase(*override, billingRate, input.BillingCostOverride, input.BillingCostAddon)
 	}
-	if input.BillingCostAddon != nil {
-		actualCost = ratevalue.SafeAddNonNegative(actualCost, *input.BillingCostAddon)
-	}
-
-	billedCost := ratevalue.SafeMulNonNegative(actualCost, sellRate)
+	billedCost := ratevalue.SafeMulNonNegative(keyChargeBase, sellRate)
 
 	accountCost := ratevalue.SafeMulNonNegative(totalCost, accountRate)
 
@@ -109,4 +115,15 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 		SellRate:              sellRate,
 		AccountRateMultiplier: accountRate,
 	}
+}
+
+func calculateChargeBase(total, rate float64, override, addon *float64) float64 {
+	cost := ratevalue.SafeMulNonNegative(total, rate)
+	if override != nil {
+		cost = ratevalue.NormalizeNonNegative(*override)
+	}
+	if addon != nil {
+		cost = ratevalue.SafeAddNonNegative(cost, *addon)
+	}
+	return cost
 }

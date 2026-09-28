@@ -422,10 +422,10 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		SellRate:          state.keyInfo.SellRate,
 		AccountRate:       state.account.RateMultiplier,
 	}
-	applyImageBillingCostPolicy(&calcInput, usage, state.keyInfo.GroupPluginSettings, state.requestPath)
+	applyUsageBillingCostPolicy(&calcInput, usage, state.keyInfo.GroupPluginSettings, state.requestPath)
 	calc := f.calculator.Calculate(calcInput)
 	reasoningEffort := resolveReasoningEffort(state.reasoningEffort, usage)
-	usageMetadata := usageMetadataFromSDK(usage, usageValues)
+	usageMetadata := usageBillingMetadata(usage, usageValues, calcInput)
 
 	// 窗口费用沿用 account_cost（= total × account_rate），与用户账单解耦。
 	f.scheduler.AddWindowCost(ctx, state.account.ID, calc.AccountCost)

@@ -223,6 +223,7 @@ export function GroupFormModal({
     subscription_type: group?.subscription_type ?? 'standard' as const,
   });
   const [basispointsEnabled, setBasispointsEnabled] = useState(group?.plugin_settings?.openai?.basispoints === 'true');
+  const [basispointsStandardKeyBilling, setBasispointsStandardKeyBilling] = useState(group?.plugin_settings?.openai?.basispoints_standard_key_billing === 'true');
   const [quotas, setQuotas] = useState(parseQuotas(group?.quotas as Record<string, unknown> | undefined));
   const [claudeCodeOnly, setClaudeCodeOnly] = useState(group?.plugin_settings?.claude?.claude_code_only === 'true');
   const [openaiOperations, setOpenAIOperations] = useState<OpenAIOperations>(() => parseOpenAIOperations(group?.operation_policies));
@@ -288,6 +289,7 @@ export function GroupFormModal({
     if (form.platform === 'openai') {
       pluginSettings.openai = buildOpenAISettings(pluginSettings.openai, imagePrices);
       pluginSettings.openai.basispoints = String(basispointsEnabled);
+      pluginSettings.openai.basispoints_standard_key_billing = String(basispointsStandardKeyBilling);
     }
     const operationPolicies = form.platform === 'openai'
       ? buildOperationPolicies(group?.operation_policies, openaiOperations)
@@ -477,15 +479,60 @@ export function GroupFormModal({
         </HeroTextField>
 
         {form.platform === 'openai' ? (
-          <NativeCheckbox
-            isSelected={basispointsEnabled}
-            onChange={setBasispointsEnabled}
-          >
-            <span>
-              <span className="block text-sm text-text">{t('groups.openai_basispoints')}</span>
-              <span className="mt-1 block text-[11px] text-text-tertiary">{t('groups.openai_basispoints_hint')}</span>
-            </span>
-          </NativeCheckbox>
+          <div className="grid grid-cols-2 items-start gap-4">
+            <NativeCheckbox
+              contentStyle={{ alignItems: 'flex-start' }}
+              ariaLabel={t('groups.openai_basispoints')}
+              isSelected={basispointsEnabled}
+              onChange={setBasispointsEnabled}
+            >
+              <span>
+                <span className="block text-sm text-text">{t('groups.openai_basispoints')}</span>
+                <span className="mt-1 block text-[11px] text-text-tertiary">{t('groups.openai_basispoints_hint')}</span>
+              </span>
+            </NativeCheckbox>
+            <NativeCheckbox
+              contentStyle={{ alignItems: 'flex-start' }}
+              ariaLabel={t('groups.openai_basispoints_standard_key_billing')}
+              isSelected={basispointsStandardKeyBilling}
+              onChange={setBasispointsStandardKeyBilling}
+              isDisabled={!basispointsEnabled}
+            >
+              <span>
+                <span className="block text-sm text-text">{t('groups.openai_basispoints_standard_key_billing')}</span>
+                <span className="mt-1 block text-[11px] text-text-tertiary">{t('groups.openai_basispoints_standard_key_billing_hint')}</span>
+              </span>
+            </NativeCheckbox>
+            <NativeCheckbox
+              contentStyle={{ alignItems: 'flex-start' }}
+              isSelected={openaiOperations.imagesApi}
+              onChange={(selected) => setOpenAIOperations((current) => ({
+                ...current,
+                imagesApi: selected,
+              }))}
+            >
+              <span>
+                <span className="block text-sm text-text">{t('groups.openai_images_api')}</span>
+                <span className="mt-1 block text-[11px] text-text-tertiary">
+                  {t('groups.openai_images_api_hint')}
+                </span>
+              </span>
+            </NativeCheckbox>
+            <NativeCheckbox
+              contentStyle={{ alignItems: 'flex-start' }}
+              isSelected={openaiOperations.responsesImageGeneration}
+              onChange={(selected) =>
+                setOpenAIOperations((current) => ({ ...current, responsesImageGeneration: selected }))
+              }
+            >
+              <span>
+                <span className="block text-sm text-text">{t('groups.openai_responses_image_generation')}</span>
+                <span className="mt-1 block text-[11px] text-text-tertiary">
+                  {t('groups.openai_responses_image_generation_hint')}
+                </span>
+              </span>
+            </NativeCheckbox>
+          </div>
         ) : null}
 
         {form.platform === 'claude' ? (
@@ -505,34 +552,6 @@ export function GroupFormModal({
 
         {form.platform === 'openai' ? (
           <div className="space-y-3">
-            <NativeCheckbox
-              isSelected={openaiOperations.imagesApi}
-              onChange={(selected) => setOpenAIOperations((current) => ({
-                ...current,
-                imagesApi: selected,
-              }))}
-            >
-              <span>
-                <span className="block text-sm text-text">{t('groups.openai_images_api')}</span>
-                <span className="mt-1 block text-[11px] text-text-tertiary">
-                  {t('groups.openai_images_api_hint')}
-                </span>
-              </span>
-            </NativeCheckbox>
-            <NativeCheckbox
-              isSelected={openaiOperations.responsesImageGeneration}
-              onChange={(selected) =>
-                setOpenAIOperations((current) => ({ ...current, responsesImageGeneration: selected }))
-              }
-            >
-              <span>
-                <span className="block text-sm text-text">{t('groups.openai_responses_image_generation')}</span>
-                <span className="mt-1 block text-[11px] text-text-tertiary">
-                  {t('groups.openai_responses_image_generation_hint')}
-                </span>
-              </span>
-            </NativeCheckbox>
-
             <div className={imagePricingEnabled ? undefined : 'opacity-60'}>
               <p
                 className={`mb-1.5 text-xs font-medium uppercaser ${

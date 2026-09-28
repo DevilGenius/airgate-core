@@ -663,6 +663,8 @@
 
   "groups": {
     "openai_basispoints": "OAuth Basispoints mode",
+    "openai_basispoints_standard_key_billing": "Ignore fast-tier pricing for Basispoints",
+    "openai_basispoints_standard_key_billing_hint": "Only affects API Key quota",
     "openai_basispoints_hint": "Use Basispoints for compatible OAuth requests; unsupported requests use normal mode. Turn off to restore normal OAuth forwarding.",
     "title": "Groups",
     "description": "Manage model groups, routing and subscription policies",

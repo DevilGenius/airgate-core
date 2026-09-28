@@ -55,7 +55,7 @@ func shouldForwardPluginSetting(plugin, key string) bool {
 		return true
 	}
 	switch strings.ToLower(strings.TrimSpace(key)) {
-	case imagePrice1KKey, imagePrice2KKey, imagePrice4KKey:
+	case imagePrice1KKey, imagePrice2KKey, imagePrice4KKey, basispointsStandardKeyBillingKey:
 		return false
 	default:
 		return true
