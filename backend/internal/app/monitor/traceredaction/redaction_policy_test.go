@@ -47,6 +47,32 @@ func TestStructuredRedactionUsesOneFieldPolicy(t *testing.T) {
 	}
 }
 
+func TestImageFormOmitsUnknownFieldsRegardlessOfOtherRedactions(t *testing.T) {
+	for _, contentType := range []string{"application/x-www-form-urlencoded", "application/x-www-form-urlencoded; charset=UTF-8"} {
+		for _, extra := range []string{"", "&api_key=credential_secret", "&image=known_image_secret"} {
+			t.Run(contentType+extra, func(t *testing.T) {
+				raw := []byte("photo=cHJpdmF0ZS1pbWFnZQ%3D%3D&prompt=x" + extra)
+				before := bytes.Clone(raw)
+				got := SanitizeBody(raw, contentType, BodyOptions{ForceImageRequest: true})
+				if len(got.Body) != 0 || !got.Redacted || got.RedactionReason != imageRedactionReason || got.OriginalSize != int64(len(raw)) || got.ContentType != contentType {
+					t.Fatalf("image form was not omitted: %+v", got)
+				}
+				if !bytes.Equal(raw, before) {
+					t.Fatal("redaction changed forwarded form bytes")
+				}
+			})
+		}
+	}
+}
+
+func TestOrdinaryFormPreservesUnknownFields(t *testing.T) {
+	raw := []byte("photo=ordinary-value&prompt=keep%20format&prompt=second")
+	got := SanitizeBody(raw, "application/x-www-form-urlencoded", BodyOptions{})
+	if got.Redacted || !bytes.Equal(got.Body, raw) {
+		t.Fatal("ordinary form was rewritten")
+	}
+}
+
 func TestMultipartDropsFilesAndRedactsCredentials(t *testing.T) {
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)

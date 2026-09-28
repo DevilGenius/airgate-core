@@ -46,6 +46,37 @@ func TestTracePersistenceUsesSharedRedactionPolicy(t *testing.T) {
 	}
 }
 
+func TestImageFormIsOmittedFromStoredIngressAndOutbound(t *testing.T) {
+	raw := []byte("photo=cHJpdmF0ZS1pbWFnZQ%3D%3D&prompt=x&api_key=fixture_secret")
+	headers := http.Header{"Content-Type": {"application/x-www-form-urlencoded; charset=UTF-8"}}
+	input := requestmonitoring.TraceInput{
+		Path: "/v1/images/edits", RequestHeaders: headers, RequestBody: raw,
+		Attempts: []requestmonitoring.TraceAttempt{{OutboundRequests: []requestmonitoring.TraceOutboundRequest{{
+			URL: "https://example.test/v1/images/edits", Headers: headers, Body: raw, BodyOriginalSize: int64(len(raw)),
+		}}}},
+	}
+	stored, err := encodeRequestTrace(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := decodeStoredRequestTrace(stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload requestTracePayload
+	if err := json.Unmarshal(decoded.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Attempts) != 1 || len(payload.Attempts[0].Outbound) != 1 {
+		t.Fatal("missing outbound diagnostics")
+	}
+	for _, body := range []requestTraceBody{payload.Request.Body, payload.Attempts[0].Outbound[0].Body} {
+		if body.Text != "" || body.Base64 != "" || body.Size != 0 || !body.Redacted || body.RedactionReason != "image_input" || body.OriginalSize != int64(len(raw)) {
+			t.Fatalf("image form reached persistence: %+v", body)
+		}
+	}
+}
+
 func TestSDKRawCaptureIsRedactedOnlyBeforeStorage(t *testing.T) {
 	raw := []byte(`{"access_token":"fixture_access_secret","partial_image_b64":"fixture_image_secret","prompt":"keep prompt"}`)
 	headers := http.Header{"Content-Type": {"application/json"}, "Authorization": {"Bearer fixture_header_secret"}, "session_id": {"fixture_session_secret"}}

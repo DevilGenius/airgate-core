@@ -64,6 +64,11 @@ func sanitizeBody(body []byte, contentType string, forceImage bool) BodySnapshot
 	}
 	switch {
 	case mediaType == "application/x-www-form-urlencoded":
+		// Image endpoints can put binary payloads in arbitrary form fields.
+		// Redacting a known field does not make the remaining fields safe.
+		if forceImage {
+			return sanitized(nil, contentType, len(body), imageRedaction)
+		}
 		values, err := url.ParseQuery(string(body))
 		if err != nil {
 			return sanitized(nil, contentType, len(body), uncertainRedaction)
