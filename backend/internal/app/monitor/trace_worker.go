@@ -59,7 +59,7 @@ func (s *Service) persistRequestTrace(ctx context.Context, item queuedRequestTra
 		s.enqueueRequestEvent(item.Event)
 		return
 	}
-	stored, err := encodeRequestTrace(item.Trace, s.retention)
+	stored, err := encodeRequestTrace(item.Trace)
 	if err != nil {
 		slog.Warn("monitor_request_trace_encode_failed", "error", err)
 		item.Event.Detail["trace_dropped"] = "encode_failed"

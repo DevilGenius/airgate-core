@@ -46,7 +46,6 @@ func toMonitorRequestTraceResp(item appmonitor.RequestTrace) dto.MonitorRequestT
 		SeenCount:      item.SeenCount,
 		FirstSeenAt:    monitorTimeString(item.FirstSeenAt),
 		LastSeenAt:     monitorTimeString(item.LastSeenAt),
-		ExpiresAt:      monitorTimeString(item.ExpiresAt),
 		Payload:        item.Payload,
 	}
 }

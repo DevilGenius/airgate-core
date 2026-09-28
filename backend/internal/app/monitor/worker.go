@@ -104,7 +104,6 @@ func (s *Service) runCleanupExpiredOnce(parent context.Context) {
 
 	total := 0
 	requestTotal := 0
-	requestTraceTotal := 0
 	for {
 		if err := ctx.Err(); err != nil {
 			return
@@ -153,34 +152,8 @@ func (s *Service) runCleanupExpiredOnce(parent context.Context) {
 			break
 		}
 	}
-	if traceRepo, ok := s.repo.(RequestTraceRepository); ok {
-		for {
-			if err := ctx.Err(); err != nil {
-				return
-			}
-			deleted, err := traceRepo.CleanupExpiredRequestTraces(ctx, time.Now(), workerBatchSize)
-			if err != nil {
-				slog.Warn("monitor_request_trace_cleanup_failed", "deleted", requestTraceTotal, "error", err)
-				s.Record(context.Background(), monitoring.EventInput{
-					Type:        monitoring.TypeSystemError,
-					Severity:    monitoring.SeverityWarning,
-					Source:      monitoring.SourceMonitorWorker,
-					SubjectType: monitoring.SubjectSystem,
-					SubjectID:   "request_trace_cleanup",
-					Title:       "Monitor request trace cleanup failed",
-					Message:     err.Error(),
-					ErrorCode:   "monitor_request_trace_cleanup_failed",
-				})
-				return
-			}
-			requestTraceTotal += deleted
-			if deleted < workerBatchSize {
-				break
-			}
-		}
-	}
-	if total > 0 || requestTotal > 0 || requestTraceTotal > 0 {
-		slog.Info("monitor_cleanup_completed", "deleted", total, "request_deleted", requestTotal, "request_trace_deleted", requestTraceTotal)
+	if total > 0 || requestTotal > 0 {
+		slog.Info("monitor_cleanup_completed", "deleted", total, "request_deleted", requestTotal)
 		s.broadcastMonitorChanged("cleanup")
 	}
 	s.pruneRecoverySnapshot(ctx)

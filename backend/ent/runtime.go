@@ -602,10 +602,6 @@ func init() {
 	monitorrequesttraceDescLastSeenAt := monitorrequesttraceFields[8].Descriptor()
 	// monitorrequesttrace.DefaultLastSeenAt holds the default value on creation for the last_seen_at field.
 	monitorrequesttrace.DefaultLastSeenAt = monitorrequesttraceDescLastSeenAt.Default.(func() time.Time)
-	// monitorrequesttraceDescExpiresAt is the schema descriptor for expires_at field.
-	monitorrequesttraceDescExpiresAt := monitorrequesttraceFields[9].Descriptor()
-	// monitorrequesttrace.DefaultExpiresAt holds the default value on creation for the expires_at field.
-	monitorrequesttrace.DefaultExpiresAt = monitorrequesttraceDescExpiresAt.Default.(func() time.Time)
 	pluginFields := schema.Plugin{}.Fields()
 	_ = pluginFields
 	// pluginDescName is the schema descriptor for name field.

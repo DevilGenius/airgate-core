@@ -330,20 +330,12 @@ var (
 		{Name: "seen_count", Type: field.TypeInt64, Default: 1},
 		{Name: "first_seen_at", Type: field.TypeTime},
 		{Name: "last_seen_at", Type: field.TypeTime},
-		{Name: "expires_at", Type: field.TypeTime},
 	}
 	// MonitorRequestTraceTable holds the schema information for the "monitor_request_trace" table.
 	MonitorRequestTraceTable = &schema.Table{
 		Name:       "monitor_request_trace",
 		Columns:    MonitorRequestTraceColumns,
 		PrimaryKey: []*schema.Column{MonitorRequestTraceColumns[0]},
-		Indexes: []*schema.Index{
-			{
-				Name:    "monitorrequesttrace_expires_at",
-				Unique:  false,
-				Columns: []*schema.Column{MonitorRequestTraceColumns[10]},
-			},
-		},
 	}
 	// PluginsColumns holds the columns for the "plugins" table.
 	PluginsColumns = []*schema.Column{

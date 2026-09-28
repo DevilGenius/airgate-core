@@ -95,7 +95,6 @@ type StoredRequestTrace struct {
 	SeenCount      int64
 	FirstSeenAt    time.Time
 	LastSeenAt     time.Time
-	ExpiresAt      time.Time
 }
 
 // RequestTrace is the verified, decompressed trace returned to admin callers.
@@ -110,7 +109,6 @@ type RequestTrace struct {
 	SeenCount      int64
 	FirstSeenAt    time.Time
 	LastSeenAt     time.Time
-	ExpiresAt      time.Time
 }
 
 type queuedRequestTrace struct {
@@ -273,7 +271,6 @@ type RequestTraceRepository interface {
 	UpsertRequestTrace(context.Context, StoredRequestTrace, QueuedRequestEvent) error
 	GetRequestTrace(context.Context, string) (StoredRequestTrace, error)
 	ClearRequestTraces(context.Context, *time.Time) (int, error)
-	CleanupExpiredRequestTraces(context.Context, time.Time, int) (int, error)
 }
 
 var _ requestmonitoring.Recorder = (*Service)(nil)

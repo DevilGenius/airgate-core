@@ -174,20 +174,6 @@ func (mrtu *MonitorRequestTraceUpdate) SetNillableLastSeenAt(t *time.Time) *Moni
 	return mrtu
 }
 
-// SetExpiresAt sets the "expires_at" field.
-func (mrtu *MonitorRequestTraceUpdate) SetExpiresAt(t time.Time) *MonitorRequestTraceUpdate {
-	mrtu.mutation.SetExpiresAt(t)
-	return mrtu
-}
-
-// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
-func (mrtu *MonitorRequestTraceUpdate) SetNillableExpiresAt(t *time.Time) *MonitorRequestTraceUpdate {
-	if t != nil {
-		mrtu.SetExpiresAt(*t)
-	}
-	return mrtu
-}
-
 // Mutation returns the MonitorRequestTraceMutation object of the builder.
 func (mrtu *MonitorRequestTraceUpdate) Mutation() *MonitorRequestTraceMutation {
 	return mrtu.mutation
@@ -285,9 +271,6 @@ func (mrtu *MonitorRequestTraceUpdate) sqlSave(ctx context.Context) (n int, err 
 	}
 	if value, ok := mrtu.mutation.LastSeenAt(); ok {
 		_spec.SetField(monitorrequesttrace.FieldLastSeenAt, field.TypeTime, value)
-	}
-	if value, ok := mrtu.mutation.ExpiresAt(); ok {
-		_spec.SetField(monitorrequesttrace.FieldExpiresAt, field.TypeTime, value)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, mrtu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -455,20 +438,6 @@ func (mrtuo *MonitorRequestTraceUpdateOne) SetNillableLastSeenAt(t *time.Time) *
 	return mrtuo
 }
 
-// SetExpiresAt sets the "expires_at" field.
-func (mrtuo *MonitorRequestTraceUpdateOne) SetExpiresAt(t time.Time) *MonitorRequestTraceUpdateOne {
-	mrtuo.mutation.SetExpiresAt(t)
-	return mrtuo
-}
-
-// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
-func (mrtuo *MonitorRequestTraceUpdateOne) SetNillableExpiresAt(t *time.Time) *MonitorRequestTraceUpdateOne {
-	if t != nil {
-		mrtuo.SetExpiresAt(*t)
-	}
-	return mrtuo
-}
-
 // Mutation returns the MonitorRequestTraceMutation object of the builder.
 func (mrtuo *MonitorRequestTraceUpdateOne) Mutation() *MonitorRequestTraceMutation {
 	return mrtuo.mutation
@@ -596,9 +565,6 @@ func (mrtuo *MonitorRequestTraceUpdateOne) sqlSave(ctx context.Context) (_node *
 	}
 	if value, ok := mrtuo.mutation.LastSeenAt(); ok {
 		_spec.SetField(monitorrequesttrace.FieldLastSeenAt, field.TypeTime, value)
-	}
-	if value, ok := mrtuo.mutation.ExpiresAt(); ok {
-		_spec.SetField(monitorrequesttrace.FieldExpiresAt, field.TypeTime, value)
 	}
 	_node = &MonitorRequestTrace{config: mrtuo.config}
 	_spec.Assign = _node.assignValues

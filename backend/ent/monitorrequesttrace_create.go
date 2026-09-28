@@ -130,20 +130,6 @@ func (mrtc *MonitorRequestTraceCreate) SetNillableLastSeenAt(t *time.Time) *Moni
 	return mrtc
 }
 
-// SetExpiresAt sets the "expires_at" field.
-func (mrtc *MonitorRequestTraceCreate) SetExpiresAt(t time.Time) *MonitorRequestTraceCreate {
-	mrtc.mutation.SetExpiresAt(t)
-	return mrtc
-}
-
-// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
-func (mrtc *MonitorRequestTraceCreate) SetNillableExpiresAt(t *time.Time) *MonitorRequestTraceCreate {
-	if t != nil {
-		mrtc.SetExpiresAt(*t)
-	}
-	return mrtc
-}
-
 // Mutation returns the MonitorRequestTraceMutation object of the builder.
 func (mrtc *MonitorRequestTraceCreate) Mutation() *MonitorRequestTraceMutation {
 	return mrtc.mutation
@@ -207,10 +193,6 @@ func (mrtc *MonitorRequestTraceCreate) defaults() {
 		v := monitorrequesttrace.DefaultLastSeenAt()
 		mrtc.mutation.SetLastSeenAt(v)
 	}
-	if _, ok := mrtc.mutation.ExpiresAt(); !ok {
-		v := monitorrequesttrace.DefaultExpiresAt()
-		mrtc.mutation.SetExpiresAt(v)
-	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -251,9 +233,6 @@ func (mrtc *MonitorRequestTraceCreate) check() error {
 	}
 	if _, ok := mrtc.mutation.LastSeenAt(); !ok {
 		return &ValidationError{Name: "last_seen_at", err: errors.New(`ent: missing required field "MonitorRequestTrace.last_seen_at"`)}
-	}
-	if _, ok := mrtc.mutation.ExpiresAt(); !ok {
-		return &ValidationError{Name: "expires_at", err: errors.New(`ent: missing required field "MonitorRequestTrace.expires_at"`)}
 	}
 	return nil
 }
@@ -316,10 +295,6 @@ func (mrtc *MonitorRequestTraceCreate) createSpec() (*MonitorRequestTrace, *sqlg
 	if value, ok := mrtc.mutation.LastSeenAt(); ok {
 		_spec.SetField(monitorrequesttrace.FieldLastSeenAt, field.TypeTime, value)
 		_node.LastSeenAt = value
-	}
-	if value, ok := mrtc.mutation.ExpiresAt(); ok {
-		_spec.SetField(monitorrequesttrace.FieldExpiresAt, field.TypeTime, value)
-		_node.ExpiresAt = value
 	}
 	return _node, _spec
 }

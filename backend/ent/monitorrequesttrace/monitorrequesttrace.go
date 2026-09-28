@@ -31,8 +31,6 @@ const (
 	FieldFirstSeenAt = "first_seen_at"
 	// FieldLastSeenAt holds the string denoting the last_seen_at field in the database.
 	FieldLastSeenAt = "last_seen_at"
-	// FieldExpiresAt holds the string denoting the expires_at field in the database.
-	FieldExpiresAt = "expires_at"
 	// Table holds the table name of the monitorrequesttrace in the database.
 	Table = "monitor_request_trace"
 )
@@ -49,7 +47,6 @@ var Columns = []string{
 	FieldSeenCount,
 	FieldFirstSeenAt,
 	FieldLastSeenAt,
-	FieldExpiresAt,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -81,8 +78,6 @@ var (
 	DefaultFirstSeenAt func() time.Time
 	// DefaultLastSeenAt holds the default value on creation for the "last_seen_at" field.
 	DefaultLastSeenAt func() time.Time
-	// DefaultExpiresAt holds the default value on creation for the "expires_at" field.
-	DefaultExpiresAt func() time.Time
 )
 
 // OrderOption defines the ordering options for the MonitorRequestTrace queries.
@@ -131,9 +126,4 @@ func ByFirstSeenAt(opts ...sql.OrderTermOption) OrderOption {
 // ByLastSeenAt orders the results by the last_seen_at field.
 func ByLastSeenAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastSeenAt, opts...).ToFunc()
-}
-
-// ByExpiresAt orders the results by the expires_at field.
-func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
 }

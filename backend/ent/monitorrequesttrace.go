@@ -34,9 +34,7 @@ type MonitorRequestTrace struct {
 	// FirstSeenAt holds the value of the "first_seen_at" field.
 	FirstSeenAt time.Time `json:"first_seen_at,omitempty"`
 	// LastSeenAt holds the value of the "last_seen_at" field.
-	LastSeenAt time.Time `json:"last_seen_at,omitempty"`
-	// ExpiresAt holds the value of the "expires_at" field.
-	ExpiresAt    time.Time `json:"expires_at,omitempty"`
+	LastSeenAt   time.Time `json:"last_seen_at,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -51,7 +49,7 @@ func (*MonitorRequestTrace) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case monitorrequesttrace.FieldHash, monitorrequesttrace.FieldEncoding:
 			values[i] = new(sql.NullString)
-		case monitorrequesttrace.FieldFirstSeenAt, monitorrequesttrace.FieldLastSeenAt, monitorrequesttrace.FieldExpiresAt:
+		case monitorrequesttrace.FieldFirstSeenAt, monitorrequesttrace.FieldLastSeenAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -128,12 +126,6 @@ func (mrt *MonitorRequestTrace) assignValues(columns []string, values []any) err
 			} else if value.Valid {
 				mrt.LastSeenAt = value.Time
 			}
-		case monitorrequesttrace.FieldExpiresAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field expires_at", values[i])
-			} else if value.Valid {
-				mrt.ExpiresAt = value.Time
-			}
 		default:
 			mrt.selectValues.Set(columns[i], values[i])
 		}
@@ -196,9 +188,6 @@ func (mrt *MonitorRequestTrace) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("last_seen_at=")
 	builder.WriteString(mrt.LastSeenAt.Format(time.ANSIC))
-	builder.WriteString(", ")
-	builder.WriteString("expires_at=")
-	builder.WriteString(mrt.ExpiresAt.Format(time.ANSIC))
 	builder.WriteByte(')')
 	return builder.String()
 }

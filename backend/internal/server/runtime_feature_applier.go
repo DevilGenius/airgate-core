@@ -56,7 +56,7 @@ func (a *runtimeFeatureApplier) ApplyRuntimeFeatures(ctx context.Context, state 
 		if a.forwarder != nil {
 			a.forwarder.SetRequestTraceEnabled(true)
 		}
-		slog.Warn("monitor_request_trace_enabled", "retention", "7d", "raw_request_bodies", true, "source", "system_settings")
+		slog.Warn("monitor_request_trace_enabled", "retention", "permanent", "raw_request_bodies", true, "source", "system_settings")
 		return nil
 	}
 	if a.forwarder != nil {

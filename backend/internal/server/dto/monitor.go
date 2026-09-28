@@ -163,7 +163,6 @@ type MonitorRequestTraceResp struct {
 	SeenCount      int64           `json:"seen_count"`
 	FirstSeenAt    string          `json:"first_seen_at"`
 	LastSeenAt     string          `json:"last_seen_at"`
-	ExpiresAt      string          `json:"expires_at"`
 	Payload        json.RawMessage `json:"payload"`
 }
 

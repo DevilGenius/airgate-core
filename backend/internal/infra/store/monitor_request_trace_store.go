@@ -35,7 +35,6 @@ func (s *MonitorStore) UpsertRequestTrace(ctx context.Context, trace appmonitor.
 			monitorrequesttrace.FieldSeenCount,
 			monitorrequesttrace.FieldFirstSeenAt,
 			monitorrequesttrace.FieldLastSeenAt,
-			monitorrequesttrace.FieldExpiresAt,
 		).
 		Values(
 			trace.Hash,
@@ -47,15 +46,13 @@ func (s *MonitorStore) UpsertRequestTrace(ctx context.Context, trace appmonitor.
 			trace.SeenCount,
 			trace.FirstSeenAt,
 			trace.LastSeenAt,
-			trace.ExpiresAt,
 		).
 		OnConflict(
 			entsql.ConflictColumns(monitorrequesttrace.FieldHash),
 			entsql.ResolveWith(func(update *entsql.UpdateSet) {
 				update.
 					Add(monitorrequesttrace.FieldSeenCount, 1).
-					SetExcluded(monitorrequesttrace.FieldLastSeenAt).
-					SetExcluded(monitorrequesttrace.FieldExpiresAt)
+					SetExcluded(monitorrequesttrace.FieldLastSeenAt)
 			}),
 		)
 	query, args := insert.Query()
@@ -98,29 +95,6 @@ func (s *MonitorStore) ClearRequestTraces(ctx context.Context, before *time.Time
 	return delete.Exec(ctx)
 }
 
-func (s *MonitorStore) CleanupExpiredRequestTraces(ctx context.Context, cutoff time.Time, batchSize int) (int, error) {
-	if s == nil || s.db == nil {
-		return 0, nil
-	}
-	if batchSize <= 0 {
-		batchSize = 500
-	}
-	ids, err := s.db.MonitorRequestTrace.Query().
-		Where(monitorrequesttrace.ExpiresAtLT(cutoff)).
-		Order(ent.Asc(monitorrequesttrace.FieldExpiresAt), ent.Asc(monitorrequesttrace.FieldID)).
-		Limit(batchSize).
-		IDs(ctx)
-	if err != nil {
-		return 0, err
-	}
-	if len(ids) == 0 {
-		return 0, nil
-	}
-	return s.db.MonitorRequestTrace.Delete().
-		Where(monitorrequesttrace.IDIn(ids...)).
-		Exec(ctx)
-}
-
 func mapStoredRequestTrace(row *ent.MonitorRequestTrace) appmonitor.StoredRequestTrace {
 	if row == nil {
 		return appmonitor.StoredRequestTrace{}
@@ -135,6 +109,5 @@ func mapStoredRequestTrace(row *ent.MonitorRequestTrace) appmonitor.StoredReques
 		SeenCount:      row.SeenCount,
 		FirstSeenAt:    row.FirstSeenAt,
 		LastSeenAt:     row.LastSeenAt,
-		ExpiresAt:      row.ExpiresAt,
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,20 +11,26 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
-	"github.com/zeebo/xxh3"
-
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
+	"github.com/DevilGenius/airgate-sdk/runtimego/requesttrace"
 )
 
 const (
 	requestTraceSchemaVersion = 2
 	requestTraceEncoding      = "gzip-json"
-	requestTraceHashAlgorithm = "xxh3-128"
+	requestTraceHashAlgorithm = requesttrace.HashAlgorithm
 	maxRequestTraceRawBytes   = 256 << 20
 )
+
+// Reuse codec workspace, never a trace payload or request-owned buffer.
+var requestTraceCompressors = sync.Pool{New: func() any {
+	writer, _ := gzip.NewWriterLevel(io.Discard, gzip.BestSpeed)
+	return writer
+}}
 
 type requestTracePayload struct {
 	SchemaVersion int                      `json:"schema_version"`
@@ -125,10 +130,10 @@ type requestTraceBodyOptions struct {
 	OriginalSize      int64
 }
 
-func encodeRequestTrace(input requestmonitoring.TraceInput, retention time.Duration) (StoredRequestTrace, error) {
+func encodeRequestTrace(input requestmonitoring.TraceInput) (StoredRequestTrace, error) {
 	requestBody := buildRequestTraceBody(input.RequestBody, headerContentType(input.RequestHeaders), requestTraceBodyOptions{
 		RedactImageInputs: true,
-		ForceImageRequest: isRequestTraceImagePath(input.Path),
+		ForceImageRequest: requesttrace.IsImagePath(input.Path),
 	})
 	payload := requestTracePayload{
 		SchemaVersion: requestTraceSchemaVersion,
@@ -190,7 +195,7 @@ func encodeRequestTrace(input requestmonitoring.TraceInput, retention time.Durat
 		for _, outbound := range attempt.OutboundRequests {
 			outboundBody := buildRequestTraceBody(outbound.Body, headerContentType(outbound.Headers), requestTraceBodyOptions{
 				RedactImageInputs: true,
-				ForceImageRequest: isRequestTraceImageURL(outbound.URL),
+				ForceImageRequest: requesttrace.IsImageURL(outbound.URL),
 				AlreadyRedacted:   outbound.BodyRedacted,
 				RedactionReason:   outbound.BodyRedactionReason,
 				OriginalSize:      outbound.BodyOriginalSize,
@@ -214,12 +219,11 @@ func encodeRequestTrace(input requestmonitoring.TraceInput, retention time.Durat
 	if len(raw) > maxRequestTraceRawBytes {
 		return StoredRequestTrace{}, fmt.Errorf("request trace exceeds %d bytes", maxRequestTraceRawBytes)
 	}
-	digest := requestTraceFastHash(raw)
+	digest := requesttrace.Hash(raw)
 	var compressed bytes.Buffer
-	zw, err := gzip.NewWriterLevel(&compressed, gzip.BestSpeed)
-	if err != nil {
-		return StoredRequestTrace{}, fmt.Errorf("create request trace compressor: %w", err)
-	}
+	zw := requestTraceCompressors.Get().(*gzip.Writer)
+	zw.Reset(&compressed)
+	defer func() { zw.Reset(io.Discard); requestTraceCompressors.Put(zw) }()
 	if _, err := zw.Write(raw); err != nil {
 		_ = zw.Close()
 		return StoredRequestTrace{}, fmt.Errorf("compress request trace: %w", err)
@@ -232,9 +236,6 @@ func encodeRequestTrace(input requestmonitoring.TraceInput, retention time.Durat
 	if observedAt.IsZero() {
 		observedAt = time.Now()
 	}
-	if retention <= 0 {
-		retention = defaultRetention
-	}
 	return StoredRequestTrace{
 		Hash:           digest,
 		SchemaVersion:  requestTraceSchemaVersion,
@@ -245,7 +246,6 @@ func encodeRequestTrace(input requestmonitoring.TraceInput, retention time.Durat
 		SeenCount:      1,
 		FirstSeenAt:    observedAt,
 		LastSeenAt:     observedAt,
-		ExpiresAt:      observedAt.Add(retention),
 	}, nil
 }
 
@@ -283,7 +283,7 @@ func decodeStoredRequestTrace(stored StoredRequestTrace) (RequestTrace, error) {
 	if int64(len(raw)) != stored.RawSize {
 		return RequestTrace{}, fmt.Errorf("request trace size mismatch")
 	}
-	if requestTraceFastHash(raw) != stored.Hash {
+	if requesttrace.Hash(raw) != stored.Hash {
 		return RequestTrace{}, fmt.Errorf("request trace hash mismatch")
 	}
 	return RequestTrace{
@@ -297,7 +297,6 @@ func decodeStoredRequestTrace(stored StoredRequestTrace) (RequestTrace, error) {
 		SeenCount:      stored.SeenCount,
 		FirstSeenAt:    stored.FirstSeenAt,
 		LastSeenAt:     stored.LastSeenAt,
-		ExpiresAt:      stored.ExpiresAt,
 	}, nil
 }
 
@@ -306,8 +305,10 @@ func buildRequestTraceBody(body []byte, contentType string, options requestTrace
 	redacted := options.AlreadyRedacted
 	redactionReason := strings.TrimSpace(options.RedactionReason)
 	originalSize := options.OriginalSize
-	if options.RedactImageInputs {
-		snapshot := sanitizeStoredRequestTraceBody(body, contentType, options.ForceImageRequest)
+	// Plugin diagnostics carry trusted redaction metadata through the SDK.
+	// Preserve already-sanitized bytes; incomplete metadata still needs a pass.
+	if options.RedactImageInputs && !(redacted && redactionReason != "") {
+		snapshot := requesttrace.SanitizeBody(body, contentType, options.ForceImageRequest)
 		body = snapshot.Body
 		if snapshot.Redacted {
 			contentType = snapshot.ContentType
@@ -333,7 +334,7 @@ func buildRequestTraceBody(body []byte, contentType string, options requestTrace
 	if len(body) == 0 {
 		return out
 	}
-	out.Hash = requestTraceFastHash(body)
+	out.Hash = requesttrace.Hash(body)
 	out.HashAlgorithm = requestTraceHashAlgorithm
 	if utf8.Valid(body) {
 		out.Encoding = "utf-8"
@@ -386,7 +387,7 @@ func walkEncryptedContent(value interface{}, path string, out *[]encryptedConten
 						Type:          itemType,
 						ID:            itemID,
 						Size:          len(encrypted),
-						Hash:          requestTraceFastHashString(encrypted),
+						Hash:          requesttrace.HashString(encrypted),
 						HashAlgorithm: requestTraceHashAlgorithm,
 					})
 				}
@@ -407,14 +408,14 @@ func safeStoredTraceHeaders(headers http.Header) map[string][]string {
 		switch canonical {
 		case "accept", "content-type", "openai-beta", "originator", "user-agent", "x-openai-previous-response-id", "retry-after", "retry-after-ms":
 			out[canonical] = append([]string(nil), values...)
-		case "session_id", "session-id", "x-session-id", "conversation_id", "conversation-id", "x-codex-turn-state":
-			key := strings.NewReplacer("_", "-", ".", "-").Replace(canonical)
-			out["x-airgate-trace-"+key+"-xxh3-128"] = []string{requestTraceFastHashString(strings.Join(values, "\x00"))}
 		default:
 			if strings.HasPrefix(canonical, "x-airgate-trace-") {
 				out[canonical] = append([]string(nil), values...)
 			}
 		}
+	}
+	for key, digest := range requesttrace.HeaderFingerprints(headers) {
+		out[key] = []string{digest}
 	}
 	if len(out) == 0 {
 		return nil
@@ -432,16 +433,6 @@ func storedTraceHeadersForBody(headers http.Header, body requestTraceBody) map[s
 	}
 	out["content-type"] = []string{body.ContentType}
 	return out
-}
-
-func requestTraceFastHash(value []byte) string {
-	digest := xxh3.Hash128(value).Bytes()
-	return hex.EncodeToString(digest[:])
-}
-
-func requestTraceFastHashString(value string) string {
-	digest := xxh3.HashString128(value).Bytes()
-	return hex.EncodeToString(digest[:])
 }
 
 func headerContentType(headers http.Header) string {

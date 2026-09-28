@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"strings"
@@ -86,7 +87,8 @@ func (s *requestTraceSession) captureRequestBody(body []byte, contentType string
 	if s == nil {
 		return
 	}
-	s.requestBody = body
+	// Keep the ingress snapshot immutable even if forwarding rewrites its buffer.
+	s.requestBody = bytes.Clone(body)
 	if contentType != "" {
 		if s.requestHeaders == nil {
 			s.requestHeaders = make(http.Header)
@@ -371,6 +373,16 @@ func (f *Forwarder) recordRequestEvent(ctx context.Context, input requestmonitor
 }
 
 func (f *Forwarder) finishRequestTrace(c *gin.Context, trace *requestTraceSession) {
+	if trace != nil {
+		defer func() {
+			// Gin contexts are pooled: do not pin a completed request until reuse.
+			// A queued TraceInput already owns separate slice/header references.
+			trace.requestBody, trace.requestHeaders, trace.attempts = nil, nil, nil
+			if c != nil {
+				c.Set(ginCtxKeyRequestTrace, nil)
+			}
+		}()
+	}
 	if f == nil || trace == nil || trace.eventHandled || f.requestMonitor == nil {
 		return
 	}

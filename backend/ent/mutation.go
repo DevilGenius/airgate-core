@@ -10647,7 +10647,6 @@ type MonitorRequestTraceMutation struct {
 	addseen_count      *int64
 	first_seen_at      *time.Time
 	last_seen_at       *time.Time
-	expires_at         *time.Time
 	clearedFields      map[string]struct{}
 	done               bool
 	oldValue           func(context.Context) (*MonitorRequestTrace, error)
@@ -11156,42 +11155,6 @@ func (m *MonitorRequestTraceMutation) ResetLastSeenAt() {
 	m.last_seen_at = nil
 }
 
-// SetExpiresAt sets the "expires_at" field.
-func (m *MonitorRequestTraceMutation) SetExpiresAt(t time.Time) {
-	m.expires_at = &t
-}
-
-// ExpiresAt returns the value of the "expires_at" field in the mutation.
-func (m *MonitorRequestTraceMutation) ExpiresAt() (r time.Time, exists bool) {
-	v := m.expires_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldExpiresAt returns the old "expires_at" field's value of the MonitorRequestTrace entity.
-// If the MonitorRequestTrace object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MonitorRequestTraceMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
-	}
-	return oldValue.ExpiresAt, nil
-}
-
-// ResetExpiresAt resets all changes to the "expires_at" field.
-func (m *MonitorRequestTraceMutation) ResetExpiresAt() {
-	m.expires_at = nil
-}
-
 // Where appends a list predicates to the MonitorRequestTraceMutation builder.
 func (m *MonitorRequestTraceMutation) Where(ps ...predicate.MonitorRequestTrace) {
 	m.predicates = append(m.predicates, ps...)
@@ -11226,7 +11189,7 @@ func (m *MonitorRequestTraceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MonitorRequestTraceMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 9)
 	if m.hash != nil {
 		fields = append(fields, monitorrequesttrace.FieldHash)
 	}
@@ -11254,9 +11217,6 @@ func (m *MonitorRequestTraceMutation) Fields() []string {
 	if m.last_seen_at != nil {
 		fields = append(fields, monitorrequesttrace.FieldLastSeenAt)
 	}
-	if m.expires_at != nil {
-		fields = append(fields, monitorrequesttrace.FieldExpiresAt)
-	}
 	return fields
 }
 
@@ -11283,8 +11243,6 @@ func (m *MonitorRequestTraceMutation) Field(name string) (ent.Value, bool) {
 		return m.FirstSeenAt()
 	case monitorrequesttrace.FieldLastSeenAt:
 		return m.LastSeenAt()
-	case monitorrequesttrace.FieldExpiresAt:
-		return m.ExpiresAt()
 	}
 	return nil, false
 }
@@ -11312,8 +11270,6 @@ func (m *MonitorRequestTraceMutation) OldField(ctx context.Context, name string)
 		return m.OldFirstSeenAt(ctx)
 	case monitorrequesttrace.FieldLastSeenAt:
 		return m.OldLastSeenAt(ctx)
-	case monitorrequesttrace.FieldExpiresAt:
-		return m.OldExpiresAt(ctx)
 	}
 	return nil, fmt.Errorf("unknown MonitorRequestTrace field %s", name)
 }
@@ -11385,13 +11341,6 @@ func (m *MonitorRequestTraceMutation) SetField(name string, value ent.Value) err
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLastSeenAt(v)
-		return nil
-	case monitorrequesttrace.FieldExpiresAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetExpiresAt(v)
 		return nil
 	}
 	return fmt.Errorf("unknown MonitorRequestTrace field %s", name)
@@ -11519,9 +11468,6 @@ func (m *MonitorRequestTraceMutation) ResetField(name string) error {
 		return nil
 	case monitorrequesttrace.FieldLastSeenAt:
 		m.ResetLastSeenAt()
-		return nil
-	case monitorrequesttrace.FieldExpiresAt:
-		m.ResetExpiresAt()
 		return nil
 	}
 	return fmt.Errorf("unknown MonitorRequestTrace field %s", name)

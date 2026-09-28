@@ -104,7 +104,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		appmonitor.WithRequestTrace(runtimeFeatureState.RequestTraceEnabled),
 	)
 	if runtimeFeatureState.RequestTraceEnabled {
-		slog.Warn("monitor_request_trace_enabled", "retention", "7d", "raw_request_bodies", true, "source", "system_settings")
+		slog.Warn("monitor_request_trace_enabled", "retention", "permanent", "raw_request_bodies", true, "source", "system_settings")
 	}
 	runtimeSampler := appmonitor.NewRuntimeSampler(sqlDB, rdb, sched, concurrency, recorder, monitorService)
 	sched.SetMonitorRecorder(monitorService)
