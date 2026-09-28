@@ -18,7 +18,7 @@ func BenchmarkTraceIngressSnapshot(b *testing.B) {
 					if enabled {
 						trace = &requestTraceSession{}
 					}
-					trace.captureRequestBody(body, "application/json")
+					trace.captureRequestBody(body, "application/json", int64(len(body)), nil)
 					runtime.KeepAlive(trace)
 				}
 			})

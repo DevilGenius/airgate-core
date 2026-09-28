@@ -327,7 +327,10 @@ func (s *Service) ListRequests(ctx context.Context, filter RequestListFilter) (R
 	return s.repo.ListRequests(ctx, filter)
 }
 
-// ClearRequestEvents deletes request monitor rows. A nil before value clears all rows.
+// ClearRequestEvents deletes events with created_at < before, then trace payloads
+// with last_seen_at < before. Nil/zero before clears both sets completely.
+// The count includes events only. Deletions are sequential, not atomic; a trace
+// deletion failure returns the already-deleted event count alongside the error.
 func (s *Service) ClearRequestEvents(ctx context.Context, before *time.Time) (int, error) {
 	if s == nil || s.repo == nil {
 		return 0, nil

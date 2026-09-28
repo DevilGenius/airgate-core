@@ -26,6 +26,10 @@ export const monitorApi = {
     get<MonitorListResp>('/api/v1/admin/monitor', params, options),
   requestList: (params: MonitorRequestListQuery, options?: MonitorRequestOptions) =>
     get<MonitorRequestListResp>('/api/v1/admin/monitor/requests', params, options),
+  /**
+   * 删除 created_at < before 的事件及 last_seen_at < before 的 Trace；省略则清空两者。
+   * deleted 只统计事件。两次删除非原子，报错时事件可能已删除。
+   */
   clearRequests: (before?: string) =>
     del<MonitorRequestClearResp>('/api/v1/admin/monitor/requests', before ? { before } : undefined),
   clearRequestTraces: () =>

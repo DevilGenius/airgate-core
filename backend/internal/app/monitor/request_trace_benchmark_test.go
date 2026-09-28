@@ -53,3 +53,31 @@ func BenchmarkRequestTraceEnqueue(b *testing.B) {
 		})
 	}
 }
+
+// Full production persistence path, including enqueue, encoding, repository
+// dispatch, counters and budget release. The repository is in-memory, so this
+// benchmark excludes database latency and asynchronous scheduling.
+func BenchmarkRequestTracePersist(b *testing.B) {
+	for _, size := range []int{64 << 10, 1 << 20} {
+		b.Run(fmt.Sprintf("%dKiB", size>>10), func(b *testing.B) {
+			repo := &traceLifecycleRepo{}
+			s := NewService(repo, WithRequestTrace(true))
+			body := []byte(`{"input":"` + strings.Repeat("history context ", size/16) + `"}`)
+			trace := requestmonitoring.TraceInput{RequestBody: body, RequestHeaders: http.Header{"Content-Type": {"application/json"}}}
+			event := requestmonitoring.EventInput{Method: "POST", RequestPath: "/v1/responses", Model: "gpt-test"}
+			b.ReportAllocs()
+			b.SetBytes(int64(len(body)))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if !s.RecordRequestTrace(b.Context(), event, trace) {
+					b.Fatal("enqueue failed")
+				}
+				s.persistRequestTrace(b.Context(), <-s.traceQueue)
+			}
+			b.StopTimer()
+			if s.traceQueuedBytes.Load() != 0 || s.flushedEvents.Load() != int64(b.N) || len(repo.stored.Payload) == 0 {
+				b.Fatal("persistence did not complete or release its queue budget")
+			}
+		})
+	}
+}

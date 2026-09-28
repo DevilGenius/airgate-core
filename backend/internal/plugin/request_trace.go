@@ -28,8 +28,10 @@ type requestTraceSession struct {
 	model     string
 	stream    bool
 
-	requestHeaders http.Header
-	requestBody    []byte
+	requestHeaders          http.Header
+	requestBody             []byte
+	requestBodyOriginalSize int64
+	requestBodyIncomplete   bool
 
 	previousResponseID          string
 	requireContinuationAffinity bool
@@ -82,12 +84,19 @@ func requestTraceFromGinContext(c *gin.Context) *requestTraceSession {
 	return session
 }
 
-func (s *requestTraceSession) captureRequestBody(body []byte, contentType string) {
+func (s *requestTraceSession) captureRequestBody(body []byte, contentType string, contentLength int64, readErr error) {
 	if s == nil {
 		return
 	}
-	// Keep the ingress snapshot immutable even if forwarding rewrites its buffer.
-	s.requestBody = bytes.Clone(body)
+	// The length is declared or observed, not an invented total for unknown-length
+	// failures. Read failure must remain explicit even when zero bytes arrived.
+	s.requestBodyOriginalSize = max(contentLength, int64(len(body)))
+	s.requestBodyIncomplete = readErr != nil || contentLength > int64(len(body))
+	s.requestBody = nil
+	if !s.requestBodyIncomplete {
+		// Keep a complete ingress snapshot immutable across forwarding rewrites.
+		s.requestBody = bytes.Clone(body)
+	}
 	if contentType != "" {
 		if s.requestHeaders == nil {
 			s.requestHeaders = make(http.Header)
@@ -267,6 +276,8 @@ func (s *requestTraceSession) traceInput() requestmonitoring.TraceInput {
 		Stream:                      s.stream,
 		RequestHeaders:              s.requestHeaders,
 		RequestBody:                 s.requestBody,
+		RequestBodyOriginalSize:     s.requestBodyOriginalSize,
+		RequestBodyIncomplete:       s.requestBodyIncomplete,
 		PreviousResponseID:          s.previousResponseID,
 		RequireContinuationAffinity: s.requireContinuationAffinity,
 		ContinuationRecoveryApplied: s.continuationRecoveryApplied,
@@ -375,6 +386,7 @@ func (f *Forwarder) finishRequestTrace(c *gin.Context, trace *requestTraceSessio
 			// Gin contexts are pooled: do not pin a completed request until reuse.
 			// A queued TraceInput already owns separate slice/header references.
 			trace.requestBody, trace.requestHeaders, trace.attempts = nil, nil, nil
+			trace.requestBodyOriginalSize, trace.requestBodyIncomplete = 0, false
 			if c != nil {
 				c.Set(ginCtxKeyRequestTrace, nil)
 			}

@@ -1,9 +1,40 @@
 package monitor
 
 import (
+	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
 )
+
+func TestIncompleteIngressIsMarkedBeforeTraceStorage(t *testing.T) {
+	for _, input := range []requestmonitoring.TraceInput{
+		{RequestBodyIncomplete: true},
+		{RequestBody: []byte(`{"valid":"but incomplete"}`), RequestBodyIncomplete: true},
+		{RequestBodyOriginalSize: 100, RequestBodyIncomplete: true},
+		{RequestBody: []byte("short"), RequestBodyOriginalSize: 100},
+	} {
+		input.RequestHeaders = http.Header{"Content-Type": {"application/json"}}
+		stored, err := encodeRequestTrace(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := decodeStoredRequestTrace(stored)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var payload requestTracePayload
+		if err := json.Unmarshal(decoded.Payload, &payload); err != nil {
+			t.Fatal(err)
+		}
+		body := payload.Request.Body
+		if body.Text != "" || body.Base64 != "" || body.Hash != "" || body.Size != 0 || !body.Redacted || body.RedactionReason != "trace_capture_incomplete" || body.OriginalSize != max(input.RequestBodyOriginalSize, int64(len(input.RequestBody))) {
+			t.Fatalf("incomplete ingress persisted as a complete body: %+v", body)
+		}
+	}
+}
 
 func TestCaptureLengthIsSeparateFromRedaction(t *testing.T) {
 	got := buildRequestTraceBody(nil, "application/json", requestTraceBodyOptions{OriginalSize: 99})

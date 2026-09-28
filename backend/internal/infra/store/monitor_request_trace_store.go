@@ -84,6 +84,8 @@ func (s *MonitorStore) GetRequestTrace(ctx context.Context, hash string) (appmon
 	return mapStoredRequestTrace(row), nil
 }
 
+// ClearRequestTraces manually deletes payloads with last_seen_at strictly before
+// the cutoff. Nil/zero before deletes all payloads, without deleting events.
 func (s *MonitorStore) ClearRequestTraces(ctx context.Context, before *time.Time) (int, error) {
 	if s == nil || s.db == nil {
 		return 0, nil

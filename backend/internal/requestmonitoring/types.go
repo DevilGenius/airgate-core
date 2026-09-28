@@ -78,6 +78,10 @@ type TraceInput struct {
 
 	RequestHeaders http.Header
 	RequestBody    []byte
+	// OriginalSize is the larger of declared Content-Length and bytes observed.
+	// On unknown-length read failures it is a lower bound, not the full body size.
+	RequestBodyOriginalSize int64
+	RequestBodyIncomplete   bool
 
 	PreviousResponseID          string
 	RequireContinuationAffinity bool

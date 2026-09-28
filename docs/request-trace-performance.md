@@ -1,6 +1,22 @@
 # Trace 性能与内存测试（历史基准）
 
-> 本文数值采集于脱敏迁移到 Core 之前，保留用于历史对照，不代表当前 SDK 热路径或当前端到端性能。当前 SDK 只采集原始诊断；脱敏统一在 Core 落库前进行，旧的可信脱敏元数据优化已移除。下方命令已更新为当前包位置。
+## 当前基准范围
+
+`BenchmarkRequestTraceEnqueue` 仅测入队与同步取出，手动归还容量，不包含 worker 成本。新增 `BenchmarkRequestTracePersist` 经由真实 `persistRequestTrace` 执行编码、仓储调用、计数及容量释放；使用内存仓储，排除数据库 I/O 和异步调度，不能当作端到端吞吐。以下历史表格不包含新增基准的数据。
+
+```powershell
+# airgate-core/backend
+go test ./internal/app/monitor -run '^$' -bench '^BenchmarkRequestTracePersist$' -benchmem -benchtime=200ms -count=3 -cpu=1
+```
+
+本轮新增持久化路径基准在 Windows amd64 / i5-13600KF 上执行，GOMAXPROCS=1、每项 200ms、重复三次，中位数如下。仅有一份入口正文，不能与下方历史双正文编码数据直接比较。
+
+| 新增基准 | 中位数 ms/op | 范围 |
+|---|---:|---|
+| RequestTracePersist / 64 KiB | 0.744 | 入队至内存仓储完成，含容量释放 |
+| RequestTracePersist / 1 MiB | 11.288 | 入队至内存仓储完成，含容量释放 |
+
+> 以下历史数值采集于脱敏迁移到 Core 之前，保留用于历史对照，不代表当前 SDK 热路径或当前端到端性能。当前 SDK 只采集原始诊断；脱敏统一在 Core 落库前进行，旧的可信脱敏元数据优化已移除。下方命令已更新为当前包位置。
 
 ## 方法与范围
 

@@ -12,7 +12,7 @@ func TestRequestTraceIngressSnapshotIsImmutable(t *testing.T) {
 	original := []byte(`{"model":"gpt-test","input":"original","service_tier":"priority"}`)
 	body := bytes.Clone(original)
 	trace := &requestTraceSession{}
-	trace.captureRequestBody(body, "application/json")
+	trace.captureRequestBody(body, "application/json", int64(len(body)), nil)
 	for i := range body {
 		body[i] = 'x'
 	}
@@ -24,7 +24,7 @@ func TestRequestTraceIngressSnapshotIsImmutable(t *testing.T) {
 func TestFinishedTraceDoesNotPinGinContext(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	trace := &requestTraceSession{eventHandled: true}
-	trace.captureRequestBody([]byte("original"), "application/json")
+	trace.captureRequestBody([]byte("original"), "application/json", 8, nil)
 	c.Set(ginCtxKeyRequestTrace, trace)
 	queued := trace.traceInput()
 	(&Forwarder{}).finishRequestTrace(c, trace)

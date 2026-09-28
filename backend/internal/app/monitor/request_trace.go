@@ -27,7 +27,10 @@ const (
 
 // Reuse codec workspace, never a trace payload or request-owned buffer.
 var requestTraceCompressors = sync.Pool{New: func() any {
-	writer, _ := gzip.NewWriterLevel(io.Discard, gzip.BestSpeed)
+	writer, err := gzip.NewWriterLevel(io.Discard, gzip.BestSpeed)
+	if err != nil {
+		panic(fmt.Errorf("initialize request trace compressor: %w", err))
+	}
 	return writer
 }}
 
@@ -124,11 +127,14 @@ type encryptedContentTraceFingerprint struct {
 type requestTraceBodyOptions struct {
 	ForceImageRequest bool
 	OriginalSize      int64
+	Incomplete        bool
 }
 
 func encodeRequestTrace(input requestmonitoring.TraceInput) (StoredRequestTrace, error) {
 	requestBody := buildRequestTraceBody(input.RequestBody, headerContentType(input.RequestHeaders), requestTraceBodyOptions{
 		ForceImageRequest: traceredaction.IsImagePath(input.Path),
+		OriginalSize:      input.RequestBodyOriginalSize,
+		Incomplete:        input.RequestBodyIncomplete,
 	})
 	payload := requestTracePayload{
 		SchemaVersion: requestTraceSchemaVersion,
@@ -289,8 +295,8 @@ func decodeStoredRequestTrace(stored StoredRequestTrace) (RequestTrace, error) {
 }
 
 func buildRequestTraceBody(body []byte, contentType string, options requestTraceBodyOptions) requestTraceBody {
-	if options.OriginalSize > int64(len(body)) {
-		return requestTraceBody{ContentType: contentType, Redacted: true, RedactionReason: "trace_capture_incomplete", OriginalSize: options.OriginalSize}
+	if options.Incomplete || options.OriginalSize > int64(len(body)) {
+		return requestTraceBody{ContentType: contentType, Redacted: true, RedactionReason: "trace_capture_incomplete", OriginalSize: max(options.OriginalSize, int64(len(body)))}
 	}
 	snapshot := traceredaction.SanitizeBody(body, contentType, traceredaction.BodyOptions{ForceImageRequest: options.ForceImageRequest})
 	body, contentType = snapshot.Body, snapshot.ContentType

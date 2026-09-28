@@ -109,7 +109,7 @@ func fieldRule(key string) redactions {
 	if rule, ok := fieldRules[key]; ok {
 		return rule
 	}
-	if strings.IndexAny(key, "_-") < 0 {
+	if !strings.ContainsAny(key, "_-") {
 		return 0
 	}
 	return fieldRules[fieldSeparators.Replace(key)]

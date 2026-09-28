@@ -265,11 +265,11 @@ type Repository interface {
 	AutoResolveDue(context.Context, time.Time, int) (int, error)
 }
 
-// RequestTraceRepository is optional so existing monitor repositories and
-// tests remain compatible when raw request tracing is disabled.
+// RequestTraceRepository is the persistence capability required by trace capture.
 type RequestTraceRepository interface {
 	UpsertRequestTrace(context.Context, StoredRequestTrace, QueuedRequestEvent) error
 	GetRequestTrace(context.Context, string) (StoredRequestTrace, error)
+	// ClearRequestTraces uses last_seen_at < before; nil/zero deletes all payloads.
 	ClearRequestTraces(context.Context, *time.Time) (int, error)
 }
 

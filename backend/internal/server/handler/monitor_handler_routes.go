@@ -153,7 +153,9 @@ func (h *MonitorHandler) ListMonitorRequestEvents(c *gin.Context) {
 	response.Success(c, toMonitorRequestListResp(result))
 }
 
-// ClearMonitorRequestEvents deletes request monitor events. Without before it clears all request rows.
+// ClearMonitorRequestEvents deletes events created before the cutoff and trace
+// payloads last seen before it. Without before both are cleared completely.
+// The returned deleted count includes events only; the two deletions are not atomic.
 func (h *MonitorHandler) ClearMonitorRequestEvents(c *gin.Context) {
 	before, err := parseMonitorTime(c.Query("before"), false)
 	if err != nil {

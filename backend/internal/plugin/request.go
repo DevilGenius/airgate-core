@@ -55,7 +55,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	body, err := io.ReadAll(c.Request.Body)
 	if f.RequestTraceEnabled() {
 		if trace := requestTraceFromGinContext(c); trace != nil {
-			trace.captureRequestBody(body, contentType)
+			trace.captureRequestBody(body, contentType, c.Request.ContentLength, err)
 		}
 	}
 	if err != nil {
