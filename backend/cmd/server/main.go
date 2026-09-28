@@ -239,7 +239,18 @@ func startMainServer(cfg *config.Config) {
 	migrationCancel()
 
 	// 执行版本化系统升级 SQL。
-	bootstrap.RunSystemUpgrades(drv)
+	upgradeCtx, stopUpgrade := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	upgradeErr := bootstrap.RunSystemUpgrades(upgradeCtx, drv)
+	upgradeCanceled := upgradeCtx.Err()
+	stopUpgrade()
+	if upgradeCanceled != nil {
+		slog.Info("system_upgrade_canceled")
+		return
+	}
+	if upgradeErr != nil {
+		slog.Error("system_upgrade_failed", sdk.LogFieldError, upgradeErr)
+		os.Exit(1)
+	}
 
 	// 初始化 Redis
 	rdb := redis.NewClient(redisconfig.Options(cfg.Redis))

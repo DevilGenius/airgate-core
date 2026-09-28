@@ -90,7 +90,9 @@ func TestBalanceAlertEmailEarlyReturnWithoutSMTPConfig(t *testing.T) {
 }
 
 func TestSystemUpgradeHelpersLoadDescribeExecuteAndPanic(t *testing.T) {
-	RunSystemUpgrades(nil)
+	if err := RunSystemUpgrades(t.Context(), nil); err != nil {
+		t.Fatal(err)
+	}
 
 	upgrades := loadSystemUpgrades()
 	if len(upgrades) == 0 {
@@ -352,7 +354,7 @@ func TestAdditionalSystemUpgradeParsingBranches(t *testing.T) {
 	}
 }
 
-func TestRunSystemUpgradesPanicsOnSQLiteDriver(t *testing.T) {
+func TestRunSystemUpgradesReturnsErrorOnSQLiteDriver(t *testing.T) {
 	db, err := stdsql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -363,16 +365,10 @@ func TestRunSystemUpgradesPanicsOnSQLiteDriver(t *testing.T) {
 		}
 	}()
 
-	defer func() {
-		recovered := recover()
-		if recovered == nil {
-			t.Fatal("RunSystemUpgrades did not panic on PostgreSQL advisory lock SQL")
-		}
-		if !strings.Contains(fmt.Sprint(recovered), "set migration lock deadline") {
-			t.Fatalf("panic = %v, want PostgreSQL lock deadline setup failure", recovered)
-		}
-	}()
-	RunSystemUpgrades(entsql.OpenDB("sqlite", db))
+	err = RunSystemUpgrades(t.Context(), entsql.OpenDB("sqlite", db))
+	if err == nil || !strings.Contains(err.Error(), "set migration lock deadline") {
+		t.Fatalf("error = %v, want PostgreSQL lock deadline setup failure", err)
+	}
 }
 
 func TestRunSystemUpgradesWithMockPostgresDriver(t *testing.T) {
@@ -388,7 +384,9 @@ func TestRunSystemUpgradesWithMockPostgresDriver(t *testing.T) {
 			t.Fatalf("close mock db: %v", err)
 		}
 	}()
-	RunSystemUpgrades(entsql.OpenDB("postgres", db))
+	if err := RunSystemUpgrades(t.Context(), entsql.OpenDB("postgres", db)); err != nil {
+		t.Fatal(err)
+	}
 	if !state.execContains("pg_advisory_lock") || !state.execContains("pg_advisory_unlock") {
 		t.Fatalf("lock/unlock statements missing: %v", state.execs)
 	}
@@ -408,7 +406,9 @@ func TestRunSystemUpgradesWithMockPostgresDriver(t *testing.T) {
 	state = &systemUpgradeMockState{applied: map[string]*string{upgrades[0].ID: &emptyChecksum}}
 	db = openSystemUpgradeMockDB(t, state)
 	defer func() { _ = db.Close() }()
-	RunSystemUpgrades(entsql.OpenDB("postgres", db))
+	if err := RunSystemUpgrades(t.Context(), entsql.OpenDB("postgres", db)); err != nil {
+		t.Fatal(err)
+	}
 	if !state.execContains("UPDATE public.system_upgrade") {
 		t.Fatalf("backfill update statement missing: %v", state.execs)
 	}
@@ -417,16 +417,10 @@ func TestRunSystemUpgradesWithMockPostgresDriver(t *testing.T) {
 	state = &systemUpgradeMockState{applied: map[string]*string{upgrades[0].ID: &badChecksum}}
 	db = openSystemUpgradeMockDB(t, state)
 	defer func() { _ = db.Close() }()
-	defer func() {
-		recovered := recover()
-		if recovered == nil {
-			t.Fatal("RunSystemUpgrades did not panic on checksum mismatch")
-		}
-		if !strings.Contains(fmt.Sprint(recovered), "verify system upgrade checksum") {
-			t.Fatalf("panic = %v, want checksum verification", recovered)
-		}
-	}()
-	RunSystemUpgrades(entsql.OpenDB("postgres", db))
+	err := RunSystemUpgrades(t.Context(), entsql.OpenDB("postgres", db))
+	if err == nil || !strings.Contains(err.Error(), "verify system upgrade checksum") {
+		t.Fatalf("error = %v, want checksum verification", err)
+	}
 }
 
 var (
@@ -439,6 +433,7 @@ type systemUpgradeMockState struct {
 	mu      sync.Mutex
 	applied map[string]*string
 	execs   []string
+	onExec  func(string, []driver.NamedValue) error
 }
 
 func (s *systemUpgradeMockState) execContains(fragment string) bool {
@@ -517,6 +512,18 @@ func (c *systemUpgradeMockConn) Begin() (driver.Tx, error) {
 func (c *systemUpgradeMockConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	c.state.mu.Lock()
 	c.state.execs = append(c.state.execs, query)
+	c.state.mu.Unlock()
+	if c.state.onExec != nil {
+		if err := c.state.onExec(query, args); err != nil {
+			return nil, err
+		}
+	}
+	c.state.mu.Lock()
+	if strings.Contains(query, "INSERT INTO public.system_upgrade") && len(args) >= 3 {
+		id, _ := args[0].Value.(string)
+		checksum, _ := args[2].Value.(string)
+		c.state.applied[id] = &checksum
+	}
 	if strings.Contains(query, "UPDATE public.system_upgrade") && len(args) >= 3 {
 		id, _ := args[0].Value.(string)
 		checksum, _ := args[1].Value.(string)

@@ -7,6 +7,7 @@ import (
 	"database/sql/driver"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -35,25 +36,26 @@ type systemUpgrade struct {
 	SQL         string
 }
 
-// RunSystemUpgrades applies versioned SQL upgrades that are embedded with the binary.
-func RunSystemUpgrades(drv *entsql.Driver) {
+// RunSystemUpgrades applies required versioned SQL before serving requests.
+// Lock contention retries until ctx is canceled; other failures return to the caller.
+func RunSystemUpgrades(ctx context.Context, drv *entsql.Driver) error {
 	if drv == nil {
-		return
+		return nil
 	}
 	upgrades := loadSystemUpgrades()
 	if len(upgrades) == 0 {
-		return
+		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	conn, err := drv.DB().Conn(ctx)
+	connectionCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	conn, err := drv.DB().Conn(connectionCtx)
+	cancel()
 	if err != nil {
-		panicSystemUpgrade("open system upgrade connection", err)
+		return fmt.Errorf("open system upgrade connection: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
-	if _, err := conn.ExecContext(ctx, `SET lock_timeout='2s'`); err != nil {
-		panicSystemUpgrade("set migration lock deadline", err)
+	if err := execSystemUpgrade(ctx, conn, "set migration lock deadline", `SET lock_timeout='2s'`); err != nil {
+		return fmt.Errorf("set migration lock deadline: %w", err)
 	}
 	defer func() {
 		cleanup, stop := context.WithTimeout(context.Background(), 2*time.Second)
@@ -71,34 +73,38 @@ func RunSystemUpgrades(drv *entsql.Driver) {
 			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 		}
 	}()
-	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, systemUpgradeAdvisoryLockKey); err != nil {
-		panicSystemUpgrade("lock system upgrades", err)
+	if err := execSystemUpgrade(ctx, conn, "lock system upgrades", `SELECT pg_advisory_lock($1)`, systemUpgradeAdvisoryLockKey); err != nil {
+		return fmt.Errorf("lock system upgrades: %w", err)
 	}
 
 	if err := prepareSystemUpgradeTable(ctx, conn); err != nil {
-		panicSystemUpgrade("prepare system_upgrade table", err)
+		return fmt.Errorf("prepare system_upgrade table: %w", err)
 	}
 
 	for _, upgrade := range upgrades {
 		var appliedChecksum stdsql.NullString
 		const appliedSQL = `SELECT checksum FROM public.system_upgrade WHERE id = $1`
-		err := conn.QueryRowContext(ctx, appliedSQL, upgrade.ID).Scan(&appliedChecksum)
+		err := retrySystemUpgradeLock(ctx, "check system upgrade "+upgrade.ID, func(attemptCtx context.Context) error {
+			queryCtx, cancel := context.WithTimeout(attemptCtx, 30*time.Second)
+			defer cancel()
+			return conn.QueryRowContext(queryCtx, appliedSQL, upgrade.ID).Scan(&appliedChecksum)
+		})
 		if err == nil {
 			if appliedChecksum.Valid && appliedChecksum.String != "" && appliedChecksum.String != upgrade.Checksum {
-				panicSystemUpgrade("verify system upgrade checksum "+upgrade.ID, fmt.Errorf("recorded=%s current=%s", appliedChecksum.String, upgrade.Checksum))
+				return fmt.Errorf("verify system upgrade checksum %s: recorded=%s current=%s", upgrade.ID, appliedChecksum.String, upgrade.Checksum)
 			}
 			if !appliedChecksum.Valid || appliedChecksum.String == "" {
 				const updateSQL = `UPDATE public.system_upgrade
 					SET checksum = $2, description = $3
 					WHERE id = $1 AND checksum = ''`
-				if _, err := conn.ExecContext(ctx, updateSQL, upgrade.ID, upgrade.Checksum, upgrade.Description); err != nil {
-					panicSystemUpgrade("backfill system upgrade checksum "+upgrade.ID, err)
+				if err := execSystemUpgrade(ctx, conn, "backfill system upgrade checksum "+upgrade.ID, updateSQL, upgrade.ID, upgrade.Checksum, upgrade.Description); err != nil {
+					return fmt.Errorf("backfill system upgrade checksum %s: %w", upgrade.ID, err)
 				}
 			}
 			continue
 		}
-		if err != stdsql.ErrNoRows {
-			panicSystemUpgrade("check system upgrade "+upgrade.ID, err)
+		if !errors.Is(err, stdsql.ErrNoRows) {
+			return fmt.Errorf("check system upgrade %s: %w", upgrade.ID, err)
 		}
 		if maintenanceOnly(upgrade) {
 			slog.Info("system_upgrade_deferred", "id", upgrade.ID, "reason", "concurrent index maintenance runs after HTTP startup")
@@ -108,17 +114,18 @@ func RunSystemUpgrades(drv *entsql.Driver) {
 		start := time.Now()
 		slog.Info("system_upgrade_start", "id", upgrade.ID)
 		if err := executeSystemUpgradeSQL(ctx, conn, upgrade); err != nil {
-			panicSystemUpgrade("run system upgrade "+upgrade.ID, err)
+			return fmt.Errorf("run system upgrade %s: %w", upgrade.ID, err)
 		}
 		duration := time.Since(start).Milliseconds()
 		const insertSQL = `INSERT INTO public.system_upgrade (id, description, checksum, duration_ms)
 			VALUES ($1, $2, $3, $4)
 			ON CONFLICT (id) DO NOTHING`
-		if _, err := conn.ExecContext(ctx, insertSQL, upgrade.ID, upgrade.Description, upgrade.Checksum, duration); err != nil {
-			panicSystemUpgrade("record system upgrade "+upgrade.ID, err)
+		if err := execSystemUpgrade(ctx, conn, "record system upgrade "+upgrade.ID, insertSQL, upgrade.ID, upgrade.Description, upgrade.Checksum, duration); err != nil {
+			return fmt.Errorf("record system upgrade %s: %w", upgrade.ID, err)
 		}
 		slog.Info("system_upgrade_done", "id", upgrade.ID, "duration_ms", duration)
 	}
+	return nil
 }
 
 func prepareSystemUpgradeTable(ctx context.Context, conn *stdsql.Conn) error {
@@ -129,7 +136,7 @@ func prepareSystemUpgradeTable(ctx context.Context, conn *stdsql.Conn) error {
 		applied_at timestamptz NOT NULL DEFAULT now(),
 		duration_ms bigint NOT NULL DEFAULT 0
 	)`
-	if _, err := conn.ExecContext(ctx, createTableSQL); err != nil {
+	if err := execSystemUpgrade(ctx, conn, "create system_upgrade table", createTableSQL); err != nil {
 		return fmt.Errorf("create %s table: %w", systemUpgradeQualifiedTable, err)
 	}
 	if err := ensureSystemUpgradeColumns(ctx, conn, systemUpgradeQualifiedTable); err != nil {
@@ -163,7 +170,7 @@ func ensureSystemUpgradeColumns(ctx context.Context, conn *stdsql.Conn, table st
 		"ALTER TABLE " + table + " ALTER COLUMN duration_ms SET NOT NULL",
 	}
 	for _, statement := range statements {
-		if _, err := conn.ExecContext(ctx, statement); err != nil {
+		if err := execSystemUpgrade(ctx, conn, "ensure system_upgrade columns", statement); err != nil {
 			return fmt.Errorf("ensure %s columns: %w", table, err)
 		}
 	}
@@ -185,7 +192,7 @@ func normalizeSystemUpgradePrimaryKey(ctx context.Context, conn *stdsql.Conn) er
 			ALTER TABLE public.system_upgrade ADD CONSTRAINT system_upgrade_pkey PRIMARY KEY (id);
 		END IF;
 	END $$`
-	if _, err := conn.ExecContext(ctx, ensurePrimaryKeySQL); err != nil {
+	if err := execSystemUpgrade(ctx, conn, "ensure system_upgrade primary key", ensurePrimaryKeySQL); err != nil {
 		return fmt.Errorf("ensure %s primary key: %w", systemUpgradeQualifiedTable, err)
 	}
 	return nil
@@ -266,11 +273,12 @@ func executeSystemUpgradeSQL(ctx context.Context, conn *stdsql.Conn, upgrade sys
 	if err != nil {
 		return err
 	}
-	for _, stmt := range splitSQLStatements(source) {
-		statementCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		_, err := conn.ExecContext(statementCtx, stmt)
-		cancel()
-		if err != nil {
+	batches, err := systemUpgradeSQLBatches(source)
+	if err != nil {
+		return fmt.Errorf("validate transaction boundaries in %s: %w", upgrade.ID, err)
+	}
+	for _, statements := range batches {
+		if err := execSystemUpgradeBatch(ctx, conn, "run system upgrade "+upgrade.ID, statements); err != nil {
 			return fmt.Errorf("execute statement in %s: %w", upgrade.ID, err)
 		}
 	}
