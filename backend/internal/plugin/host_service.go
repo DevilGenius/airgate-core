@@ -1287,25 +1287,16 @@ func (h *HostService) recordHostForwardUsage(
 	if usage == nil {
 		return 0, nil
 	}
-	usageValues := usageSnapshotFromSDK(usage)
 	sellRate, err := h.hostForwardSellRate(ctx, req)
 	if err != nil {
 		return 0, err
 	}
 
-	calcInput := billing.CalculateInput{
-		InputCost:         usageValues.InputCost,
-		OutputCost:        usageValues.OutputCost,
-		CachedInputCost:   usageValues.CachedInputCost,
-		CacheCreationCost: usageValues.CacheCreationCost,
-		BillingRate:       route.EffectiveRate,
-		SellRate:          sellRate,
-		AccountRate:       accFull.RateMultiplier,
-	}
-	applyUsageBillingCostPolicy(&calcInput, usage, route.GroupPluginSettings, req.Path)
-	calc := h.calculator.Calculate(calcInput)
+	settled := settleUsage(h.calculator, usage, usageSettlementRates{
+		Billing: route.EffectiveRate, Sell: sellRate, Account: accFull.RateMultiplier,
+	})
+	usageValues, calc, usageMetadata := settled.Usage, settled.Costs, settled.Metadata
 	reasoningEffort := resolveReasoningEffort(hostForwardReasoningEffort(req), usage)
-	usageMetadata := usageBillingMetadata(usage, usageValues, calcInput)
 
 	h.scheduler.AddWindowCost(ctx, accountID, calc.AccountCost)
 
@@ -1724,7 +1715,7 @@ func hostForwardHeaders(req hostForwardRequest, route routing.Candidate) http.He
 	}
 	for plugin, kv := range route.GroupPluginSettings {
 		for k, v := range kv {
-			if v == "" || !shouldForwardPluginSetting(plugin, k) {
+			if v == "" {
 				continue
 			}
 			headers.Set("X-Airgate-Plugin-"+canonicalHeaderToken(plugin)+"-"+canonicalHeaderToken(k), v)

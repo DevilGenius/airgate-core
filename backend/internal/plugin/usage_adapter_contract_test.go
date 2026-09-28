@@ -1,0 +1,60 @@
+package plugin
+
+import (
+	"testing"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
+)
+
+func TestUsageSnapshotFromSDKReadsPluginMetadata(t *testing.T) {
+	usage := &sdk.Usage{
+		InputTokens:     10,
+		OutputCost:      0.40,
+		ReasoningEffort: "high",
+		Metadata: map[string]string{
+			"service_tier":                    "priority",
+			"openai.image.size":               "1672x941",
+			"openai.image.input_text_tokens":  "3",
+			"openai.image.input_image_tokens": "7",
+			"openai.image.count":              "2",
+			"openai.image.unit_price":         "0.2",
+			"openai.image.unit":               "USD/image",
+		},
+	}
+
+	snap := usageSnapshotFromSDK(usage)
+	if snap.ServiceTier != "priority" || snap.ImageSize != "1672x941" {
+		t.Fatalf("snapshot metadata strings = (%q, %q)", snap.ServiceTier, snap.ImageSize)
+	}
+	if snap.TextInputTokens != 3 || snap.ImageInputTokens != 7 || snap.ImageCount != 2 {
+		t.Fatalf("snapshot metadata ints = (%d, %d, %d)", snap.TextInputTokens, snap.ImageInputTokens, snap.ImageCount)
+	}
+	if snap.ImageUnitPrice != 0.2 || snap.ImageUnit != "USD/image" {
+		t.Fatalf("snapshot image price = (%v, %q)", snap.ImageUnitPrice, snap.ImageUnit)
+	}
+	if got := resolveReasoningEffort("", usage); got != "high" {
+		t.Fatalf("resolveReasoningEffort = %q, want high", got)
+	}
+}
+
+func TestUsageMetadataFromSDKPreservesPluginMetadata(t *testing.T) {
+	usage := &sdk.Usage{
+		Metadata: map[string]string{
+			"custom.plugin.value":             "kept",
+			"openai.image.size":               "1672x941",
+			"openai.image.input_text_tokens":  "3",
+			"claude.cache_creation_1h_tokens": "4",
+		},
+	}
+
+	meta := usageMetadataFromSDK(usage, usageSnapshotFromSDK(usage))
+	if meta["custom.plugin.value"] != "kept" {
+		t.Fatalf("custom plugin metadata = %q, want kept", meta["custom.plugin.value"])
+	}
+	if meta["openai.image.size"] != "1672x941" || meta["openai.image.input_text_tokens"] != "3" {
+		t.Fatalf("openai image metadata not preserved: %+v", meta)
+	}
+	if meta["claude.cache_creation_1h_tokens"] != "4" {
+		t.Fatalf("claude metadata = %q, want 4", meta["claude.cache_creation_1h_tokens"])
+	}
+}

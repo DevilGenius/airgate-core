@@ -2,8 +2,9 @@
 package billing
 
 import (
-	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 	"math"
+
+	"github.com/DevilGenius/airgate-core/internal/pkg/ratevalue"
 )
 
 // Calculator 费用计算器

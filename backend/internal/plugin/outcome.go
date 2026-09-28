@@ -407,25 +407,11 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 	if actualModel == "" {
 		actualModel = state.model
 	}
-	usageValues := usageSnapshotFromSDK(usage)
-
-	// 三条独立倍率管道：
-	//   billingRate: 平台对 reseller 的计费倍率（group/user 优先级链）
-	//   sellRate:    reseller 对客户的销售倍率（叠加在 actual_cost 上）
-	//   accountRate: 账号自身的真实成本系数（"账号计费"统计管道）
-	calcInput := billing.CalculateInput{
-		InputCost:         usageValues.InputCost,
-		OutputCost:        usageValues.OutputCost,
-		CachedInputCost:   usageValues.CachedInputCost,
-		CacheCreationCost: usageValues.CacheCreationCost,
-		BillingRate:       billing.ResolveBillingRate(state.keyInfo),
-		SellRate:          state.keyInfo.SellRate,
-		AccountRate:       state.account.RateMultiplier,
-	}
-	applyUsageBillingCostPolicy(&calcInput, usage, state.keyInfo.GroupPluginSettings, state.requestPath)
-	calc := f.calculator.Calculate(calcInput)
+	settled := settleUsage(f.calculator, usage, usageSettlementRates{
+		Billing: billing.ResolveBillingRate(state.keyInfo), Sell: state.keyInfo.SellRate, Account: state.account.RateMultiplier,
+	})
+	usageValues, calc, usageMetadata := settled.Usage, settled.Costs, settled.Metadata
 	reasoningEffort := resolveReasoningEffort(state.reasoningEffort, usage)
-	usageMetadata := usageBillingMetadata(usage, usageValues, calcInput)
 
 	// 窗口费用沿用 account_cost（= total × account_rate），与用户账单解耦。
 	f.scheduler.AddWindowCost(ctx, state.account.ID, calc.AccountCost)

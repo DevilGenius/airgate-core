@@ -753,7 +753,7 @@ func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
 	// 分组级插件开关：X-Airgate-Plugin-{plugin}-{key} 约定。
 	for plugin, kv := range keyInfo.GroupPluginSettings {
 		for k, v := range kv {
-			if v == "" || !shouldForwardPluginSetting(plugin, k) {
+			if v == "" {
 				continue
 			}
 			headers.Set("X-Airgate-Plugin-"+canonicalHeaderToken(plugin)+"-"+canonicalHeaderToken(k), v)

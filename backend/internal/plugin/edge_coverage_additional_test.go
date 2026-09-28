@@ -98,61 +98,6 @@ func TestDispatchChainBoundaryBranches(t *testing.T) {
 	}
 }
 
-func TestImagePricingAdditionalBranches(t *testing.T) {
-	t.Parallel()
-
-	applyImageBillingCostPolicy(nil, &sdk.Usage{}, nil, "/v1/responses")
-	input := &billing.CalculateInput{}
-	applyImageBillingCostPolicy(input, &sdk.Usage{}, nil, "/v1/responses")
-	if input.BillingCostAddon != nil || input.BillingCostOverride != nil {
-		t.Fatalf("empty usage should not set image cost: %+v", input)
-	}
-
-	for _, usage := range []*sdk.Usage{
-		{Metadata: map[string]string{"openai.image.size": "bad", "openai.image.count": "1"}},
-		{Metadata: map[string]string{"openai.image.size": "1024x1024", "openai.image.count": "1"}},
-		{Metadata: map[string]string{"openai.image.size": "1024x1024", "openai.image.count": "0"}},
-	} {
-		if cost, ok := imageBillingCostFromSettings(usage, nil); ok || cost != 0 {
-			t.Fatalf("imageBillingCostFromSettings(%+v) = %v/%v, want 0 false", usage, cost, ok)
-		}
-	}
-
-	settings := map[string]map[string]string{
-		"other":  {imagePrice1KKey: "1"},
-		"OpenAI": {"ignored": "1", imagePrice1KKey: " "},
-	}
-	if price, ok := imageTierPriceFromSettings(settings, "1k"); ok || price != 0 {
-		t.Fatalf("blank price = %v/%v, want 0 false", price, ok)
-	}
-	settings["OpenAI"][imagePrice1KKey] = "-1"
-	if price, ok := imageTierPriceFromSettings(settings, "1k"); ok || price != 0 {
-		t.Fatalf("negative price = %v/%v, want 0 false", price, ok)
-	}
-	settings["OpenAI"][imagePrice1KKey] = "bad"
-	if price, ok := imageTierPriceFromSettings(settings, "1k"); ok || price != 0 {
-		t.Fatalf("bad price = %v/%v, want 0 false", price, ok)
-	}
-	if key := imageTierPriceKey("unknown"); key != "" {
-		t.Fatalf("unknown tier key = %q, want empty", key)
-	}
-	if shouldForwardPluginSetting("other", imagePrice1KKey) != true {
-		t.Fatal("non-openai image price setting should be forwarded")
-	}
-	if shouldForwardPluginSetting("openai", imagePrice1KKey) != false {
-		t.Fatal("openai image price setting should not be forwarded")
-	}
-
-	for _, raw := range []string{"1024", "badx1024", "0x1024", "1024xbad", "1024x0"} {
-		if w, h, ok := parseImageSizeForBilling(raw); ok || w != 0 || h != 0 {
-			t.Fatalf("parseImageSizeForBilling(%q) = %d/%d/%v, want zeros false", raw, w, h, ok)
-		}
-	}
-	if tier, _, ok := imageTierForSize("bad"); ok || tier != "" {
-		t.Fatalf("bad tier = %q/%v, want empty false", tier, ok)
-	}
-}
-
 func TestTaskInputAssetAdditionalEdges(t *testing.T) {
 	t.Parallel()
 

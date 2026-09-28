@@ -13,10 +13,16 @@ vi.mock('react-i18next', () => ({
 
 function mount(settings: Record<string, string> = {}) {
   const onSubmit = vi.fn();
-  const group = {
+  const group: GroupResp = {
     id: 18, name: 'OpenAI', platform: 'openai', rate_multiplier: 1,
+    is_exclusive: false,
+    status_visible: true,
+    subscription_type: 'standard',
+    sort_weight: 0,
+    created_at: '2026-09-28T00:00:00Z',
+    updated_at: '2026-09-28T00:00:00Z',
     plugin_settings: { openai: { existing_setting: 'keep', ...settings } },
-  } as GroupResp;
+  };
   render(<GroupFormModal open title="Edit group" group={group} onClose={vi.fn()} onSubmit={onSubmit} loading={false} platforms={['openai']} />);
   return onSubmit;
 }
