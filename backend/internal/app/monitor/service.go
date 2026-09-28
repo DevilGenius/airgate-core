@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"github.com/DevilGenius/airgate-core/internal/app/monitor/traceredaction"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
 	"github.com/DevilGenius/airgate-core/internal/pkg/usagemodel"
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
@@ -37,13 +37,6 @@ const (
 	maxDetailArrayItems  = 5
 
 	dropLogInterval = time.Minute
-)
-
-var (
-	bearerPattern = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+`)
-	skKeyPattern  = regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{8,}\b`)
-	emailPattern  = regexp.MustCompile(`(?i)\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b`)
-	secretPattern = regexp.MustCompile(`(?i)\b(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|secret|cookie|session)\b\s*[:=]\s*["']?[^"',\s}]+`)
 )
 
 // Option customizes the monitor service.
@@ -788,13 +781,7 @@ func defaultRequestTitle(eventType string) string {
 	}
 }
 
-func scrubText(text string) string {
-	text = bearerPattern.ReplaceAllString(text, "Bearer [REDACTED]")
-	text = skKeyPattern.ReplaceAllString(text, "sk-[REDACTED]")
-	text = secretPattern.ReplaceAllString(text, "$1=[REDACTED]")
-	text = emailPattern.ReplaceAllString(text, "[REDACTED_EMAIL]")
-	return text
-}
+func scrubText(text string) string { return traceredaction.SanitizeText(text) }
 
 func sanitizeDetail(detail map[string]interface{}) map[string]interface{} {
 	if len(detail) == 0 {
@@ -928,19 +915,7 @@ func detailFits(detail map[string]interface{}) bool {
 }
 
 func isSensitiveKey(key string) bool {
-	k := strings.ToLower(key)
-	return strings.Contains(k, "authorization") ||
-		strings.Contains(k, "api_key") ||
-		strings.Contains(k, "apikey") ||
-		strings.Contains(k, "access_token") ||
-		strings.Contains(k, "refresh_token") ||
-		strings.Contains(k, "id_token") ||
-		strings.Contains(k, "token") ||
-		strings.Contains(k, "private_key") ||
-		strings.Contains(k, "privatekey") ||
-		strings.Contains(k, "secret") ||
-		strings.Contains(k, "cookie") ||
-		strings.Contains(k, "session")
+	return traceredaction.IsSensitiveDetailKey(key)
 }
 
 func truncateString(value string, limit int) string {

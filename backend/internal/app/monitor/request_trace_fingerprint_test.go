@@ -4,15 +4,13 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
-
-	"github.com/DevilGenius/airgate-sdk/runtimego/requesttrace"
 )
 
 func TestIngressAndOutboundTraceFingerprintsMatch(t *testing.T) {
 	ingress := http.Header{"X-Session-Id": {"same-session", "second-value"}, "Conversation-Id": {"same-conversation"}, "X-Codex-Turn-State": {"same-turn"}}
 	outbound := http.Header{"session_id": {"same-session", "second-value"}, "conversation_id": {"same-conversation"}, "x-codex-turn-state": {"same-turn"}}
 	before := safeStoredTraceHeaders(ingress)
-	after := safeStoredTraceHeaders(requesttrace.SafeHeaders(outbound))
+	after := safeStoredTraceHeaders(outbound)
 	if !reflect.DeepEqual(before, after) {
 		t.Fatalf("ingress=%v outbound=%v", before, after)
 	}

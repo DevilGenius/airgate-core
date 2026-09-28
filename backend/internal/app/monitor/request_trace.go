@@ -8,21 +8,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
+	"github.com/DevilGenius/airgate-core/internal/app/monitor/traceredaction"
 	"github.com/DevilGenius/airgate-core/internal/requestmonitoring"
-	"github.com/DevilGenius/airgate-sdk/runtimego/requesttrace"
 )
 
 const (
 	requestTraceSchemaVersion = 2
 	requestTraceEncoding      = "gzip-json"
-	requestTraceHashAlgorithm = requesttrace.HashAlgorithm
+	requestTraceHashAlgorithm = traceredaction.HashAlgorithm
 	maxRequestTraceRawBytes   = 256 << 20
 )
 
@@ -123,17 +122,13 @@ type encryptedContentTraceFingerprint struct {
 }
 
 type requestTraceBodyOptions struct {
-	RedactImageInputs bool
 	ForceImageRequest bool
-	AlreadyRedacted   bool
-	RedactionReason   string
 	OriginalSize      int64
 }
 
 func encodeRequestTrace(input requestmonitoring.TraceInput) (StoredRequestTrace, error) {
 	requestBody := buildRequestTraceBody(input.RequestBody, headerContentType(input.RequestHeaders), requestTraceBodyOptions{
-		RedactImageInputs: true,
-		ForceImageRequest: requesttrace.IsImagePath(input.Path),
+		ForceImageRequest: traceredaction.IsImagePath(input.Path),
 	})
 	payload := requestTracePayload{
 		SchemaVersion: requestTraceSchemaVersion,
@@ -158,16 +153,14 @@ func encodeRequestTrace(input requestmonitoring.TraceInput) (StoredRequestTrace,
 			HTTPStatus: input.Final.HTTPStatus,
 			ErrorType:  input.Final.ErrorType,
 			ErrorCode:  input.Final.ErrorCode,
-			Message:    scrubText(input.Final.Message),
+			Message:    traceredaction.SanitizeText(input.Final.Message),
 		},
 	}
 	if len(input.Attempts) > 0 {
 		payload.Attempts = make([]requestTraceAttempt, 0, len(input.Attempts))
 	}
 	for _, attempt := range input.Attempts {
-		upstreamBody := buildRequestTraceBody(attempt.UpstreamBody, headerContentType(attempt.UpstreamHeaders), requestTraceBodyOptions{
-			RedactImageInputs: true,
-		})
+		upstreamBody := buildRequestTraceBody(attempt.UpstreamBody, headerContentType(attempt.UpstreamHeaders), requestTraceBodyOptions{})
 		storedAttempt := requestTraceAttempt{
 			Number:          attempt.Number,
 			AccountID:       attempt.AccountID,
@@ -180,30 +173,25 @@ func encodeRequestTrace(input requestmonitoring.TraceInput) (StoredRequestTrace,
 			TimeoutProfile:  attempt.TimeoutProfile,
 			OutcomeKind:     attempt.OutcomeKind,
 			FailoverScope:   attempt.FailoverScope,
-			Reason:          scrubText(attempt.Reason),
-			PluginError:     scrubText(attempt.PluginError),
+			Reason:          traceredaction.SanitizeText(attempt.Reason),
+			PluginError:     traceredaction.SanitizeText(attempt.PluginError),
 			UpstreamStatus:  attempt.UpstreamStatus,
 			UpstreamHeaders: storedTraceHeadersForBody(attempt.UpstreamHeaders, upstreamBody),
 			UpstreamBody:    upstreamBody,
-			RawError: buildRequestTraceBody(attempt.UpstreamErrorBody, "application/json", requestTraceBodyOptions{
-				RedactImageInputs: true,
-			}),
+			RawError:        buildRequestTraceBody(attempt.UpstreamErrorBody, "application/json", requestTraceBodyOptions{}),
 		}
 		if len(attempt.OutboundRequests) > 0 {
 			storedAttempt.Outbound = make([]requestTraceOutbound, 0, len(attempt.OutboundRequests))
 		}
 		for _, outbound := range attempt.OutboundRequests {
 			outboundBody := buildRequestTraceBody(outbound.Body, headerContentType(outbound.Headers), requestTraceBodyOptions{
-				RedactImageInputs: true,
-				ForceImageRequest: requesttrace.IsImageURL(outbound.URL),
-				AlreadyRedacted:   outbound.BodyRedacted,
-				RedactionReason:   outbound.BodyRedactionReason,
+				ForceImageRequest: traceredaction.IsImageURL(outbound.URL),
 				OriginalSize:      outbound.BodyOriginalSize,
 			})
 			storedAttempt.Outbound = append(storedAttempt.Outbound, requestTraceOutbound{
 				Transport:  outbound.Transport,
 				Method:     outbound.Method,
-				URL:        redactStoredTraceURL(outbound.URL),
+				URL:        traceredaction.SanitizeURL(outbound.URL),
 				Headers:    storedTraceHeadersForBody(outbound.Headers, outboundBody),
 				Body:       outboundBody,
 				StatusCode: outbound.StatusCode,
@@ -219,7 +207,7 @@ func encodeRequestTrace(input requestmonitoring.TraceInput) (StoredRequestTrace,
 	if len(raw) > maxRequestTraceRawBytes {
 		return StoredRequestTrace{}, fmt.Errorf("request trace exceeds %d bytes", maxRequestTraceRawBytes)
 	}
-	digest := requesttrace.Hash(raw)
+	digest := traceredaction.Hash(raw)
 	var compressed bytes.Buffer
 	zw := requestTraceCompressors.Get().(*gzip.Writer)
 	zw.Reset(&compressed)
@@ -283,7 +271,7 @@ func decodeStoredRequestTrace(stored StoredRequestTrace) (RequestTrace, error) {
 	if int64(len(raw)) != stored.RawSize {
 		return RequestTrace{}, fmt.Errorf("request trace size mismatch")
 	}
-	if requesttrace.Hash(raw) != stored.Hash {
+	if traceredaction.Hash(raw) != stored.Hash {
 		return RequestTrace{}, fmt.Errorf("request trace hash mismatch")
 	}
 	return RequestTrace{
@@ -301,40 +289,16 @@ func decodeStoredRequestTrace(stored StoredRequestTrace) (RequestTrace, error) {
 }
 
 func buildRequestTraceBody(body []byte, contentType string, options requestTraceBodyOptions) requestTraceBody {
-	originalBodySize := len(body)
-	redacted := options.AlreadyRedacted
-	redactionReason := strings.TrimSpace(options.RedactionReason)
-	originalSize := options.OriginalSize
-	// Plugin diagnostics carry trusted redaction metadata through the SDK.
-	// Preserve already-sanitized bytes; incomplete metadata still needs a pass.
-	if options.RedactImageInputs && !(redacted && redactionReason != "") {
-		snapshot := requesttrace.SanitizeBody(body, contentType, options.ForceImageRequest)
-		body = snapshot.Body
-		if snapshot.Redacted {
-			contentType = snapshot.ContentType
-			redacted = true
-			if redactionReason == "" {
-				redactionReason = snapshot.RedactionReason
-			}
-			if originalSize <= 0 {
-				originalSize = snapshot.OriginalSize
-			}
-		}
+	if options.OriginalSize > int64(len(body)) {
+		return requestTraceBody{ContentType: contentType, Redacted: true, RedactionReason: "trace_capture_incomplete", OriginalSize: options.OriginalSize}
 	}
-	if redacted && originalSize <= 0 {
-		originalSize = int64(originalBodySize)
-	}
-	out := requestTraceBody{
-		ContentType:     contentType,
-		Size:            len(body),
-		OriginalSize:    originalSize,
-		Redacted:        redacted,
-		RedactionReason: redactionReason,
-	}
+	snapshot := traceredaction.SanitizeBody(body, contentType, traceredaction.BodyOptions{ForceImageRequest: options.ForceImageRequest})
+	body, contentType = snapshot.Body, snapshot.ContentType
+	out := requestTraceBody{ContentType: contentType, Size: len(body), OriginalSize: snapshot.OriginalSize, Redacted: snapshot.Redacted, RedactionReason: snapshot.RedactionReason}
 	if len(body) == 0 {
 		return out
 	}
-	out.Hash = requesttrace.Hash(body)
+	out.Hash = traceredaction.Hash(body)
 	out.HashAlgorithm = requestTraceHashAlgorithm
 	if utf8.Valid(body) {
 		out.Encoding = "utf-8"
@@ -387,7 +351,7 @@ func walkEncryptedContent(value interface{}, path string, out *[]encryptedConten
 						Type:          itemType,
 						ID:            itemID,
 						Size:          len(encrypted),
-						Hash:          requesttrace.HashString(encrypted),
+						Hash:          traceredaction.HashString(encrypted),
 						HashAlgorithm: requestTraceHashAlgorithm,
 					})
 				}
@@ -399,26 +363,13 @@ func walkEncryptedContent(value interface{}, path string, out *[]encryptedConten
 }
 
 func safeStoredTraceHeaders(headers http.Header) map[string][]string {
-	if len(headers) == 0 {
+	safe := traceredaction.SanitizeHeaders(headers)
+	if len(safe) == 0 {
 		return nil
 	}
-	out := make(map[string][]string)
-	for name, values := range headers {
-		canonical := strings.ToLower(strings.TrimSpace(name))
-		switch canonical {
-		case "accept", "content-type", "openai-beta", "originator", "user-agent", "x-openai-previous-response-id", "retry-after", "retry-after-ms":
-			out[canonical] = append([]string(nil), values...)
-		default:
-			if strings.HasPrefix(canonical, "x-airgate-trace-") {
-				out[canonical] = append([]string(nil), values...)
-			}
-		}
-	}
-	for key, digest := range requesttrace.HeaderFingerprints(headers) {
-		out[key] = []string{digest}
-	}
-	if len(out) == 0 {
-		return nil
+	out := make(map[string][]string, len(safe))
+	for key, values := range safe {
+		out[strings.ToLower(key)] = values
 	}
 	return out
 }
@@ -440,18 +391,4 @@ func headerContentType(headers http.Header) string {
 		return ""
 	}
 	return strings.TrimSpace(headers.Get("Content-Type"))
-}
-
-func redactStoredTraceURL(raw string) string {
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed == nil {
-		if index := strings.IndexByte(raw, '?'); index >= 0 {
-			return raw[:index]
-		}
-		return raw
-	}
-	parsed.User = nil
-	parsed.RawQuery = ""
-	parsed.Fragment = ""
-	return parsed.String()
 }

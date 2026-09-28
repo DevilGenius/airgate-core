@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -65,7 +64,7 @@ func (f *Forwarder) beginRequestTrace(c *gin.Context) *requestTraceSession {
 		path:      requestPath(c),
 	}
 	if c.Request != nil {
-		session.requestHeaders = safeRequestTraceHeaders(c.Request.Header)
+		session.requestHeaders = c.Request.Header.Clone()
 	}
 	c.Set(ginCtxKeyRequestTrace, session)
 	return session
@@ -183,15 +182,13 @@ func (s *requestTraceSession) addFailedAttempt(number int, state *forwardState, 
 			attempt.OutboundRequests = make([]requestmonitoring.TraceOutboundRequest, 0, len(diagnostic.OutboundRequests))
 			for _, request := range diagnostic.OutboundRequests {
 				attempt.OutboundRequests = append(attempt.OutboundRequests, requestmonitoring.TraceOutboundRequest{
-					Transport:           request.Transport,
-					Method:              request.Method,
-					URL:                 request.URL,
-					Headers:             request.Headers,
-					Body:                request.Body,
-					StatusCode:          request.StatusCode,
-					BodyRedacted:        request.BodyRedacted,
-					BodyRedactionReason: request.BodyRedactionReason,
-					BodyOriginalSize:    request.BodyOriginalSize,
+					Transport:        request.Transport,
+					Method:           request.Method,
+					URL:              request.URL,
+					Headers:          request.Headers,
+					Body:             request.Body,
+					StatusCode:       request.StatusCode,
+					BodyOriginalSize: request.BodyOriginalSize,
 				})
 			}
 		}
@@ -401,22 +398,4 @@ func (f *Forwarder) finishRequestTrace(c *gin.Context, trace *requestTraceSessio
 		ctx = context.WithoutCancel(c.Request.Context())
 	}
 	f.recordRequestEvent(ctx, trace.genericEventInput(), trace, true)
-}
-
-func safeRequestTraceHeaders(headers http.Header) http.Header {
-	if len(headers) == 0 {
-		return nil
-	}
-	safe := make(http.Header)
-	for name, values := range headers {
-		switch strings.ToLower(strings.TrimSpace(name)) {
-		case "accept", "content-type", "openai-beta", "originator", "user-agent", "x-openai-previous-response-id",
-			"session_id", "session-id", "x-session-id", "conversation_id", "conversation-id", "x-codex-turn-state":
-			safe[name] = append([]string(nil), values...)
-		}
-	}
-	if len(safe) == 0 {
-		return nil
-	}
-	return safe
 }

@@ -116,17 +116,15 @@ type TraceAttempt struct {
 	UpstreamErrorBody []byte
 }
 
-// TraceOutboundRequest is a credential-free request actually sent by a plugin.
+// TraceOutboundRequest is an internal raw snapshot, sanitized before persistence.
 type TraceOutboundRequest struct {
-	Transport           string
-	Method              string
-	URL                 string
-	Headers             http.Header
-	Body                []byte
-	StatusCode          int
-	BodyRedacted        bool
-	BodyRedactionReason string
-	BodyOriginalSize    int64
+	Transport        string
+	Method           string
+	URL              string
+	Headers          http.Header
+	Body             []byte
+	StatusCode       int
+	BodyOriginalSize int64
 }
 
 // TraceFinalError is the client-visible terminal error classification.
