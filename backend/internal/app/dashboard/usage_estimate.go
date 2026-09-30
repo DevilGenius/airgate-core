@@ -20,15 +20,6 @@ type UsageEstimateSource struct {
 	Meta accountusage.EstimateMeta
 }
 
-type usageEstimatePool struct {
-	plan             string
-	requiredPlans    []string
-	requiredAnyPlans []string
-	present          bool
-	fiveHour         usageEstimateWindowPool
-	sevenDay         usageEstimateWindowPool
-}
-
 type usageEstimateWindowPool struct {
 	supported    bool
 	observations []usageEstimateObservation
@@ -42,99 +33,58 @@ type usageEstimateObservation struct {
 	maxAge   time.Duration
 }
 
-// BuildUsageEstimates 聚合 Plus/Pro 套餐池的用量增长、100% 成本和剩余时间。
-// 分组路由类别与估算路径彼此独立：只有 Plus 进入 Plus 路径；Team/K12、
-// ProLite 和 Pro 均进入 Pro 路径。Pro 汇总继续叠加 Plus，表示整个付费账号池。
+// BuildUsageEstimates 聚合非 Free 账号：逐账号选择实际存在的 5h，否则使用 7d。
+// 两种窗口独立校准后相加，避免同套餐的 5h/7d 标准值混用。
 func BuildUsageEstimates(sources []UsageEstimateSource, now time.Time, accountCostPerMinute float64) []UsageEstimate {
-	plus := usageEstimatePool{plan: plantype.Plus, requiredPlans: []string{plantype.Plus}}
-	pro := usageEstimatePool{plan: plantype.Pro}
-	hasPlusAccounts := false
-	proPlans := make(map[string]struct{})
-	planHasFiveHour := make(map[string]bool)
-	for _, source := range sources {
-		plan := plantype.Normalize(source.Plan)
-		if plantype.EstimatePool(plan) == "" {
-			continue
-		}
-		planHasFiveHour[plan] = planHasFiveHour[plan] || observationSupported(usageEstimateObservation{
-			window:   source.Meta.FiveHour,
-			optional: true,
-		})
-	}
-	plusShortTerm := make([]usageEstimateObservation, 0, len(sources))
-	proShortTerm := make([]usageEstimateObservation, 0, len(sources))
+	var fiveHour, sevenDay usageEstimateWindowPool
+	present := false
+	observedWindows := false
 	day := now.In(time.Local).Format("2006-01-02")
 	for _, source := range sources {
 		plan := plantype.Normalize(source.Plan)
-		estimatePool := plantype.EstimatePool(plan)
-		if estimatePool == "" {
+		if plan == "" || plan == plantype.Free {
 			continue
 		}
-		if plan == plantype.Plus {
-			hasPlusAccounts = true
-		}
-		fiveHour := usageEstimateObservation{
-			window: source.Meta.FiveHour, plan: plan, day: day, optional: true, maxAge: usage5hObservationAge,
-		}
-		sevenDay := usageEstimateObservation{
-			window: source.Meta.SevenDay, plan: plan, day: day, maxAge: usage7dObservationAge,
-		}
-		shortTerm := sevenDay
-		if planHasFiveHour[plan] {
-			shortTerm = fiveHour
-			// 5h 能力按 plan_type 判定；同套餐的新账号也必须计入，并共享该套餐标准值。
-			shortTerm.optional = false
-		}
-		if estimatePool == plantype.EstimatePoolPlus {
-			plus.present = true
-			plus.sevenDay.add(sevenDay)
-			pro.sevenDay.add(sevenDay)
-			plusShortTerm = append(plusShortTerm, shortTerm)
-			proShortTerm = append(proShortTerm, shortTerm)
-		}
-		if estimatePool == plantype.EstimatePoolPro {
-			pro.present = true
-			pro.sevenDay.add(sevenDay)
-			proShortTerm = append(proShortTerm, shortTerm)
-			proPlans[plan] = struct{}{}
+		present = true
+		observedWindows = observedWindows || source.Meta.WindowsObservedAt != nil ||
+			source.Meta.FiveHour.ObservedAt != nil || source.Meta.SevenDay.ObservedAt != nil
+		if source.Meta.HasFiveHourWindow() {
+			fiveHour.add(usageEstimateObservation{window: source.Meta.FiveHour, plan: plan, day: day})
+		} else {
+			sevenDay.add(usageEstimateObservation{window: source.Meta.SevenDay, plan: plan, day: day})
 		}
 	}
-	// 短期行按 plan_type 选择有效限制：有 5h 则用 5h，否则使用 7d。
-	// 是否显示整行只由 Plus 决定；Plus 没有 5h 时，短期余量与 7d 相同，省略重复行。
-	if planHasFiveHour[plantype.Plus] {
-		for _, observation := range plusShortTerm {
-			plus.fiveHour.add(observation)
-		}
-		for _, observation := range proShortTerm {
-			pro.fiveHour.add(observation)
-		}
+	if !present {
+		return []UsageEstimate{}
 	}
-	if hasPlusAccounts {
-		pro.requiredPlans = append(pro.requiredPlans, plantype.Plus)
-	}
-	for _, plan := range []string{plantype.Pro, plantype.Team, plantype.K12, plantype.ProLite} {
-		if _, present := proPlans[plan]; present {
-			pro.requiredAnyPlans = append(pro.requiredAnyPlans, plan)
-		}
-	}
-
-	result := make([]UsageEstimate, 0, 2)
-	for _, pool := range []*usageEstimatePool{&plus, &pro} {
-		if !pool.present {
+	five := fiveHour.estimate("5h", nil, nil, accountCostPerMinute, now, usage5hObservationAge)
+	seven := sevenDay.estimate("7d", nil, nil, accountCostPerMinute, now, usage7dObservationAge)
+	total := UsageEstimateWindow{Window: "total", Status: "insufficient", AccountCount: len(fiveHour.observations) + len(sevenDay.observations)}
+	for _, part := range []UsageEstimateWindow{five, seven} {
+		if part.Status != "ready" || part.RemainingCost == nil {
 			continue
 		}
-		item := UsageEstimate{Plan: pool.plan, Windows: make([]UsageEstimateWindow, 0, 2)}
-		if pool.fiveHour.supported {
-			item.Windows = append(item.Windows, pool.fiveHour.estimate("5h", pool.requiredPlans, pool.requiredAnyPlans, accountCostPerMinute, now, usage5hObservationAge))
+		if total.RemainingCost == nil {
+			total.RemainingCost = new(float64)
 		}
-		if pool.sevenDay.supported {
-			item.Windows = append(item.Windows, pool.sevenDay.estimate("7d", pool.requiredPlans, pool.requiredAnyPlans, accountCostPerMinute, now, usage7dObservationAge))
-		}
-		if len(item.Windows) > 0 {
-			result = append(result, item)
+		total.Status = "ready"
+		*total.RemainingCost += *part.RemainingCost
+	}
+	if total.RemainingCost != nil {
+		if *total.RemainingCost == 0 {
+			total.RemainingMinutes = new(float64)
+		} else if validPositive(accountCostPerMinute) {
+			minutes := *total.RemainingCost / accountCostPerMinute
+			total.RemainingMinutes = &minutes
 		}
 	}
-	return result
+	if !fiveHour.supported && observedWindows {
+		// 已知不存在 5h 账号与存在但数据不足须区分。
+		five.Status = "ready"
+		five.RemainingCost = new(float64)
+		five.RemainingMinutes = new(float64)
+	}
+	return []UsageEstimate{{Plan: "non_free", Windows: []UsageEstimateWindow{total, five}}}
 }
 
 func (p *usageEstimateWindowPool) add(observation usageEstimateObservation) {
@@ -151,7 +101,7 @@ func observationSupported(observation usageEstimateObservation) bool {
 }
 
 func (p usageEstimateWindowPool) estimate(window string, requiredPlans, requiredAnyPlans []string, accountCostPerMinute float64, now time.Time, observationMaxAge time.Duration) UsageEstimateWindow {
-	result := UsageEstimateWindow{Window: window, Status: "insufficient"}
+	result := UsageEstimateWindow{Window: window, Status: "insufficient", AccountCount: len(p.observations)}
 	planRates := sharedPlanRates(p.observations, now)
 	for _, plan := range requiredPlans {
 		if _, available := planRates[plan]; !available {

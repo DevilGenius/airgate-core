@@ -50,24 +50,22 @@ type DashboardStatsResp struct {
 	ActiveUsers        int64   `json:"active_users"`
 
 	// 用量估算：账号页“成本”口径（usage_logs.account_cost）。
-	AccountCostPerMinute1M  float64                  `json:"account_cost_per_minute_1m"`
-	AccountCostPerMinute10M float64                  `json:"account_cost_per_minute_10m"`
-	UsageEstimates          []DashboardUsageEstimate `json:"usage_estimates"`
+	AccountCostPerMinute1M  float64                `json:"account_cost_per_minute_1m"`
+	AccountCostPerMinute10M float64                `json:"account_cost_per_minute_10m"`
+	UsageEstimate           DashboardUsageEstimate `json:"usage_estimate"`
 }
 
-// DashboardUsageEstimate 套餐池按当前一分钟成本速率换算的剩余时间。
+// DashboardUsageEstimate 非 Free 账号短期可用总量及其中的 5h 部分。
 type DashboardUsageEstimate struct {
-	Plan    string                         `json:"plan"`
-	Windows []DashboardUsageEstimateWindow `json:"windows"`
+	Total    DashboardUsageEstimateWindow `json:"total"`
+	FiveHour DashboardUsageEstimateWindow `json:"five_hour"`
 }
 
-// DashboardUsageEstimateWindow 单个 5h/7d 窗口剩余用量估值。
+// DashboardUsageEstimateWindow 可用标准成本及按最近一分钟消耗换算的时间。
 type DashboardUsageEstimateWindow struct {
-	Window             string   `json:"window"`
-	Status             string   `json:"status"`
-	DailyGrowthPercent float64  `json:"daily_growth_percent"` // 正数用量增长幅度（已消耗百分比增量）
-	FullCost           float64  `json:"full_cost"`
-	RemainingCost      *float64 `json:"remaining_cost,omitempty"`
+	AccountCount  int      `json:"account_count"`
+	Status        string   `json:"status"`
+	RemainingCost *float64 `json:"remaining_cost,omitempty"`
 	// RemainingMinutes 在状态为 ready 且仍有剩余标准额度时为空，表示可用时长无上限。
 	RemainingMinutes *float64 `json:"remaining_minutes,omitempty"`
 }

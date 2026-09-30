@@ -46,18 +46,17 @@ type CredentialFreeAccountResp struct {
 	State string `json:"state"`
 }
 
-// CredentialUsageEstimateResp 提供账号池标准消耗速率及四个套餐窗口的可用量估算。
+// CredentialUsageEstimateResp 提供非 Free 短期总量及其中的 5h 部分。
 type CredentialUsageEstimateResp struct {
 	StandardCostPerMinute1M  float64                         `json:"standard_cost_per_minute_1m"`
 	StandardCostPerMinute10M float64                         `json:"standard_cost_per_minute_10m"`
-	Plus5h                   CredentialUsageAvailabilityResp `json:"plus_5h"`
-	Pro5h                    CredentialUsageAvailabilityResp `json:"pro_5h"`
-	Plus7d                   CredentialUsageAvailabilityResp `json:"plus_7d"`
-	Pro7d                    CredentialUsageAvailabilityResp `json:"pro_7d"`
+	Total                    CredentialUsageAvailabilityResp `json:"total"`
+	FiveHour                 CredentialUsageAvailabilityResp `json:"five_hour"`
 }
 
 type CredentialUsageAvailabilityResp struct {
-	Status string `json:"status"`
+	AccountCount int    `json:"account_count"`
+	Status       string `json:"status"`
 	// AvailableMinutes 在状态为 ready 且仍有剩余标准额度时为空，表示可用时长无上限。
 	AvailableMinutes      *float64 `json:"available_minutes"`
 	AvailableStandardCost *float64 `json:"available_standard_cost"`

@@ -37,28 +37,33 @@ func toDashboardStatsResp(item appdashboard.Stats) dto.DashboardStatsResp {
 		ActiveUsers:             item.ActiveUsers,
 		AccountCostPerMinute1M:  item.AccountCostPerMinute1M,
 		AccountCostPerMinute10M: item.AccountCostPerMinute10M,
-		UsageEstimates:          toDashboardUsageEstimates(item.UsageEstimates),
+		UsageEstimate:           toDashboardUsageEstimate(item.UsageEstimates),
 	}
 }
 
-func toDashboardUsageEstimates(items []appdashboard.UsageEstimate) []dto.DashboardUsageEstimate {
-	result := make([]dto.DashboardUsageEstimate, 0, len(items))
+func toDashboardUsageEstimate(items []appdashboard.UsageEstimate) dto.DashboardUsageEstimate {
+	result := dto.DashboardUsageEstimate{
+		Total:    dto.DashboardUsageEstimateWindow{Status: "insufficient"},
+		FiveHour: dto.DashboardUsageEstimateWindow{Status: "insufficient"},
+	}
 	for _, item := range items {
-		windows := make([]dto.DashboardUsageEstimateWindow, 0, len(item.Windows))
-		for _, window := range item.Windows {
-			windows = append(windows, dto.DashboardUsageEstimateWindow{
-				Window:             window.Window,
-				Status:             window.Status,
-				DailyGrowthPercent: window.DailyGrowthPercent,
-				FullCost:           window.FullCost,
-				RemainingCost:      window.RemainingCost,
-				RemainingMinutes:   window.RemainingMinutes,
-			})
+		if item.Plan != "non_free" {
+			continue
 		}
-		result = append(result, dto.DashboardUsageEstimate{
-			Plan:    item.Plan,
-			Windows: windows,
-		})
+		for _, window := range item.Windows {
+			availability := dto.DashboardUsageEstimateWindow{
+				AccountCount:     window.AccountCount,
+				Status:           window.Status,
+				RemainingCost:    window.RemainingCost,
+				RemainingMinutes: window.RemainingMinutes,
+			}
+			switch window.Window {
+			case "total":
+				result.Total = availability
+			case "5h":
+				result.FiveHour = availability
+			}
+		}
 	}
 	return result
 }

@@ -37,7 +37,7 @@ import { UserSearchFilterComboBox } from '../shared/components/UserSearchFilterC
 import { usePersistentAutoRefresh } from '../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../shared/storageKeys';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../shared/ui/metricTones';
-import type { DashboardAPIKeyTrend, DashboardStatsResp, DashboardTrendResp, DashboardUsageEstimateWindow } from '../shared/types';
+import type { DashboardAPIKeyTrend, DashboardStatsResp, DashboardTrendResp, DashboardUsageEstimate } from '../shared/types';
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 const USER_COLORS = [...decorativePalette];
@@ -144,32 +144,38 @@ export function fmtUsageEstimateCost(value: number): string {
   return `$${Math.round(value / 1e9)}B`;
 }
 
-/** 将 $ 金额文本渲染为绿色 $ + 继承色金额，参考今日 Token 卡片标准成本（text-success）样式 */
-function GreenCost({ text }: { text: string }) {
+/** 金额数字继承文字颜色，$ 默认绿色，也可单独指定颜色。 */
+function GreenCost({ text, symbolClassName = 'text-success' }: { text: string; symbolClassName?: string }) {
   if (!text.startsWith('$')) return <>{text}</>;
   return (
     <>
-      <span className="text-success">$</span>
+      <span className={symbolClassName}>$</span>
       {text.slice(1)}
     </>
   );
 }
 
-/** 用量估算单窗口单元格：剩余时间-剩余标准用量。 */
-function UsageEstimateCell({ window }: { window: DashboardUsageEstimateWindow }) {
+/** 总量和可用时间使用卡片主字号，5h 小计与相邻卡片金额字体一致。 */
+export function UsageEstimateCell({ estimate }: { estimate?: DashboardUsageEstimate }) {
   const { t } = useTranslation();
-  if (window.status !== 'ready' || window.remaining_cost == null) {
+  const total = estimate?.total;
+  const fiveHour = estimate?.five_hour;
+  if (total?.status !== 'ready' || total.remaining_cost == null) {
     return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
   }
-  const duration = window.remaining_minutes == null
+  const duration = total.remaining_minutes == null
     ? '>1000h'
-    : fmtUsageEstimateDuration(window.remaining_minutes);
-  const cost = fmtUsageEstimateCost(window.remaining_cost);
+    : fmtUsageEstimateDuration(total.remaining_minutes);
+  const cost = fmtUsageEstimateCost(total.remaining_cost);
   if (!duration) return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
   return (
-    // 估算数据字号比标题大一号会显得过重，这里收到 text-xs（宽屏下由 layout.css 的容器查询统一放大一档）。
-    <span className="ag-dashboard-usage-estimate-value font-mono text-xs font-semibold leading-none text-text">
-      {duration}-<GreenCost text={cost} />
+    <span className="inline-flex items-baseline gap-x-1.5 whitespace-nowrap font-mono font-semibold leading-none text-text">
+      <span className="ag-dashboard-metric-value text-xl leading-none"><GreenCost text={cost} /></span>{' '}
+      <span className="font-sans text-xs font-semibold">
+        <GreenCost text={fiveHour?.status === 'ready' && fiveHour.remaining_cost != null
+          ? fmtUsageEstimateCost(fiveHour.remaining_cost) : '-'} />
+      </span>{' '}
+      <span className="ag-dashboard-metric-value text-xl leading-none">{duration}</span>
     </span>
   );
 }
@@ -326,7 +332,7 @@ function rpmBadge(rpm: number): { className: string; style?: CSSProperties } {
   return { className: RPM_BADGE_MAX_CLASS };
 }
 
-/** 用量估算 Bell 徽章配色：按 plus 套餐 5h 窗口剩余标准余额分档，<300 警告色(amber)，<200 危险色(红)，<100 黑；其余/无数据保持 violet。 */
+/** 用量估算 Bell 徽章配色：按所有非 Free 账号的短期可用总量分档。 */
 const USAGE_ESTIMATE_BADGE_LEVELS: Array<{ maxExclusive: number; className: string }> = [
   { maxExclusive: 100, className: METRIC_BADGE_CRITICAL_CLASS },
   { maxExclusive: 200, className: METRIC_BADGE_DANGER_CLASS },
@@ -437,19 +443,9 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
   const { t } = useTranslation();
   const todayImageRequests = stats.today_image_requests ?? 0;
   const todayTextRequests = Math.max(0, (stats.today_requests ?? 0) - todayImageRequests);
-  const usageEstimates = stats.usage_estimates ?? [];
-  const usageEstimateWindows = (['5h', '7d'] as const).filter((windowKey) =>
-    usageEstimates.some((estimate) => estimate.windows.some((window) => window.window === windowKey)),
-  );
-  const orderedUsageEstimates = [...usageEstimates].sort((left, right) => {
-    const rank = (plan: string) => plan === 'plus' ? 0 : plan === 'pro' ? 1 : 2;
-    return rank(left.plan) - rank(right.plan);
-  });
-  // Bell 徽章配色锚定 plus 套餐 5h 窗口的剩余标准余额。
-  const plus5hWindow = usageEstimates
-    .find((estimate) => estimate.plan === 'plus')
-    ?.windows.find((window) => window.window === '5h');
-  const plus5hRemainingCost = plus5hWindow?.status === 'ready' ? plus5hWindow.remaining_cost : undefined;
+  const usageEstimate = stats.usage_estimate;
+  const total = usageEstimate?.total;
+  const totalRemainingCost = total?.status === 'ready' ? total.remaining_cost : undefined;
   return (
     <div className="ag-dashboard-metrics-grid grid auto-rows-fr gap-3">
       <Card className="ag-dashboard-metric min-h-[72px]">
@@ -516,41 +512,16 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       />
       <Card className="ag-dashboard-metric min-h-[72px]">
         <Card.Content className="ag-dashboard-metric-content p-3">
-          <div className="ag-dashboard-metric-copy flex min-h-12 flex-col self-stretch">
+          <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
             <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">
               {t('dashboard.usage_estimate')} (1min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_1m)} />/10min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_10m)} />)
             </div>
-            {usageEstimates.length === 0 ? (
-              <div className="mt-auto flex min-h-7 items-center pt-1 font-mono text-xs font-semibold leading-none text-text">
-                <span className="text-text">-</span>
-              </div>
-            ) : (
-              <div className="mt-auto flex min-h-7 flex-col justify-center gap-0.5 pt-1 font-mono text-xs font-semibold leading-none text-text">
-                {usageEstimateWindows.map((windowKey) => {
-                  const estimatesForWindow = orderedUsageEstimates
-                    .flatMap((estimate) => {
-                      const window = estimate.windows.find((item) => item.window === windowKey);
-                      return window ? [{ estimate, window }] : [];
-                    });
-                  return (
-                    <div key={windowKey} className="flex min-w-0 items-baseline gap-x-1.5 whitespace-nowrap">
-                      {estimatesForWindow.map(({ estimate, window }, index) => (
-                        <Fragment key={estimate.plan}>
-                          {index > 0 ? (
-                            <span aria-hidden="true" className="font-mono text-xs leading-none text-text">/</span>
-                          ) : null}
-                          <span className="shrink-0"><UsageEstimateCell window={window} /></span>
-                        </Fragment>
-                      ))}
-                      <span className="shrink-0 text-[10px] font-medium leading-none text-text">{windowKey}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <div className="mt-auto flex min-w-0 items-baseline whitespace-nowrap pt-1">
+              <UsageEstimateCell estimate={usageEstimate} />
+            </div>
           </div>
           <span
-            className={`ag-dashboard-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${usageEstimateBadgeClass(plus5hRemainingCost)}`}
+            className={`ag-dashboard-metric-badge h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm ${usageEstimateBadgeClass(totalRemainingCost)}`}
           >
             <Bell className="h-5 w-5" />
           </span>

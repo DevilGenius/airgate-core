@@ -921,20 +921,18 @@ export interface DashboardStatsResp {
   active_users: number;
   account_cost_per_minute_1m: number;
   account_cost_per_minute_10m: number;
-  usage_estimates: DashboardUsageEstimate[];
+  usage_estimate: DashboardUsageEstimate;
 }
 
 export interface DashboardUsageEstimate {
-  plan: string;
-  windows: DashboardUsageEstimateWindow[];
+  /** Short-term total: 5h balances plus 7d balances of accounts without 5h. */
+  total: DashboardUsageEstimateWindow;
+  five_hour: DashboardUsageEstimateWindow;
 }
 
 export interface DashboardUsageEstimateWindow {
-  window: '5h' | '7d';
+  account_count: number;
   status: 'ready' | 'insufficient';
-  /** Positive daily usage growth (increase in consumed percentage). */
-  daily_growth_percent: number;
-  full_cost: number;
   remaining_cost?: number;
   /** Omitted with ready status and a remaining cost when the available duration is unbounded. */
   remaining_minutes?: number;

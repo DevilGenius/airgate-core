@@ -1186,6 +1186,11 @@ func (s *AccountStore) commitPreparedUsageGrowth(
 	meta.Version = accountusage.EstimateMetaVersion
 	changed := false
 	if prepared.fiveHour != nil {
+		changed = meta.ObserveWindows(true, prepared.fiveHour.observation.ObservedAt) || changed
+	} else if prepared.sevenDay != nil {
+		changed = meta.ObserveWindows(false, prepared.sevenDay.observation.ObservedAt) || changed
+	}
+	if prepared.fiveHour != nil {
 		changed = meta.FiveHour.ApplyObservation(
 			prepared.fiveHour.observation,
 			prepared.fiveHour.costDelta,

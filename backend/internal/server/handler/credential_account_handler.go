@@ -260,27 +260,25 @@ func credentialUsageEstimateResp(stats appdashboard.Stats) dto.CredentialUsageEs
 	result := dto.CredentialUsageEstimateResp{
 		StandardCostPerMinute1M:  stats.AccountCostPerMinute1M,
 		StandardCostPerMinute10M: stats.AccountCostPerMinute10M,
-		Plus5h:                   insufficient(),
-		Pro5h:                    insufficient(),
-		Plus7d:                   insufficient(),
-		Pro7d:                    insufficient(),
+		Total:                    insufficient(),
+		FiveHour:                 insufficient(),
 	}
 	for _, estimate := range stats.UsageEstimates {
+		if estimate.Plan != "non_free" {
+			continue
+		}
 		for _, window := range estimate.Windows {
 			availability := dto.CredentialUsageAvailabilityResp{
+				AccountCount:          window.AccountCount,
 				Status:                window.Status,
 				AvailableMinutes:      window.RemainingMinutes,
 				AvailableStandardCost: window.RemainingCost,
 			}
-			switch {
-			case estimate.Plan == "plus" && window.Window == "5h":
-				result.Plus5h = availability
-			case estimate.Plan == "pro" && window.Window == "5h":
-				result.Pro5h = availability
-			case estimate.Plan == "plus" && window.Window == "7d":
-				result.Plus7d = availability
-			case estimate.Plan == "pro" && window.Window == "7d":
-				result.Pro7d = availability
+			switch window.Window {
+			case "total":
+				result.Total = availability
+			case "5h":
+				result.FiveHour = availability
 			}
 		}
 	}

@@ -874,10 +874,6 @@
     font-size: 1.5rem;
   }
 
-  .ag-dashboard-page .ag-dashboard-usage-estimate-value {
-    font-size: 1rem;
-  }
-
   .ag-dashboard-page .ag-dashboard-metric-badge {
     display: flex;
   }

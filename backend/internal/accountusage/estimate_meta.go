@@ -6,9 +6,30 @@ const EstimateMetaVersion = 1
 
 // EstimateMeta 保存账号级 5h/7d 用量增长与滚动成本校准状态。
 type EstimateMeta struct {
-	Version  int            `json:"version,omitempty"`
-	FiveHour WindowEstimate `json:"5h,omitempty"`
-	SevenDay WindowEstimate `json:"7d,omitempty"`
+	Version           int            `json:"version,omitempty"`
+	HasFiveHour       *bool          `json:"has_5h,omitempty"`
+	WindowsObservedAt *time.Time     `json:"windows_observed_at,omitempty"`
+	FiveHour          WindowEstimate `json:"5h,omitempty"`
+	SevenDay          WindowEstimate `json:"7d,omitempty"`
+}
+
+// HasFiveHourWindow 使用账号自身最新窗口快照，旧数据回退到该账号的 5h 观测。
+func (value EstimateMeta) HasFiveHourWindow() bool {
+	if value.HasFiveHour != nil {
+		return *value.HasFiveHour
+	}
+	w := value.FiveHour
+	return w.ObservedAt != nil || w.GrowthDate != "" || w.CostPerPercent > 0
+}
+
+// ObserveWindows 记录窗口是否存在；过时响应不能覆盖最新能力快照。
+func (value *EstimateMeta) ObserveWindows(hasFiveHour bool, observedAt time.Time) bool {
+	if value.WindowsObservedAt != nil && !observedAt.After(*value.WindowsObservedAt) {
+		return false
+	}
+	value.HasFiveHour = &hasFiveHour
+	value.WindowsObservedAt = &observedAt
+	return true
 }
 
 // WindowEstimate 保存单个用量窗口的展示状态、校准值和观测游标。
@@ -28,6 +49,11 @@ type WindowEstimate struct {
 
 // Clone 深拷贝内部指针，避免领域对象与 Ent 实体共享可变引用。
 func Clone(value EstimateMeta) EstimateMeta {
+	if value.HasFiveHour != nil {
+		hasFiveHour := *value.HasFiveHour
+		value.HasFiveHour = &hasFiveHour
+	}
+	value.WindowsObservedAt = cloneTime(value.WindowsObservedAt)
 	value.FiveHour = cloneWindow(value.FiveHour)
 	value.SevenDay = cloneWindow(value.SevenDay)
 	return value
@@ -37,6 +63,9 @@ func Clone(value EstimateMeta) EstimateMeta {
 // 时间使用 Time.Equal 比较，避免相同时刻因 Location 表示不同而触发无意义重试。
 func Equal(left, right EstimateMeta) bool {
 	return left.Version == right.Version &&
+		((left.HasFiveHour == nil && right.HasFiveHour == nil) ||
+			(left.HasFiveHour != nil && right.HasFiveHour != nil && *left.HasFiveHour == *right.HasFiveHour)) &&
+		timeEqual(left.WindowsObservedAt, right.WindowsObservedAt) &&
 		windowEqual(left.FiveHour, right.FiveHour) &&
 		windowEqual(left.SevenDay, right.SevenDay)
 }

@@ -102,10 +102,8 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 	}
 	if envelope.Data.UsageEstimate.StandardCostPerMinute1M != 0 ||
 		envelope.Data.UsageEstimate.StandardCostPerMinute10M != 0 ||
-		envelope.Data.UsageEstimate.Plus5h.Status != "insufficient" ||
-		envelope.Data.UsageEstimate.Pro5h.Status != "insufficient" ||
-		envelope.Data.UsageEstimate.Plus7d.Status != "insufficient" ||
-		envelope.Data.UsageEstimate.Pro7d.Status != "insufficient" {
+		envelope.Data.UsageEstimate.Total.Status != "insufficient" ||
+		envelope.Data.UsageEstimate.FiveHour.Status != "insufficient" {
 		t.Fatalf("usage estimate defaults = %+v", envelope.Data.UsageEstimate)
 	}
 	if envelope.Data.AccountSummary.Total != 3 ||
@@ -332,31 +330,21 @@ func TestCredentialOverviewFreePlanClassification(t *testing.T) {
 	}
 }
 
-func TestCredentialUsageEstimateRespMapsAllWindows(t *testing.T) {
-	plus5Minutes, plus5Cost := 30.0, 300.0
-	pro5Minutes, pro5Cost := 60.0, 600.0
-	plus7Minutes, plus7Cost := 90.0, 900.0
-	pro7Minutes, pro7Cost := 120.0, 1200.0
-	result := credentialUsageEstimateResp(appdashboard.Stats{
-		AccountCostPerMinute1M:  10.25,
-		AccountCostPerMinute10M: 4.78,
-		UsageEstimates: []appdashboard.UsageEstimate{
-			{Plan: "plus", Windows: []appdashboard.UsageEstimateWindow{
-				{Window: "5h", Status: "ready", RemainingMinutes: &plus5Minutes, RemainingCost: &plus5Cost},
-				{Window: "7d", Status: "ready", RemainingMinutes: &plus7Minutes, RemainingCost: &plus7Cost},
-			}},
-			{Plan: "pro", Windows: []appdashboard.UsageEstimateWindow{
-				{Window: "5h", Status: "ready", RemainingMinutes: &pro5Minutes, RemainingCost: &pro5Cost},
-				{Window: "7d", Status: "ready", RemainingMinutes: &pro7Minutes, RemainingCost: &pro7Cost},
-			}},
-		},
-	})
-	if result.StandardCostPerMinute1M != 10.25 || result.StandardCostPerMinute10M != 4.78 ||
-		result.Plus5h.AvailableMinutes == nil || *result.Plus5h.AvailableMinutes != plus5Minutes ||
-		result.Pro5h.AvailableStandardCost == nil || *result.Pro5h.AvailableStandardCost != pro5Cost ||
-		result.Plus7d.AvailableMinutes == nil || *result.Plus7d.AvailableMinutes != plus7Minutes ||
-		result.Pro7d.AvailableStandardCost == nil || *result.Pro7d.AvailableStandardCost != pro7Cost {
-		t.Fatalf("mapped usage estimate = %+v", result)
+func TestCredentialUsageEstimateRespMapsShortTermTotalAndFiveHour(t *testing.T) {
+	totalMinutes, totalCost, fiveMinutes, fiveCost := 315.0, 3150.0, 15.0, 150.0
+	stats := appdashboard.Stats{AccountCostPerMinute1M: 10, AccountCostPerMinute10M: 4.78,
+		UsageEstimates: []appdashboard.UsageEstimate{{Plan: "non_free", Windows: []appdashboard.UsageEstimateWindow{
+			{Window: "total", Status: "ready", RemainingMinutes: &totalMinutes, RemainingCost: &totalCost},
+			{Window: "5h", Status: "ready", RemainingMinutes: &fiveMinutes, RemainingCost: &fiveCost},
+		}}},
+	}
+	result := credentialUsageEstimateResp(stats)
+	if result.StandardCostPerMinute1M != 10 || result.StandardCostPerMinute10M != 4.78 || result.Total.AvailableMinutes == nil || *result.Total.AvailableMinutes != totalMinutes || result.Total.AvailableStandardCost == nil || *result.Total.AvailableStandardCost != totalCost || result.FiveHour.AvailableStandardCost == nil || *result.FiveHour.AvailableStandardCost != fiveCost {
+		t.Fatalf("credential estimate = %+v", result)
+	}
+	dashboard := toDashboardStatsResp(stats).UsageEstimate
+	if dashboard.Total.RemainingCost == nil || *dashboard.Total.RemainingCost != totalCost || dashboard.FiveHour.RemainingCost == nil || *dashboard.FiveHour.RemainingCost != fiveCost || dashboard.Total.RemainingMinutes == nil || *dashboard.Total.RemainingMinutes != totalMinutes {
+		t.Fatalf("dashboard estimate = %+v", dashboard)
 	}
 }
 

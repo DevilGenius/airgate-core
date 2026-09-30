@@ -75,6 +75,43 @@ func TestAccountStoreOccupiedPrioritiesGroupsAndExcludes(t *testing.T) {
 	}
 }
 
+func TestAccountStoreObserveUsageGrowthTracksWindowPresence(t *testing.T) {
+	db := enttestOpen(t)
+	defer db.Close()
+	ctx := context.Background()
+	item, err := db.Account.Create().SetName("window-presence").SetPlatform("openai").SetType("oauth").Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := NewAccountStore(db)
+	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+	percent := 10.0
+	for _, step := range []struct {
+		offset time.Duration
+		five   *float64
+		want   bool
+	}{
+		{0, &percent, true},
+		{time.Hour, nil, false},
+		{time.Minute, &percent, false},
+		{2 * time.Hour, &percent, true},
+	} {
+		err := store.ObserveUsageGrowth(ctx, item.ID, account.UsageGrowthObservation{
+			Day: "2026-09-30", ObservedAt: now.Add(step.offset), FiveHourPercent: step.five, SevenDayPercent: &percent,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := db.Account.Get(ctx, item.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.UsageEstimateMeta.HasFiveHour == nil || got.UsageEstimateMeta.HasFiveHourWindow() != step.want {
+			t.Fatalf("offset %s: presence = %+v, want %v", step.offset, got.UsageEstimateMeta, step.want)
+		}
+	}
+}
+
 func TestAccountStoreObserveUsageGrowthAccumulatesResetsAndDays(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {

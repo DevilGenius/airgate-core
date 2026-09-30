@@ -83,7 +83,7 @@ type Stats struct {
 	UsageEstimates          []UsageEstimate
 }
 
-// UsageEstimate 表示按最近一分钟账号成本速率换算的套餐剩余可用时间。
+// UsageEstimate 表示非 Free 账号短期总量和其中的 5h 部分。
 type UsageEstimate struct {
 	Plan    string
 	Windows []UsageEstimateWindow
@@ -91,6 +91,7 @@ type UsageEstimate struct {
 
 // UsageEstimateWindow 表示一个套餐池窗口的有效性、日增长、总容量和剩余成本估值。
 type UsageEstimateWindow struct {
+	AccountCount       int
 	Window             string
 	Status             string
 	DailyGrowthPercent float64 // 正数的当日累计用量增长（已消耗百分比增量）

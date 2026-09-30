@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
   apiKeyBilledCostDataKey,
   buildTopAPIKeyChartData,
@@ -10,9 +12,18 @@ import {
   sortTopAPIKeysByTokens,
   topAPIKeyTotalTokens,
   usageEstimateBadgeClass,
+  UsageEstimateCell,
 } from './DashboardPage';
 
 describe('dashboard usage estimate formatting', () => {
+  it('shows the short-term total, 5h subtotal, and duration of the total', () => {
+    const markup = renderToStaticMarkup(createElement(UsageEstimateCell, { estimate: {
+      total: { status: 'ready', account_count: 5, remaining_cost: 3150, remaining_minutes: 315 },
+      five_hour: { status: 'ready', account_count: 2, remaining_cost: 150, remaining_minutes: 15 },
+    } }));
+    expect(markup.replace(/<[^>]*>/g, '')).toBe('$3.2K $150 5h15m');
+  });
+
   it('formats account cost rates compactly', () => {
     expect(fmtCostPerMinute(15)).toBe('$15');
     expect(fmtCostPerMinute(13.2)).toBe('$13.2');
@@ -41,7 +52,7 @@ describe('dashboard usage estimate formatting', () => {
     expect(fmtUsageEstimateCost(3_000_000_000)).toBe('$3B');
   });
 
-  it('picks the usage estimate badge tone from the plus 5h remaining cost', () => {
+  it('picks the usage estimate badge tone from the non-Free short-term total', () => {
     expect(usageEstimateBadgeClass(undefined)).toContain('violet');
     expect(usageEstimateBadgeClass(300)).toContain('violet');
     expect(usageEstimateBadgeClass(299)).toContain('amber');
