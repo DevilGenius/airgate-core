@@ -26,6 +26,8 @@ import (
 	pluginent "github.com/DevilGenius/airgate-core/ent/plugin"
 	settingent "github.com/DevilGenius/airgate-core/ent/setting"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
+	"github.com/DevilGenius/airgate-core/internal/plantype"
+	"github.com/DevilGenius/airgate-core/internal/routegraph"
 )
 
 // pluginGRPCMaxMessageBytes 是与插件之间 gRPC 单条消息的最大字节数（收/发同值）。
@@ -474,6 +476,7 @@ func (m *Manager) publishPlugin(ctx context.Context, op *pluginUpdate, p *prepar
 			m.credCache[inst.Platform] = cloneCredentialFields(p.info.AccountTypes[0].Fields)
 		}
 		dispatchresolver.RegisterPlatformDSL(inst.Platform, p.info.DispatchDSL)
+		routegraph.SetPlatformPlanMetadata(inst.Platform, p.info.Metadata[plantype.FiltersMetadataKey])
 	}
 	if inst.Artifact.SourcePath != "" {
 		m.devPaths[inst.Name] = inst.Artifact.SourcePath
@@ -583,6 +586,7 @@ func (m *Manager) stopPlugin(name string, parents ...context.Context) {
 	m.unregisterAliasesLocked(name, inst.SourceName)
 	if inst.Platform != "" {
 		dispatchresolver.UnregisterPlatformDSL(inst.Platform)
+		routegraph.SetPlatformPlanMetadata(inst.Platform, "")
 	}
 	m.mu.Unlock()
 	if m.devWatcher != nil {

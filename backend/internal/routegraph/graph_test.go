@@ -662,8 +662,8 @@ func TestCloneAndCategoryHelpers(t *testing.T) {
 			t.Fatalf("account plan %q category keys = %v, want [team]", plan, planKeys)
 		}
 	}
-	if containsString(keys, "oauth") {
-		t.Fatalf("category keys = %v, should not include default oauth for typed OAuth account", keys)
+	if !containsString(keys, "oauth") {
+		t.Fatalf("category keys = %v, legacy category aliases must not hide the unrecognized raw plan", keys)
 	}
 	defaultOAuthKeys := accountCategoryKeys(&ent.Account{Type: "OAuth"})
 	if !containsString(defaultOAuthKeys, "oauth") {

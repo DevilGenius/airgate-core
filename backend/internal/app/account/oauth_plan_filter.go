@@ -1,9 +1,9 @@
 package account
 
 import (
-	"encoding/json"
 	"strings"
 
+	"github.com/DevilGenius/airgate-core/internal/plantype"
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
 
@@ -13,13 +13,7 @@ const (
 	defaultOAuthPlanCredential = "plan_type"
 )
 
-type oauthPlanFilterMeta struct {
-	Key           string   `json:"key"`
-	Label         string   `json:"label"`
-	CredentialKey string   `json:"credential_key"`
-	MatchMode     string   `json:"match"`
-	Matches       []string `json:"matches"`
-}
+type oauthPlanFilterMeta = plantype.Filter
 
 type oauthPlanFilter struct {
 	Platform      string
@@ -50,92 +44,28 @@ func parseOAuthPlanFilterID(value string) (platform string, key string, ok bool)
 }
 
 func pluginOAuthPlanFilters(meta plugin.PluginMeta) []oauthPlanFilter {
-	raw := strings.TrimSpace(meta.Metadata[oauthPlanMetadataKey])
-	if raw == "" || meta.Platform == "" {
+	if meta.Platform == "" {
 		return nil
 	}
-
-	var declared []oauthPlanFilterMeta
-	if err := json.Unmarshal([]byte(raw), &declared); err != nil {
-		return nil
-	}
-
-	result := make([]oauthPlanFilter, 0, len(declared))
-	for _, item := range declared {
-		key := strings.TrimSpace(item.Key)
-		if key == "" {
-			continue
-		}
-		credentialKey := strings.TrimSpace(item.CredentialKey)
-		if credentialKey == "" {
-			credentialKey = defaultOAuthPlanCredential
-		}
-		matchMode := strings.ToLower(strings.TrimSpace(item.MatchMode))
-		// Installed plugins may still declare the former empty-only None entry.
-		if key == "none" && credentialKey == defaultOAuthPlanCredential && matchMode == "empty" {
-			key, matchMode = "unknown", "unknown"
-		}
-		if matchMode != "contains" && matchMode != "normalized_contains" && matchMode != "empty" && matchMode != "unknown" {
-			matchMode = "exact"
-		}
-		matches := normalizedPlanMatches(item.Matches, key)
-		if matchMode == "empty" || matchMode == "unknown" {
-			matches = nil
-		} else if len(matches) == 0 {
-			continue
-		}
-		label := strings.TrimSpace(item.Label)
-		if matchMode == "unknown" {
-			label = "Unknown"
-		}
-		if label == "" {
-			label = key
-		}
-		result = append(result, oauthPlanFilter{
-			Platform:      meta.Platform,
-			Key:           key,
-			Label:         label,
-			CredentialKey: credentialKey,
-			MatchMode:     matchMode,
-			Matches:       matches,
-		})
-	}
-	for index := range result {
-		if result[index].MatchMode != "unknown" {
-			continue
-		}
-		for _, known := range result {
-			if known.CredentialKey != result[index].CredentialKey || known.MatchMode == "unknown" || known.MatchMode == "empty" {
-				continue
+	definitions := plantype.ParseFilters(meta.Metadata[oauthPlanMetadataKey])
+	result := make([]oauthPlanFilter, 0, len(definitions))
+	for _, item := range definitions {
+		plan := oauthPlanFilter{Platform: meta.Platform, Key: item.Key, Label: item.Label, CredentialKey: item.CredentialKey, MatchMode: item.MatchMode, Matches: item.Matches}
+		if item.MatchMode == "unknown" {
+			for _, known := range definitions {
+				if known.Known() && known.CredentialKey == item.CredentialKey {
+					plan.KnownPlans = append(plan.KnownPlans, CredentialStringFilter{Key: known.CredentialKey, Values: known.Matches, MatchMode: known.MatchMode})
+				}
 			}
-			result[index].KnownPlans = append(result[index].KnownPlans, CredentialStringFilter{
-				Key: known.CredentialKey, Values: known.Matches, MatchMode: known.MatchMode,
-			})
 		}
+		result = append(result, plan)
 	}
 	return result
 }
 
 func normalizedPlanMatches(values []string, fallback string) []string {
-	if len(values) == 0 {
-		values = []string{fallback}
-	}
-	seen := make(map[string]struct{}, len(values))
-	result := make([]string, 0, len(values))
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		result = append(result, value)
-	}
-	return result
+	return plantype.NormalizeMatches(values, fallback)
 }
-
 func (s *Service) resolveOAuthPlanFilter(value string) (oauthPlanFilter, bool) {
 	platform, key, ok := parseOAuthPlanFilterID(value)
 	if !ok || s.plugins == nil {

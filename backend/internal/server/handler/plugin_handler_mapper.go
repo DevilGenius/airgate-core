@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"encoding/json"
 	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
+	"github.com/DevilGenius/airgate-core/internal/plantype"
 	"github.com/DevilGenius/airgate-core/internal/server/dto"
+	"maps"
 )
 
 func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
@@ -26,6 +29,14 @@ func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
 			Label:       accountType.Label,
 			Description: accountType.Description,
 		})
+	}
+	if item.Platform != "" {
+		resp.Metadata = maps.Clone(item.Metadata)
+		if resp.Metadata == nil {
+			resp.Metadata = map[string]string{}
+		}
+		definitions, _ := json.Marshal(plantype.ParseFilters(item.Metadata[plantype.FiltersMetadataKey]))
+		resp.Metadata[plantype.FiltersMetadataKey] = string(definitions)
 	}
 	for _, page := range item.FrontendPages {
 		resp.FrontendPages = append(resp.FrontendPages, dto.FrontendPageResp{

@@ -163,7 +163,7 @@ func accountCredentialStringMatches(filter appaccount.CredentialStringFilter) pr
 		for _, value := range values {
 			switch filter.MatchMode {
 			case "contains":
-				valuePredicates = append(valuePredicates, sqljson.StringContains(entaccount.FieldCredentials, value, sqljson.Path(filter.Key)))
+				valuePredicates = append(valuePredicates, jsonTextContains(entaccount.FieldCredentials, filter.Key, value))
 			case "normalized_contains":
 				if normalized := plantype.Compact(value); normalized != "" {
 					valuePredicates = append(valuePredicates, normalizedJSONTextContains(entaccount.FieldCredentials, filter.Key, normalized))
@@ -179,6 +179,21 @@ func accountCredentialStringMatches(filter appaccount.CredentialStringFilter) pr
 		s.Where(sql.Or(valuePredicates...))
 	})
 	return entaccount.And(predicates...)
+}
+
+// Use literal, case-sensitive substring matching on both PostgreSQL and SQLite,
+// matching plantype.Filter.MatchesValue (SQLite LIKE is case-insensitive).
+func jsonTextContains(column, key, value string) *sql.Predicate {
+	return sql.P(func(b *sql.Builder) {
+		if b.Dialect() == dialect.Postgres {
+			b.WriteString("STRPOS(")
+		} else {
+			b.WriteString("INSTR(")
+		}
+		b.WriteString("COALESCE(")
+		b.Join(sqljson.ValuePath(column, sqljson.Path(key), sqljson.Unquote(true)))
+		b.WriteString(", ''), ").Arg(value).WriteString(") > 0")
+	})
 }
 
 func normalizedJSONTextContains(column, key, normalized string) *sql.Predicate {

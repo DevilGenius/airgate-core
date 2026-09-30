@@ -190,11 +190,11 @@ func RefreshSync(ctx context.Context, db *ent.Client) error {
 	for _, key := range apiKeys {
 		next.apiKeysByID[key.ID] = buildAPIKeyNode(key)
 	}
+	updateMu.Lock()
 	for _, group := range groups {
 		putGroupNode(next, buildGroupNode(group))
 	}
 
-	updateMu.Lock()
 	snapshotValue.Store(next)
 	updateMu.Unlock()
 	return nil
@@ -221,9 +221,8 @@ func RefreshGroup(ctx context.Context, db *ent.Client, groupID int) error {
 		}
 		return err
 	}
-	node := buildGroupNode(group)
 	updateSnapshot(func(next *Snapshot) {
-		putGroupNode(next, node)
+		putGroupNode(next, buildGroupNode(group))
 	})
 	return nil
 }
@@ -252,9 +251,8 @@ func RefreshAccount(ctx context.Context, db *ent.Client, accountID int) error {
 		}
 		return err
 	}
-	node := buildAccountNode(account)
 	updateSnapshot(func(next *Snapshot) {
-		putAccountNode(next, node)
+		putAccountNode(next, buildAccountNode(account))
 	})
 	return nil
 }
@@ -839,6 +837,11 @@ func accountCategoryKeys(account *ent.Account) []string {
 		keys = append(keys, key)
 	}
 	addCategoryValue := func(value string) {
+		// The oauth policy key is reserved for Unknown on every platform. A legacy
+		// account_type/plan alias must not enable it for known plans or API keys.
+		if normalizeCategory(value) == "oauth" {
+			return
+		}
 		replacement, aliases := accountCategoryMapping(value)
 		if replacement != "" {
 			addNormalized(replacement)
@@ -856,19 +859,30 @@ func accountCategoryKeys(account *ent.Account) []string {
 		addCategoryValue(account.Credentials[key])
 		addCategoryValue(extraString(account.Extra, key))
 	}
-	if typeKey == "oauth" && !hasNonDefaultOAuthCategory(keys) {
-		addNormalized(account.Type)
-	}
-	return keys
-}
-
-func hasNonDefaultOAuthCategory(keys []string) bool {
-	for _, key := range keys {
-		if key != "" && key != "oauth" {
-			return true
+	if typeKey == "oauth" {
+		filters := accountPlanFilters(account.Platform)
+		unknownKey := "plan_type"
+		for _, filter := range filters {
+			if filter.Key == "unknown" {
+				unknownKey = filter.CredentialKey
+				break
+			}
+		}
+		knownPlan := false
+		for _, filter := range filters {
+			if !filter.MatchesValue(account.Credentials[filter.CredentialKey]) {
+				continue
+			}
+			addNormalized(filter.Key)
+			if filter.CredentialKey == unknownKey {
+				knownPlan = true
+			}
+		}
+		if !knownPlan {
+			addNormalized(account.Type)
 		}
 	}
-	return false
+	return keys
 }
 
 func categoryCredentialKeys() []string {

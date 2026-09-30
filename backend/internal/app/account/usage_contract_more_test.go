@@ -21,8 +21,8 @@ func TestAdditionalOAuthPlanFilterBranches(t *testing.T) {
 	if got := pluginOAuthPlanFilters(plugin.PluginMeta{}); got != nil {
 		t.Fatalf("empty plugin filters = %#v", got)
 	}
-	if got := pluginOAuthPlanFilters(plugin.PluginMeta{Platform: "openai", Metadata: map[string]string{oauthPlanMetadataKey: "{"}}); got != nil {
-		t.Fatalf("invalid plugin filters = %#v", got)
+	if got := pluginOAuthPlanFilters(plugin.PluginMeta{Platform: "openai", Metadata: map[string]string{oauthPlanMetadataKey: "{"}}); len(got) == 0 || got[len(got)-1].Key != "unknown" {
+		t.Fatalf("invalid metadata must use common defaults with Unknown, got %#v", got)
 	}
 	meta := plugin.PluginMeta{
 		Platform: "openai",
@@ -35,8 +35,8 @@ func TestAdditionalOAuthPlanFilterBranches(t *testing.T) {
 		]`},
 	}
 	filters := pluginOAuthPlanFilters(meta)
-	if len(filters) != 3 {
-		t.Fatalf("filters = %+v, want three valid filters", filters)
+	if len(filters) != 4 {
+		t.Fatalf("filters = %+v, want three valid filters plus Unknown", filters)
 	}
 	if filters[0].Key != "plus" || filters[0].Label != "Plus" || filters[0].CredentialKey != "plan" ||
 		filters[0].MatchMode != "contains" || len(filters[0].Matches) != 1 || filters[0].Matches[0] != "plus" {

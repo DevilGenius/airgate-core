@@ -7,7 +7,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 )
 
-func TestUnknownOAuthPlanFilterUsesDeclaredKnownRules(t *testing.T) {
+func TestUnknownOAuthPlanFilterUsesPlatformRules(t *testing.T) {
 	for _, key := range []string{"none", "unknown"} {
 		t.Run(key, func(t *testing.T) {
 			mode := "unknown"
@@ -33,6 +33,9 @@ func TestUnknownOAuthPlanFilterUsesDeclaredKnownRules(t *testing.T) {
 			}
 			if unknown.KnownPlans[1].MatchMode != "normalized_contains" || len(unknown.KnownPlans[1].Values) != 3 {
 				t.Fatalf("lost known matching rules: %+v", unknown.KnownPlans)
+			}
+			if unknown.KnownPlans[0].MatchMode != "exact" || len(unknown.KnownPlans[0].Values) != 1 {
+				t.Fatalf("platform rules were replaced by built-in values: %+v", unknown.KnownPlans)
 			}
 		})
 	}

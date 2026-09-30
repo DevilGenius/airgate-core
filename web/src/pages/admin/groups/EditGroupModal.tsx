@@ -20,6 +20,7 @@ import { queryKeys } from '../../../shared/queryKeys';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import { usePlatforms, type OAuthPlanFilterOption } from '../../../shared/hooks/usePlatforms';
 import {
   MAX_RATE_MULTIPLIER,
   MIN_POSITIVE_RATE_MULTIPLIER,
@@ -59,13 +60,9 @@ type OpenAIOperations = {
 
 type AccountTypePolicyInputs = Record<string, { allow: string; deny: string }>;
 
-const OPENAI_ACCOUNT_TYPE_POLICY_OPTIONS = [
-  { key: 'free', label: 'Free' },
-  { key: 'plus', label: 'Plus' },
-  { key: 'pro', label: 'Pro' },
-  { key: 'team', label: 'Team' },
+const ACCOUNT_TYPE_POLICY_OPTIONS = [
   { key: 'apikey', label: 'API Key' },
-  { key: 'oauth', label: 'OAuth 缺省' },
+  { key: 'oauth', label: 'OAuth Unknown' },
 ];
 
 const IMAGE_PRICE_FIELDS: Array<{ key: keyof ImagePrices; setting: string; label: string }> = [
@@ -182,8 +179,12 @@ function buildAccountTypeModelPolicies(
   return policies;
 }
 
-function accountTypePolicyOptions(inputs: AccountTypePolicyInputs) {
-  const defaults = [...OPENAI_ACCOUNT_TYPE_POLICY_OPTIONS];
+function accountTypePolicyOptions(inputs: AccountTypePolicyInputs, platform: string, plans: OAuthPlanFilterOption[]) {
+  const defaults = [
+    ...plans.filter((plan) => plan.platform === platform && !plan.id.endsWith(':unknown'))
+      .map((plan) => ({ key: plan.id.slice(('oauth_plan:' + platform + ':').length), label: plan.planLabel })),
+    ...ACCOUNT_TYPE_POLICY_OPTIONS,
+  ];
   const known = new Set(defaults.map((item) => item.key));
   const custom = Object.keys(inputs)
     .filter((key) => !known.has(key))
@@ -272,7 +273,8 @@ export function GroupFormModal({
   const rateMultiplierEmpty = isEmptyRateMultiplierInput(form.rate_multiplier);
   const rateMultiplierValid = rateMultiplierEmpty || isValidRateMultiplierValue(rateMultiplierValue);
   const imagePricingEnabled = openaiOperations.imagesApi || openaiOperations.responsesImageGeneration;
-  const openaiAccountTypePolicyOptions = accountTypePolicyOptions(accountTypePolicyInputs);
+  const { oauthPlanFilters } = usePlatforms();
+  const typePolicyOptions = accountTypePolicyOptions(accountTypePolicyInputs, form.platform, oauthPlanFilters);
 
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
@@ -294,16 +296,14 @@ export function GroupFormModal({
     const operationPolicies = form.platform === 'openai'
       ? buildOperationPolicies(group?.operation_policies, openaiOperations)
       : group?.operation_policies;
-    const accountTypeModelPolicies = form.platform === 'openai'
-      ? buildAccountTypeModelPolicies(accountTypePolicyInputs)
-      : undefined;
+    const accountTypeModelPolicies = buildAccountTypeModelPolicies(accountTypePolicyInputs);
 
     onSubmit({
       ...form,
       note: form.note,
       rate_multiplier: rateMultiplier,
       operation_policies: operationPolicies,
-      ...(form.platform === 'openai' ? { account_type_model_policies: accountTypeModelPolicies } : {}),
+      account_type_model_policies: accountTypeModelPolicies,
       plugin_settings: Object.keys(pluginSettings).length > 0 ? pluginSettings : undefined,
       quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
       subscription_type: form.subscription_type as 'standard' | 'subscription',
@@ -579,15 +579,18 @@ export function GroupFormModal({
               </div>
             </div>
 
+          </div>
+        ) : null}
+
             <div>
               <p className="mb-1.5 text-sm font-medium text-text">
-                {t('groups.openai_account_type_model_policies')}
+                {t('groups.account_type_model_policies')}
               </p>
               <p className="mb-2 text-[11px] text-text-tertiary">
-                {t('groups.openai_account_type_model_policies_hint')}
+                {t('groups.account_type_model_policies_hint')}
               </p>
               <div className="space-y-3">
-                {openaiAccountTypePolicyOptions.map((option) => {
+                {typePolicyOptions.map((option) => {
                   const value = accountTypePolicyInputs[option.key] ?? { allow: '', deny: '' };
                   return (
                     <div key={option.key}>
@@ -597,6 +600,7 @@ export function GroupFormModal({
                             {t('groups.model_allowlist')}({option.label})
                           </Label>
                           <TextArea
+                            aria-label={`${t('groups.model_allowlist')}(${option.label})`}
                             className="ag-model-policy-textarea"
                             rows={3}
                             value={value.allow}
@@ -617,6 +621,7 @@ export function GroupFormModal({
                             {t('groups.model_denylist')}({option.label})
                           </Label>
                           <TextArea
+                            aria-label={`${t('groups.model_denylist')}(${option.label})`}
                             className="ag-model-policy-textarea"
                             rows={3}
                             value={value.deny}
@@ -638,9 +643,6 @@ export function GroupFormModal({
                 })}
               </div>
             </div>
-          </div>
-        ) : null}
-
         {form.subscription_type === 'subscription' ? (
           <div>
             <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
