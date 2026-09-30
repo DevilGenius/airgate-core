@@ -221,6 +221,9 @@
   line-height: 1;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.ag-accounts-table .ag-account-capacity[data-animated="true"] {
   transition:
     background-color 120ms ease,
     border-color 120ms ease,

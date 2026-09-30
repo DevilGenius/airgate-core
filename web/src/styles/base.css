@@ -192,6 +192,9 @@ body::selection {
   border: 1px solid var(--ag-native-switch-track-border);
   border-radius: 999px;
   background: var(--ag-native-switch-track);
+}
+
+.ag-native-switch[data-animated="true"] .ag-native-switch-track {
   transition:
     background-color 80ms ease,
     border-color 80ms ease,
@@ -206,6 +209,9 @@ body::selection {
   background: var(--ag-native-switch-thumb);
   box-shadow: 0 1px 2px var(--ag-native-switch-thumb-shadow);
   transform: translateX(0);
+}
+
+.ag-native-switch[data-animated="true"] .ag-native-switch-thumb {
   transition: transform 80ms ease;
 }
 

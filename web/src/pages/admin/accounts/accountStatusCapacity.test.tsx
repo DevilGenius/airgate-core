@@ -1,0 +1,98 @@
+import { StrictMode, Suspense } from 'react';
+import { act, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AccountCapacityStore } from './accountRuntimeStores';
+import { AccountCapacityChip, AccountCapacityLiveChip } from './accountStatusCapacity';
+
+describe('account capacity animation lifecycle', () => {
+  const cancel = vi.fn();
+  const animate = vi.fn(() => ({ cancel }));
+
+  beforeEach(() => {
+    cancel.mockClear();
+    animate.mockClear();
+    Object.defineProperty(HTMLElement.prototype, 'animate', {
+      configurable: true,
+      value: vi.fn(),
+      writable: true,
+    });
+    vi.spyOn(HTMLElement.prototype, 'animate').mockImplementation(animate as unknown as HTMLElement['animate']);
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  });
+
+  it('keeps cached list refreshes and the first live snapshot static', () => {
+    const store = new AccountCapacityStore();
+    const { rerender } = render(<AccountCapacityLiveChip rowId={1} current={4} max={10} store={store} />);
+    rerender(<AccountCapacityLiveChip rowId={1} current={2} max={10} store={store} />);
+    expect(screen.getByLabelText('2 / 10')).toHaveAttribute('data-animated', 'false');
+    expect(animate).not.toHaveBeenCalled();
+
+    act(() => store.setCount(1, 1));
+    expect(screen.getByLabelText('1 / 10')).toBeInTheDocument();
+    expect(animate).not.toHaveBeenCalled();
+    act(() => store.setCount(1, 3));
+    expect(screen.getByLabelText('3 / 10')).toBeInTheDocument();
+    expect(animate).toHaveBeenCalledTimes(2);
+  });
+
+  it('recognizes readiness even when the first snapshot equals the fallback', () => {
+    const store = new AccountCapacityStore();
+    render(<AccountCapacityLiveChip rowId={1} current={0} max={10} store={store} />);
+    act(() => store.setCount(1, 0));
+    expect(animate).not.toHaveBeenCalled();
+    act(() => store.setCount(1, 1));
+    expect(animate).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels pending animations and does not replay them on navigation back', () => {
+    const store = new AccountCapacityStore();
+    store.setCount(1, 3);
+    const { unmount } = render(<AccountCapacityLiveChip rowId={1} current={4} max={10} store={store} />);
+    act(() => store.setCount(1, 2));
+    expect(animate).toHaveBeenCalledTimes(2);
+    unmount();
+    expect(cancel).toHaveBeenCalledTimes(2);
+    animate.mockClear();
+
+    const nextStore = new AccountCapacityStore();
+    render(<AccountCapacityLiveChip rowId={1} current={4} max={10} store={nextStore} />);
+    act(() => nextStore.setCount(1, 2));
+    expect(screen.getByLabelText('2 / 10')).toBeInTheDocument();
+    expect(animate).not.toHaveBeenCalled();
+    act(() => nextStore.setCount(1, 1));
+    expect(animate).toHaveBeenCalledTimes(2);
+  });
+
+  it('resets the baseline when Suspense hides and restores existing content', () => {
+    const pending = new Promise<never>(() => {});
+    function Content({ suspended, value }: { suspended: boolean; value: number }) {
+      if (suspended) throw pending;
+      return <AccountCapacityChip current={value} max={10} />;
+    }
+    const view = (suspended: boolean, value: number) => (
+      <Suspense fallback={<span>Loading</span>}>
+        <Content suspended={suspended} value={value} />
+      </Suspense>
+    );
+    const { rerender } = render(view(false, 1));
+    rerender(view(false, 2));
+    expect(animate).toHaveBeenCalledTimes(2);
+    rerender(view(true, 2));
+    expect(cancel).toHaveBeenCalledTimes(2);
+    animate.mockClear();
+    rerender(view(false, 3));
+    expect(screen.getByLabelText('3 / 10')).toBeInTheDocument();
+    expect(animate).not.toHaveBeenCalled();
+    rerender(view(false, 4));
+    expect(animate).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not animate StrictMode mounting or repeated identical values', () => {
+    const view = (value: number) => <StrictMode><AccountCapacityChip current={value} max={10} /></StrictMode>;
+    const { rerender } = render(view(1));
+    rerender(view(1));
+    expect(animate).not.toHaveBeenCalled();
+    rerender(view(2));
+    expect(animate).toHaveBeenCalledTimes(2);
+  });
+});

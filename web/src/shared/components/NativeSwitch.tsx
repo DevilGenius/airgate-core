@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 
 interface NativeSwitchProps {
   ariaLabel?: string;
@@ -25,12 +25,14 @@ export function NativeSwitch({
   name,
   onChange,
 }: NativeSwitchProps) {
+  // Restoring query/form state after navigation is not a toggle interaction.
+  const [hasInteracted, setHasInteracted] = useState(false);
   const content = label ?? children;
   const rootClassName = ['ag-native-switch', className].filter(Boolean).join(' ');
   const labelClassName = ['ag-native-switch-content', contentClassName].filter(Boolean).join(' ');
 
   return (
-    <label className={rootClassName} data-disabled={isDisabled ? 'true' : 'false'}>
+    <label className={rootClassName} data-disabled={isDisabled ? 'true' : 'false'} data-animated={hasInteracted ? 'true' : 'false'}>
       <input
         aria-label={ariaLabel}
         checked={isSelected}
@@ -39,7 +41,10 @@ export function NativeSwitch({
         name={name}
         role="switch"
         type="checkbox"
-        onChange={(event) => onChange(event.currentTarget.checked)}
+        onChange={(event) => {
+          setHasInteracted(true);
+          onChange(event.currentTarget.checked);
+        }}
       />
       <span className="ag-native-switch-track" aria-hidden="true">
         <span className="ag-native-switch-thumb" />

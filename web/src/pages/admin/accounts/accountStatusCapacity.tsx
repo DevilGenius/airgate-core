@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
+import { memo, useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Ban } from 'lucide-react';
 import { getAdminServerNowMs } from '../../../shared/api/adminEvents';
@@ -363,17 +363,27 @@ function prefersReducedMotion() {
  * 动画走 WAAPI（仅 transform/opacity，GPU 合成层），可被 cancel() 干净中断，无每行定时器/状态，
  * 100 行高频更新下保持高性能。首次挂载、document.hidden、prefers-reduced-motion 时不触发动画。
  */
-function AccountCapacityNumber({ value }: { value: number }) {
+function AccountCapacityNumber({ value, animate }: { value: number; animate: boolean }) {
   const incomingRef = useRef<HTMLSpanElement | null>(null);
   const outgoingRef = useRef<HTMLSpanElement | null>(null);
-  const previousRef = useRef(value);
+  const previousRef = useRef<number | undefined>(undefined);
   const animationsRef = useRef<Animation[]>([]);
   const display = formatAccountCapacityDisplay(value);
 
+  useLayoutEffect(() => () => {
+    // Suspense can disconnect layout effects while preserving component state.
+    // Treat the next visible value as a new baseline, just like a remount.
+    previousRef.current = undefined;
+    for (const animation of animationsRef.current) animation.cancel();
+    animationsRef.current = [];
+  }, []);
+
   useLayoutEffect(() => {
     const previous = previousRef.current;
-    if (previous === value) return;
     previousRef.current = value;
+    for (const animation of animationsRef.current) animation.cancel();
+    animationsRef.current = [];
+    if (!animate || previous === undefined || previous === value) return;
 
     const incoming = incomingRef.current;
     const outgoing = outgoingRef.current;
@@ -383,7 +393,6 @@ function AccountCapacityNumber({ value }: { value: number }) {
 
     // 中断上一轮滚动：cancel() 后两层瞬回 CSS 静止态（incoming 显示新值、outgoing 隐藏），
     // 因 incoming 文本始终是当前值，绝不会出现内容硬切/闪错值。
-    for (const animation of animationsRef.current) animation.cancel();
     const previousDisplay = formatAccountCapacityDisplay(previous);
     outgoing.textContent = previousDisplay.text;
     outgoing.dataset.fit = previousDisplay.fit;
@@ -413,12 +422,7 @@ function AccountCapacityNumber({ value }: { value: number }) {
         options,
       ),
     ];
-  }, [value]);
-
-  useEffect(() => () => {
-    for (const animation of animationsRef.current) animation.cancel();
-    animationsRef.current = [];
-  }, []);
+  }, [animate, value]);
 
   return (
     <>
@@ -434,19 +438,20 @@ function AccountCapacityNumber({ value }: { value: number }) {
   );
 }
 
-export const AccountCapacityChip = memo(function AccountCapacityChip({ current, max }: { current: number; max: number }) {
+export const AccountCapacityChip = memo(function AccountCapacityChip({ current, max, animate = true }: { current: number; max: number; animate?: boolean }) {
   const state = current <= 0 ? 'idle' : current >= max ? 'full' : 'active';
   const maxDisplay = formatAccountCapacityDisplay(max);
 
   return (
     <span
       className="ag-account-capacity"
+      data-animated={animate ? 'true' : 'false'}
       data-state={state}
       title={`${current} / ${max}`}
       aria-label={`${current} / ${max}`}
     >
       <span className="ag-account-capacity-current">
-        <AccountCapacityNumber value={current} />
+        <AccountCapacityNumber value={current} animate={animate} />
       </span>
       <span className="ag-account-capacity-divider">/</span>
       <span className="ag-account-capacity-max" data-fit={maxDisplay.fit}>{maxDisplay.text}</span>
@@ -465,15 +470,17 @@ export const AccountCapacityLiveChip = memo(function AccountCapacityLiveChip({
   rowId: number;
   store: AccountCapacityStore;
 }) {
+  // Subscribe to readiness as well as the count: undefined -> 0 must notify
+  // even when the list fallback is also 0. List/cache restoration is static.
   const liveCurrent = useSyncExternalStore(
     useCallback((listener) => store.subscribe(rowId, listener), [rowId, store]),
-    useCallback(() => store.getCurrent(rowId, current), [current, rowId, store]),
-    () => current,
+    useCallback(() => store.has(rowId) ? store.getCurrent(rowId, 0) : undefined, [rowId, store]),
+    () => undefined,
   );
 
   // 首次用实时值替换列表 fallback 时通过 remount 直接跳变，不播放滚动动画：
   // 页面切回时列表缓存值与首个容量快照之间几乎必然存在差值，
   // 没有这一步会把"最后一次容量变化"在每次切换页面时重复播放一遍。
-  const isLive = store.has(rowId);
-  return <AccountCapacityChip key={isLive ? 'live' : 'seed'} current={liveCurrent} max={max} />;
+  const isLive = liveCurrent !== undefined;
+  return <AccountCapacityChip key={isLive ? 'live' : 'seed'} current={liveCurrent ?? current} max={max} animate={isLive} />;
 });
