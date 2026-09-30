@@ -7,6 +7,7 @@ import (
 
 	entaccount "github.com/DevilGenius/airgate-core/ent/account"
 	"github.com/DevilGenius/airgate-core/internal/accountusage"
+	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 )
 
 func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
@@ -137,7 +138,12 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	}
 }
 
-func TestDashboardStoreUsageEstimatesSeparatePlusAndProPaths(t *testing.T) {
+// TestDashboardStoreUsageEstimatesAggregateNonFreeAccounts locks the aggregate
+// contract of loadDashboardUsageEstimates: every non-Free OpenAI OAuth account
+// is folded into a single non_free estimate with total + 5h windows, while
+// per-plan calibration never mixes rates across plan_type values (which is
+// observable through the aggregated remaining cost).
+func TestDashboardStoreUsageEstimatesAggregateNonFreeAccounts(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -172,34 +178,46 @@ func TestDashboardStoreUsageEstimatesSeparatePlusAndProPaths(t *testing.T) {
 		}
 		return item.ID
 	}
-	plusID := createAccount("plus", "ChatGPT Plus", 0.5, 20, 50) // full $50, remaining $25
-	teamID := createAccount("team", "Team", 0.5, 40, 60)         // full $50, remaining $20
-	proID := createAccount("pro", "Pro", 1, 30, 70)              // full $100, remaining $30
+	loadWindows := func() []appdashboard.UsageEstimateWindow {
+		t.Helper()
+		estimates, err := NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
+		if err != nil {
+			t.Fatalf("loadDashboardUsageEstimates: %v", err)
+		}
+		if len(estimates) != 1 || estimates[0].Plan != "non_free" || len(estimates[0].Windows) != 2 ||
+			estimates[0].Windows[0].Window != "total" || estimates[0].Windows[1].Window != "5h" {
+			t.Fatalf("estimates = %+v, want one non_free estimate with total+5h windows", estimates)
+		}
+		return estimates[0].Windows
+	}
+	requireMinutes := func(label string, window appdashboard.UsageEstimateWindow, want float64) {
+		t.Helper()
+		got := -1.0
+		if window.RemainingMinutes != nil {
+			got = *window.RemainingMinutes
+		}
+		if window.RemainingMinutes == nil || got != want {
+			t.Fatalf("%s remaining minutes = %v, want %v (%+v)", label, got, want, window)
+		}
+	}
+	plusID := createAccount("plus", "ChatGPT Plus", 0.5, 20, 50) // 7d rate 0.5, +20%, 50% used
+	teamID := createAccount("team", "Team", 0.5, 40, 60)         // 7d rate 0.5, +40%, 60% used
+	proID := createAccount("pro", "Pro", 1, 30, 70)              // 7d rate 1.0, +30%, 70% used
 	disabledID := createAccount("disabled", "Plus", 2, 0, 0)
 	if err := db.Account.UpdateOneID(disabledID).SetState(entaccount.StateDisabled).Exec(ctx); err != nil {
 		t.Fatalf("disable account: %v", err)
 	}
 
-	estimates, err := NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
-	if err != nil {
-		t.Fatalf("loadDashboardUsageEstimates: %v", err)
+	// Disabled accounts are skipped. plus/team/pro share one 7d pool but keep
+	// their own calibrated rates, so the aggregate remaining cost is
+	// 0.5*50 + 0.5*40 + 1*30 = $75 (75 min at $1/min) and no 5h sample exists.
+	windows := loadWindows()
+	if windows[0].Status != "ready" || windows[0].AccountCount != 3 {
+		t.Fatalf("total window = %+v, want a ready aggregate of 3 accounts", windows[0])
 	}
-	if len(estimates) != 2 {
-		t.Fatalf("estimates = %+v, want Plus and Pro", estimates)
-	}
-	if estimates[0].Plan != "plus" || len(estimates[0].Windows) != 1 {
-		t.Fatalf("plus estimate = %+v, want only 7d", estimates[0])
-	}
-	plusWindow := estimates[0].Windows[0]
-	if plusWindow.Window != "7d" || plusWindow.Status != "ready" || plusWindow.DailyGrowthPercent != 20 || plusWindow.FullCost != 50 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 25 {
-		t.Fatalf("plus 7d estimate = %+v, want +20%% $50 25min", plusWindow)
-	}
-	if estimates[1].Plan != "pro" || len(estimates[1].Windows) != 1 {
-		t.Fatalf("pro estimate = %+v, want only 7d", estimates[1])
-	}
-	proWindow := estimates[1].Windows[0]
-	if proWindow.Window != "7d" || proWindow.Status != "ready" || proWindow.DailyGrowthPercent != 30 || proWindow.FullCost != 200 || proWindow.RemainingMinutes == nil || *proWindow.RemainingMinutes != 75 {
-		t.Fatalf("pro 7d estimate = %+v, want +30%% $200 75min", proWindow)
+	requireMinutes("total", windows[0], 75)
+	if windows[1].Status != "ready" || windows[1].AccountCount != 0 {
+		t.Fatalf("5h window = %+v, want ready/zero because only 7d observations exist", windows[1])
 	}
 
 	plusAccount, err := db.Account.Get(ctx, plusID)
@@ -217,48 +235,50 @@ func TestDashboardStoreUsageEstimatesSeparatePlusAndProPaths(t *testing.T) {
 	if err := db.Account.UpdateOneID(plusID).SetUsageEstimateMeta(plusMeta).Exec(ctx); err != nil {
 		t.Fatalf("set calibrated zero-growth 5h sample: %v", err)
 	}
-	estimates, err = NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
-	if err != nil {
-		t.Fatalf("load estimates with calibrated zero-growth 5h: %v", err)
+	// A calibrated 5h sample moves plus into the 5h pool; the two pools stay
+	// independently calibrated (5h: $50 full / $50 left; 7d: $150 full / $50 left).
+	windows = loadWindows()
+	if windows[1].Status != "ready" || windows[1].AccountCount != 1 || windows[1].FullCost != 50 || windows[1].DailyGrowthPercent != 0 {
+		t.Fatalf("5h window = %+v, want the plus account alone at $50 full cost", windows[1])
 	}
-	if len(estimates[0].Windows) != 2 || estimates[0].Windows[0].Window != "5h" || estimates[0].Windows[0].Status != "ready" || estimates[0].Windows[0].DailyGrowthPercent != 0 || estimates[0].Windows[0].FullCost != 50 ||
-		len(estimates[1].Windows) != 2 || estimates[1].Windows[0].Window != "5h" || estimates[1].Windows[0].Status != "ready" || estimates[1].Windows[0].FullCost != 200 {
-		t.Fatalf("short-term estimates should choose 5h or 7d per plan type: %+v", estimates)
+	requireMinutes("5h", windows[1], 50)
+	if windows[0].AccountCount != 3 {
+		t.Fatalf("total window = %+v, want 1 five-hour plus 2 seven-day observations", windows[0])
 	}
+	requireMinutes("total", windows[0], 100)
 
+	// An uncalibrated Plus account is counted but contributes no rate, so the
+	// aggregate only grows by its account count.
 	newID := createAccount("new", "Plus", 0, 0, 0)
-	estimates, err = NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
-	if err != nil {
-		t.Fatalf("load estimates with partial new account: %v", err)
+	windows = loadWindows()
+	if windows[0].AccountCount != 4 {
+		t.Fatalf("total window = %+v, want the uncalibrated account counted once", windows[0])
 	}
-	plusWindow = estimates[0].Windows[1]
-	if plusWindow.Status != "ready" || plusWindow.FullCost != 100 || plusWindow.DailyGrowthPercent != 10 || plusWindow.RemainingMinutes == nil || *plusWindow.RemainingMinutes != 75 {
-		t.Fatalf("new account should use the shared Plus standard: %+v", plusWindow)
-	}
+	requireMinutes("total", windows[0], 100)
 
+	// Reactivating the calibrated Plus account gives the 7d pool a Plus rate (2.0),
+	// and same-plan accounts share that standard: both Plus accounts now contribute
+	// 2*100 = $200 each, so the aggregate is 50 (5h) + 200 + 200 + 20 (team) +
+	// 30 (pro) = $500.
 	if err := db.Account.UpdateOneID(disabledID).SetState(entaccount.StateActive).Exec(ctx); err != nil {
 		t.Fatalf("reactivate account: %v", err)
 	}
-	estimates, err = NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
-	if err != nil {
-		t.Fatalf("load estimates after reactivation: %v", err)
+	windows = loadWindows()
+	if windows[0].AccountCount != 5 {
+		t.Fatalf("total window = %+v, want the reactivated account included", windows[0])
 	}
-	if estimates[0].Windows[1].Status != "ready" || estimates[0].Windows[1].FullCost != 375 ||
-		estimates[1].Windows[1].Status != "ready" || estimates[1].Windows[1].FullCost != 525 {
-		t.Fatalf("reactivated calibrated account should rejoin estimates: %+v", estimates)
-	}
+	requireMinutes("total", windows[0], 500)
 
+	// With every calibrated account disabled, only the uncalibrated Plus account
+	// remains: the aggregate stays present but insufficient.
 	for _, id := range []int{plusID, teamID, proID, disabledID} {
 		if err := db.Account.UpdateOneID(id).SetState(entaccount.StateDisabled).Exec(ctx); err != nil {
 			t.Fatalf("disable calibrated account %d: %v", id, err)
 		}
 	}
-	estimates, err = NewDashboardStore(db).loadDashboardUsageEstimates(ctx, now, 1)
-	if err != nil {
-		t.Fatalf("load all-new estimates: %v", err)
-	}
-	if len(estimates) != 1 || estimates[0].Plan != "plus" || len(estimates[0].Windows) != 1 || estimates[0].Windows[0].Status != "insufficient" {
-		t.Fatalf("all-new active pool should be insufficient: %+v (new_id=%d)", estimates, newID)
+	windows = loadWindows()
+	if windows[0].Status != "insufficient" || windows[0].AccountCount != 1 || windows[0].RemainingCost != nil {
+		t.Fatalf("total window = %+v, want insufficient from the uncalibrated account (new_id=%d)", windows[0], newID)
 	}
 }
 
