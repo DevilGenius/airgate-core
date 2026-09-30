@@ -264,11 +264,15 @@ export default function UsersPage() {
         {t('users.balance_history_short', '记录')}
       </UserRowActionButton>
       {showMoreMenu ? (
-        <TableRowMoreMenu
-          ariaLabel={t('common.more')}
-          menuLabel={t('common.actions')}
-          items={getUserMoreMenuItems(row)}
-        />
+        row.role === 'admin' ? (
+          <span className="ag-users-row-action-placeholder" aria-hidden="true" />
+        ) : (
+          <TableRowMoreMenu
+            ariaLabel={t('common.more')}
+            menuLabel={t('common.actions')}
+            items={getUserMoreMenuItems(row)}
+          />
+        )
       ) : null}
     </div>
   );
@@ -345,19 +349,22 @@ export default function UsersPage() {
       ) : (
       <CommonTable
         ariaLabel={t('users.title', 'Users')}
-        minWidth={1180}
+        className="ag-users-table"
+        minWidth={1140}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="id" style={{ width: 72 }}>
+              <CommonTable.Column id="id" className="ag-users-column-id">
                 ID
               </CommonTable.Column>
-              <CommonTable.Column id="email">{t('users.email')}</CommonTable.Column>
-              <CommonTable.Column id="username">{t('users.username')}</CommonTable.Column>
-              <CommonTable.Column id="role">{t('users.role')}</CommonTable.Column>
-              <CommonTable.Column id="balance">{t('users.balance')}</CommonTable.Column>
-              <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
-              <CommonTable.Column id="created_at">{t('users.created_at')}</CommonTable.Column>
-              <CommonTable.Column id="actions" style={{ width: 224 }}>{t('common.actions')}</CommonTable.Column>
+              <CommonTable.Column id="email" className="ag-users-column-email">
+                <span className="ag-users-cell-start">{t('users.email')}</span>
+              </CommonTable.Column>
+              <CommonTable.Column id="username" className="ag-users-column-username">{t('users.username')}</CommonTable.Column>
+              <CommonTable.Column id="role" className="ag-users-column-role">{t('users.role')}</CommonTable.Column>
+              <CommonTable.Column id="balance" className="ag-users-column-balance">{t('users.balance')}</CommonTable.Column>
+              <CommonTable.Column id="status" className="ag-users-column-status">{t('common.status')}</CommonTable.Column>
+              <CommonTable.Column id="created_at" className="ag-users-column-created">{t('users.created_at')}</CommonTable.Column>
+              <CommonTable.Column id="actions" className="ag-users-column-actions">{t('common.actions')}</CommonTable.Column>
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
@@ -377,18 +384,18 @@ export default function UsersPage() {
                       <span className="text-text-tertiary font-mono">{row.id}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <div className="flex items-center gap-2.5">
+                      <div className="ag-users-identity">
                         <div
                           className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
                           style={{ backgroundColor: getAvatarColor(row.email) }}
                         >
                           {(row.email[0] ?? '?').toUpperCase()}
                         </div>
-                        <span className="text-text truncate">{row.email}</span>
+                        <span className="text-text truncate" title={row.email}>{row.email}</span>
                       </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="text-text-secondary">{row.username || '-'}</span>
+                      <span className="ag-users-cell-truncate text-text-secondary" title={row.username || undefined}>{row.username || '-'}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <NativeUserRoleChip tone={row.role === 'admin' ? 'warning' : 'default'}>
@@ -396,13 +403,13 @@ export default function UsersPage() {
                       </NativeUserRoleChip>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="font-mono">${row.balance.toFixed(2)}</span>
+                      <span className="ag-users-cell-truncate font-mono" title={`$${row.balance.toFixed(2)}`}>${row.balance.toFixed(2)}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       {renderUserStatus(row)}
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="text-xs text-text-secondary">{formatDateTime(row.created_at)}</span>
+                      <span className="ag-users-cell-truncate text-xs text-text-secondary" title={formatDateTime(row.created_at)}>{formatDateTime(row.created_at)}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       {renderUserActions(row)}

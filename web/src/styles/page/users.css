@@ -1,4 +1,78 @@
-/* Users page: mobile toolbar layout and mobile record cards. */
+/* Users page: table alignment, mobile toolbar layout and record cards. */
+
+.ag-users-table {
+  --ag-users-id-width: 3.5rem;
+  --ag-users-email-width: clamp(15rem, 24%, 20rem);
+  --ag-users-username-width: clamp(7rem, 10%, 9rem);
+  /* Seven 28px actions, six 2px gaps and 24px cell padding. */
+  --ag-users-actions-width: 14.5rem;
+  --ag-users-detail-width: calc(100% - var(--ag-users-id-width) - var(--ag-users-email-width) - var(--ag-users-username-width) - var(--ag-users-actions-width));
+}
+
+.ag-users-table .ag-resource-table-content {
+  table-layout: fixed;
+}
+
+.ag-users-table .ag-users-column-id {
+  width: var(--ag-users-id-width);
+}
+
+.ag-users-table .ag-users-column-email {
+  width: var(--ag-users-email-width);
+}
+
+.ag-users-table .ag-users-column-username {
+  width: var(--ag-users-username-width);
+}
+
+.ag-users-table .ag-users-column-role {
+  width: calc(var(--ag-users-detail-width) * 0.18);
+}
+
+.ag-users-table .ag-users-column-balance {
+  width: calc(var(--ag-users-detail-width) * 0.24);
+}
+
+.ag-users-table .ag-users-column-status {
+  width: calc(var(--ag-users-detail-width) * 0.22);
+}
+
+.ag-users-table .ag-users-column-created {
+  width: calc(var(--ag-users-detail-width) * 0.36);
+}
+
+.ag-users-table .ag-users-column-actions {
+  width: var(--ag-users-actions-width);
+}
+
+.ag-users-table .ag-users-cell-truncate {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-users-table .ag-users-identity {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  text-align: start;
+}
+
+.ag-users-table .ag-users-cell-start {
+  display: block;
+  width: 100%;
+  text-align: start;
+}
+
+/* Keep every action in the same column when the admin has no more menu. */
+.ag-users-table .ag-users-row-action-placeholder {
+  flex: 0 0 1.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
+}
 
 @media (max-width: 767px) {
   /* Toolbar: search + status share the first row. */
