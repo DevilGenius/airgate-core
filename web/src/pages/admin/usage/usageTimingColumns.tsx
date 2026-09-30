@@ -1,10 +1,14 @@
 import type { UsageColumnConfig } from '../../../shared/columns/usageColumns';
 import type { UsageLogResp } from '../../../shared/types';
 
-type TimingRow = Pick<UsageLogResp, 'output_tokens' | 'duration_ms' | 'first_token_ms'>;
+type TimingRow = Pick<UsageLogResp, 'output_tokens' | 'duration_ms' | 'first_token_ms' | 'stream' | 'account_type'>;
 
 /** Output tokens already include reasoning tokens; never add them a second time. */
 export function usageTokensPerSecond(row: TimingRow): number | null {
+  // A synchronous API Key response arrives as a complete body, so subtracting
+  // its first-token timestamp leaves parsing time, not token generation time.
+  const accountType = row.account_type?.trim().toLowerCase();
+  if (row.stream === false && (accountType === 'apikey' || accountType === 'api_key')) return null;
   const { output_tokens: tokens, duration_ms: duration, first_token_ms: firstToken } = row;
   if (!Number.isFinite(tokens) || tokens <= 0 || !Number.isFinite(duration) || duration <= 0) return null;
   const elapsed = Number.isFinite(firstToken) && firstToken > 0 ? duration - firstToken : duration;

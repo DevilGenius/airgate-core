@@ -159,6 +159,18 @@ func usageRouteSummary() appusage.Summary {
 	return appusage.Summary{TotalRequests: 3, TotalTokens: 30, TotalCost: 1.25, TotalActualCost: 1.1, TotalBilledCost: 1.8}
 }
 
+func TestUsageResponseIncludesAccountTypeWithoutChangingTimings(t *testing.T) {
+	record := usageRouteLogRecord()
+	record.AccountType = "apikey"
+	record.Stream = false
+	record.DurationMs = 10001
+	record.FirstTokenMs = 10000
+	resp := toUsageLogResp(record)
+	if resp.AccountType != "apikey" || resp.Stream || resp.DurationMs != 10001 || resp.FirstTokenMs != 10000 {
+		t.Fatalf("unexpected account type or timing: type=%q stream=%v duration=%d firstToken=%d", resp.AccountType, resp.Stream, resp.DurationMs, resp.FirstTokenMs)
+	}
+}
+
 func TestUsageRoutesReturnScopedAndAdminPayloads(t *testing.T) {
 	repo := &usageRouteRepoStub{}
 	handler := NewUsageHandler(appusage.NewService(repo))

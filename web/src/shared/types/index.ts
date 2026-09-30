@@ -567,6 +567,8 @@ export interface UsageLogResp {
   account_id: number;
   account_name?: string;
   account_email?: string;
+  /** Upstream account type, independent of the caller's API key. */
+  account_type?: string;
   account_deleted?: boolean;
   group_id: number;
   platform: string;

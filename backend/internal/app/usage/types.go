@@ -63,6 +63,7 @@ type LogRecord struct {
 	AccountID             int64
 	AccountName           string
 	AccountEmail          string
+	AccountType           string
 	AccountDeleted        bool
 	GroupID               int64
 	Platform              string

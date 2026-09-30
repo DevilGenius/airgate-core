@@ -59,7 +59,24 @@ describe('tokens per second', () => {
     [Number.NaN, 1000, 0, null],
     [100, Number.POSITIVE_INFINITY, 0, null],
   ])('tokens=%s duration=%s firstToken=%s => %s', (output_tokens, duration_ms, first_token_ms, expected) => {
-    expect(usageTokensPerSecond({ output_tokens, duration_ms, first_token_ms })).toBe(expected);
+    expect(usageTokensPerSecond({ output_tokens, duration_ms, first_token_ms, stream: true })).toBe(expected);
+  });
+
+  it.each(['apikey', 'api_key', ' APIKey '])('omits misleading TPS for synchronous %s upstreams', (account_type) => {
+    expect(usageTokensPerSecond({
+      output_tokens: 1000, duration_ms: 10001, first_token_ms: 10000, stream: false, account_type,
+    })).toBeNull();
+  });
+
+  it.each([
+    ['apikey', true],
+    ['api_key', true],
+    ['oauth', false],
+    [undefined, false],
+  ])('preserves TPS for account type %s with stream=%s', (account_type, stream) => {
+    expect(usageTokensPerSecond({
+      output_tokens: 1000, duration_ms: 10001, first_token_ms: 10000, stream, account_type,
+    })).toBe(1000000);
   });
 });
 

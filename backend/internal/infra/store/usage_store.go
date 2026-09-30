@@ -700,6 +700,7 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 			record.AccountEmail = *item.Edges.Account.Email
 		}
 		record.AccountName = item.Edges.Account.Name
+		record.AccountType = item.Edges.Account.Type
 	} else {
 		record.AccountName = "-"
 	}
