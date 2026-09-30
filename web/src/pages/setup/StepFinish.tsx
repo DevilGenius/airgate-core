@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import { Alert, Button, Card, Chip } from '@heroui/react';
+import { Card } from '../../shared/components/Card';
+import { Alert, Button, Chip } from '@heroui/react';
 import { setupApi } from '../../shared/api/setup';
 import { markSetupComplete } from '../../app/routeGuards';
 import {

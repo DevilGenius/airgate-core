@@ -1,10 +1,13 @@
+import { PageToolbarFrame } from '../shared/components/PageToolbar';
+import { Panel } from '../shared/components/Panel';
 import { TokenTrendChart } from '../shared/charts/TokenTrendChart';
 import { TimeSeriesChart } from '../shared/charts/TimeSeriesChart';
 import { buildAPIKeyTrendModel } from '../shared/charts/apiKeyTrend';
 import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Alert, Card, Skeleton, Tabs } from '@heroui/react';
+import { Card } from '../shared/components/Card';
+import { Alert, Skeleton, Tabs } from '@heroui/react';
 import {
   Activity,
   Astroid,
@@ -162,34 +165,6 @@ export function UsageEstimateCell({ estimate }: { estimate?: DashboardUsageEstim
   );
 }
 
-function DashboardCard({
-  children,
-  extra,
-  title,
-}: {
-  children: ReactNode;
-  extra?: ReactNode;
-  title?: string;
-}) {
-  const hasHeader = Boolean(title || extra);
-
-  return (
-    <Card className="ag-dashboard-panel">
-      {hasHeader ? (
-        <div
-          className={`flex items-center gap-3 p-3 pb-2 ${title ? 'justify-between' : 'justify-end'}`}
-        >
-          {title ? <h3 className="text-base font-semibold leading-none text-text">{title}</h3> : null}
-          {extra ? (
-            <div className="shrink-0">{extra}</div>
-          ) : null}
-        </div>
-      ) : null}
-      <Card.Content className={hasHeader ? 'px-3 pb-3' : 'p-3'}>{children}</Card.Content>
-    </Card>
-  );
-}
-
 function MetricCard({
   icon,
   meta,
@@ -208,7 +183,7 @@ function MetricCard({
   valueSuffix?: string;
 }) {
   return (
-    <Card className="ag-dashboard-metric min-h-[72px]">
+    <Card density="compact" className="ag-dashboard-metric min-h-[72px]">
       <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
           <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">{title}</div>
@@ -290,7 +265,7 @@ function PerformanceMetricCard({
   const rpmTrend = rpm1mInteger > rpm10mInteger ? 'up' : rpm1mInteger < rpm10mInteger ? 'down' : 'flat';
   const badge = rpmBadge(rpm1m);
   return (
-    <Card className="ag-dashboard-metric min-h-[72px]">
+    <Card density="compact" className="ag-dashboard-metric min-h-[72px]">
       <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
           <div className="flex h-5 min-w-0 items-center gap-1 text-sm font-semibold tracking-normal text-text">
@@ -342,7 +317,7 @@ function StatsSkeleton() {
   return (
     <div className="ag-dashboard-metrics-grid grid auto-rows-fr gap-3">
       {Array.from({ length: 8 }).map((_, index) => (
-        <Card className="ag-dashboard-metric min-h-[72px]" key={index}>
+        <Card density="compact" className="ag-dashboard-metric min-h-[72px]" key={index}>
           <Card.Content className="ag-dashboard-metric-content p-3">
             <div className="ag-dashboard-metric-copy space-y-2">
               <Skeleton className="h-3 w-24" />
@@ -368,7 +343,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
   const totalRemainingCost = total?.status === 'ready' ? total.remaining_cost : undefined;
   return (
     <div className="ag-dashboard-metrics-grid grid auto-rows-fr gap-3">
-      <Card className="ag-dashboard-metric min-h-[72px]">
+      <Card density="compact" className="ag-dashboard-metric min-h-[72px]">
         <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
           <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">
@@ -430,7 +405,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         rpm10m={stats.rpm_10m ?? 0}
         tpm10m={stats.tpm_10m ?? 0}
       />
-      <Card className="ag-dashboard-metric min-h-[72px]">
+      <Card density="compact" className="ag-dashboard-metric min-h-[72px]">
         <Card.Content className="ag-dashboard-metric-content p-3">
           <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
             <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">
@@ -528,7 +503,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
   );
 
   return (
-    <DashboardCard title={activeTitle} extra={distributionTabs}>
+    <Panel title={activeTitle} extra={distributionTabs}>
       <div className="ag-distribution-table-scroll">
         <CompactDataTable
           ariaLabel={activeTitle}
@@ -581,7 +556,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
           ]}
         />
       </div>
-    </DashboardCard>
+    </Panel>
   );
 }
 
@@ -593,13 +568,13 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
     actualCost: item.actual_cost, standardCost: item.standard_cost,
   })), [trend.token_trend]);
   return (
-    <DashboardCard title={t('dashboard.token_trend')}>
+    <Panel title={t('dashboard.token_trend')}>
       <div className="ag-dashboard-token-trend-chart h-[248px] w-full min-w-0">
         {data.length > 0 ? <TokenTrendChart data={data} /> : (
           <div className="flex h-full items-center justify-center text-sm text-text">{t('common.no_data')}</div>
         )}
       </div>
-    </DashboardCard>
+    </Panel>
   );
 }
 
@@ -607,13 +582,13 @@ function TopAPIKeysCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
   const model = useMemo(() => buildAPIKeyTrendModel(trend.top_api_keys ?? [], t('usage.api_key_plugin_call')), [trend.top_api_keys, t]);
   return (
-    <DashboardCard title={t('dashboard.top_api_keys')}>
+    <Panel title={t('dashboard.top_api_keys')}>
       <div className="ag-dashboard-api-key-trend-chart h-[268px] w-full min-w-0">
         {model.times.length > 0 ? <TimeSeriesChart model={model} label={t('dashboard.top_api_keys')} /> : (
           <div className="flex h-full items-center justify-center text-sm text-text">{t('common.no_data')}</div>
         )}
       </div>
-    </DashboardCard>
+    </Panel>
   );
 }
 
@@ -678,7 +653,7 @@ export default function DashboardPage() {
 
       {statsQuery.isLoading ? <StatsSkeleton /> : statsQuery.data ? <StatsCards stats={statsQuery.data} /> : null}
 
-      <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4">
+      <PageToolbarFrame className="ag-dashboard-toolbar" flow="stack">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.time_range')}</span>
           <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={range} onSelectionChange={(key) => setRange(key as RangePreset)}>
@@ -755,7 +730,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </div>
+      </PageToolbarFrame>
 
       {trendQuery.isLoading && !trendQuery.data ? (
         <div className="ag-dashboard-trends">

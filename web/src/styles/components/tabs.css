@@ -4,7 +4,7 @@
 
 .ag-page-tabs,
 .ag-segmented-tabs {
-  --ag-tabs-outer-radius: var(--field-radius);
+  --ag-tabs-outer-radius: var(--ag-control-radius);
   --ag-tabs-inner-radius: calc(var(--ag-tabs-outer-radius) - 0.125rem);
   max-width: 100%;
 }
@@ -30,7 +30,7 @@
   border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
   border-radius: var(--ag-tabs-outer-radius);
   background: color-mix(in oklab, var(--surface-secondary) 90%, var(--background) 10%);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--surface) 42%, transparent);
+  padding: 0.25rem;
 }
 
 .ag-page-tabs :where(.tabs__tab, [data-slot="tabs-tab"]),

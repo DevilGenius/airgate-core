@@ -1,6 +1,7 @@
+import styles from './PublicPage.module.css';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card } from '@heroui/react';
+import { Card } from '../shared/components/Card';
 import {
   Database,
   Server,
@@ -164,22 +165,7 @@ export default function SetupPage() {
   const currentStepKey = visibleSteps[step] ?? 'finish';
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* 背景 */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: `linear-gradient(var(--ag-text-tertiary) 1px, transparent 1px), linear-gradient(90deg, var(--ag-text-tertiary) 1px, transparent 1px)`,
-            backgroundSize: '64px 64px',
-          }}
-        />
-        <div
-          className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent, var(--ag-primary-glow), transparent)' }}
-        />
-      </div>
-
+    <div className={`${styles.page} ${styles.setup} flex items-center justify-center relative overflow-hidden`}>
       <div
         className="relative w-full max-w-xl"
       >

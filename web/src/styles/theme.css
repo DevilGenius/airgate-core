@@ -51,13 +51,20 @@ html[data-theme="dark"] {
   --field-border-width: 1px;
   --disabled-opacity: 0.5;
   --ring-offset-width: 2px;
+  /* Shared application geometry; semantic colors still come from the SDK. */
+  --ag-panel-radius: 0.875rem;
+  --ag-panel-border: color-mix(in oklab, var(--ag-border) 72%, transparent);
+  --ag-panel-shadow: 0 1px 3px color-mix(in oklab, var(--ag-text) 4%, transparent);
+  --ag-page-gap: 1.25rem;
+  --ag-page-gutter: clamp(1rem, 1.6vw, 1.75rem);
+  --ag-control-radius: 0.625rem;
   --cursor-interactive: pointer;
   --cursor-disabled: not-allowed;
   --skeleton-animation: shimmer;
 
   /* HeroUI radius preset */
   --radius: 0.25rem;
-  --field-radius: 0.5rem;
+  --field-radius: var(--ag-control-radius);
   --font-sans: var(--ag-font-sans);
   --font-mono: var(--ag-font-mono);
 

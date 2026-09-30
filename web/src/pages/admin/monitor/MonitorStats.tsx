@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Card } from '@heroui/react';
+import { Card } from '../../../shared/components/Card';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import { fmtNum } from '../../../shared/columns/usageColumns';
@@ -21,7 +21,7 @@ function StatCard({
   total: number;
 }) {
   return (
-    <Card className="ag-dashboard-metric ag-overview-metric-card h-[72px]">
+    <Card density="compact" className="ag-dashboard-metric ag-overview-metric-card h-[72px]">
       <Card.Content className="ag-dashboard-metric-content ag-overview-metric-content h-full p-3">
         <div className="ag-dashboard-metric-copy">
           <div className="h-5 truncate text-sm font-semibold leading-5 tracking-normal text-text-tertiary">{label}</div>

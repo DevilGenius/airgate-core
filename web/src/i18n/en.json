@@ -107,6 +107,7 @@
   },
 
   "nav": {
+    "skip_content": "Skip to content",
     "overview": "Overview",
     "management": "Management",
     "system": "System",
@@ -1319,11 +1320,6 @@
     "asset_retention_section_hint": "This section only controls the Studio task lifecycle. Expired terminal tasks and their related inputs/outputs are cleaned together; leave blank to use the default, 0 means keep forever.",
     "asset_retention_generated_days": "Studio task retention (days)",
     "asset_retention_generated_days_hint": "Studio generation tasks, generated images, and task inputs are cleaned together. Leave blank to use the default; set 0 to disable auto cleanup. Default is 7 days."
-  },
-
-  "docs": {
-    "cta_hint": "Ready to start? Jump in now.",
-    "toc": "Contents"
   },
 
   "profile": {

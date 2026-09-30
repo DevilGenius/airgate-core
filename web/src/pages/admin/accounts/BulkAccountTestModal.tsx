@@ -243,7 +243,6 @@ export function BulkAccountTestModal({
     <CommonModal
       className="ag-account-page-modal"
       description={t('accounts.bulk_test_desc')}
-      dialogStyle={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={handleClose}>
@@ -261,7 +260,7 @@ export function BulkAccountTestModal({
         </div>
       )}
       icon={<Play className="size-5" />}
-      size="lg"
+      size="md"
       state={modalState}
       title={t('accounts.bulk_test_title')}
     >

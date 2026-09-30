@@ -114,7 +114,6 @@ export function EditKeyModal({ open, apiKey, originalKey, groups, onClose, onSub
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog
             className="ag-elevation-modal"
-            style={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
           >
             <Modal.Header>
               <Modal.Heading>{t('api_keys.edit')}</Modal.Heading>

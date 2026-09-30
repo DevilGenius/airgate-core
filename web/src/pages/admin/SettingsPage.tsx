@@ -1,7 +1,9 @@
 import { type FormEvent, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
+import { Card } from '../../shared/components/Card';
+import { ContentPage } from '../../shared/components/ContentPage';
+import { Alert, AlertDialog, Button, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { settingsApi } from '../../shared/api/settings';
 import {
@@ -362,7 +364,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="ag-centered-page max-w-6xl mx-auto w-full flex flex-col gap-6 min-h-screen">
+    <ContentPage>
       <div className="mx-auto w-full max-w-full overflow-x-auto hide-scrollbar pb-1">
         <Tabs
           className="ag-page-tabs ag-settings-tabs whitespace-nowrap"
@@ -386,7 +388,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 w-full flex flex-col gap-6">
+      <div className="flex-1 w-full flex flex-col gap-[var(--ag-page-gap)]">
         {activeTab === 'site' && (
           <Card>
             <Card.Header>
@@ -661,7 +663,7 @@ export default function SettingsPage() {
         onClose={() => setSmtpTestOpen(false)}
         onSubmit={submitSmtpTest}
       />
-    </div>
+    </ContentPage>
   );
 }
 

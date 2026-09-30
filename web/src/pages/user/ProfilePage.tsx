@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Card } from '../../shared/components/Card';
+import { ContentPage } from '../../shared/components/ContentPage';
+import { Button, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
@@ -88,9 +90,9 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="ag-centered-page w-full max-w-6xl mx-auto">
+    <ContentPage>
       {/* 用户信息 */}
-      <Card className="mb-6">
+      <Card>
         <Card.Header>
           <Card.Title>{t('profile.basic_info')}</Card.Title>
         </Card.Header>
@@ -146,7 +148,7 @@ export default function ProfilePage() {
       />
 
       {/* 修改用户名 */}
-      <Card className="mb-6">
+      <Card>
         <Card.Header>
           <Card.Title>{t('profile.change_username')}</Card.Title>
         </Card.Header>
@@ -187,7 +189,7 @@ export default function ProfilePage() {
       />
 
       {/* 修改密码 */}
-      <Card className="mb-6">
+      <Card>
         <Card.Header>
           <Card.Title>{t('profile.change_password')}</Card.Title>
         </Card.Header>
@@ -259,7 +261,7 @@ export default function ProfilePage() {
           </Form>
         </Card.Content>
       </Card>
-    </div>
+    </ContentPage>
   );
 }
 
@@ -431,7 +433,7 @@ function BalanceAlertCard({ threshold, balance }: { threshold: number; balance: 
   }
 
   return (
-    <Card className="mb-6">
+    <Card>
       <Card.Header>
         <Card.Title>{t('profile.balance_alert')}</Card.Title>
       </Card.Header>

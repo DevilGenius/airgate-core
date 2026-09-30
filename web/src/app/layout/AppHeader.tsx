@@ -16,9 +16,11 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings } from '../providers/SiteSettingsProvider';
 import { effectiveDocUrl } from '../../shared/utils/docUrl';
 import type { ShellIdentity } from './useShellIdentity';
+import styles from './AppShell.module.css';
 
 interface AppHeaderProps {
   isMobile: boolean;
+  mobileMenuOpen: boolean;
   onOpenMobileMenu: () => void;
   shell: ShellIdentity;
   showStatusEntry: boolean;
@@ -26,6 +28,7 @@ interface AppHeaderProps {
 
 export const AppHeader = memo(function AppHeader({
   isMobile,
+  mobileMenuOpen,
   onOpenMobileMenu,
   shell,
   showStatusEntry,
@@ -42,11 +45,14 @@ export const AppHeader = memo(function AppHeader({
   };
 
   return (
-    <header className="ag-topbar pointer-events-auto absolute inset-x-0 top-0 z-20 flex h-12 items-center justify-between gap-3">
-      <div className="flex shrink-0 items-center gap-3">
+    <header className={`${styles.header} pointer-events-auto absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3`}>
+      <div className="flex min-w-0 items-center gap-3">
         {isMobile && (
           <Button
             aria-label={t('nav.open_menu', 'Open menu')}
+            aria-controls="app-mobile-navigation"
+            aria-expanded={mobileMenuOpen}
+            aria-haspopup="dialog"
             isIconOnly
             size="sm"
             variant="ghost"
@@ -57,7 +63,7 @@ export const AppHeader = memo(function AppHeader({
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         {showStatusEntry && (
           <HeroLink
             href="/status"
@@ -67,14 +73,14 @@ export const AppHeader = memo(function AppHeader({
             <Activity className="h-5 w-5" />
           </HeroLink>
         )}
-        <HeroLink
+        {docs && <HeroLink
           href={docs.href}
           {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
           aria-label={t('nav.docs')}
           className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
         >
           <BookOpen className="h-5 w-5" />
-        </HeroLink>
+        </HeroLink>}
         {site.contact_info && (
           <div className="hidden items-center gap-2 text-text-tertiary lg:flex">
             <MessageCircle className="h-5 w-5 shrink-0" />

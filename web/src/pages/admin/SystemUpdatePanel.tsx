@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, Link as HeroLink, Modal, useOverlayState } from '@heroui/react';
+import { Card } from '../../shared/components/Card';
+import { Alert, Button, Link as HeroLink, Modal, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { NativeCheckbox } from '../../shared/components/NativeCheckbox';
 import {

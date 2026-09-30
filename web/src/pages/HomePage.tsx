@@ -1,6 +1,8 @@
+import styles from './PublicPage.module.css';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Link as HeroLink } from '@heroui/react';
+import { Card } from '../shared/components/Card';
+import { Button, Link as HeroLink } from '@heroui/react';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { getToken } from '../shared/api/client';
@@ -19,7 +21,7 @@ export default function HomePage() {
   const showStatusEntry = useStatusPageEnabled();
 
   const isLoggedIn = !!getToken();
-  // 文档链接 fallback：管理员未填外部 doc_url 时回退到内置 /docs（详见 docUrl.ts）
+  // 仅在管理员配置文档链接时显示入口。
   const docs = effectiveDocUrl(site.doc_url);
   const homeContentHtml = sanitizeHtml(site.home_content);
 
@@ -33,11 +35,11 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-bg-deep text-text relative overflow-hidden">
+    <div className={`${styles.page} ${styles.home} relative overflow-hidden`}>
       {/* 导航栏 */}
-      <nav className="ag-public-page-gutter relative z-10 flex items-center justify-between py-4 max-w-6xl mx-auto">
+      <nav className={`${styles.navigation} ag-public-page-gutter relative z-10 flex items-center justify-between py-4 max-w-6xl mx-auto`}>
         <div className="flex items-center gap-2.5">
-          <img src={site.site_logo || defaultLogoUrl} alt="" className="w-8 h-8 rounded-sm object-cover" />
+          <img src={site.site_logo || defaultLogoUrl} alt="" className={`${styles.brand} w-8 h-8 object-cover`} />
           <span className="text-base font-bold">{site.site_name || 'AirGate'}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -50,13 +52,13 @@ export default function HomePage() {
               {t('nav.status')}
             </HeroLink>
           )}
-          <HeroLink
+          {docs && <HeroLink
             href={docs.href}
             {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors"
           >
             {t('home.docs')}
-          </HeroLink>
+          </HeroLink>}
           <Button
             aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
             isIconOnly
@@ -78,7 +80,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section className="ag-home-hero-spacing relative z-10 text-center max-w-4xl mx-auto">
+      <section className={`${styles.hero} ag-home-hero-spacing relative z-10 text-center max-w-4xl mx-auto`}>
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-[var(--radius)] text-xs font-medium mb-6 border border-border bg-surface">
           <Code className="w-3.5 h-3.5 text-[var(--ag-primary)]" />
           <span className="text-text-secondary">{t('home.badge')}</span>
@@ -98,13 +100,13 @@ export default function HomePage() {
             {isLoggedIn ? t('home.go_dashboard') : t('home.get_started')}
             <ArrowRight className="w-4 h-4" />
           </Button>
-          <HeroLink
+          {docs && <HeroLink
             href={docs.href}
             {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-[var(--radius)] border border-border text-text-secondary hover:text-text hover:bg-bg-hover transition-colors"
           >
             {t('home.view_docs')}
-          </HeroLink>
+          </HeroLink>}
         </div>
 
         {/* API 地址展示 */}

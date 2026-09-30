@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
-import { Card } from '@heroui/react';
+import { Card } from '../../../shared/components/Card';
 import { useTranslation } from 'react-i18next';
 import { Activity, AlertTriangle, Cpu, Database } from 'lucide-react';
 import { fmtNum } from '../../../shared/columns/usageColumns';
@@ -314,7 +314,7 @@ function RuntimeCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric ag-monitor-runtime-card h-[190px]">
+    <Card density="compact" className="ag-dashboard-metric ag-monitor-runtime-card h-[190px]">
       <Card.Content className="flex h-full flex-col p-3">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="min-w-0">
@@ -403,7 +403,7 @@ function MonitorSummaryCard({
 }) {
   const { t } = useTranslation();
   return (
-    <Card className="ag-dashboard-metric ag-monitor-runtime-card h-[190px]">
+    <Card density="compact" className="ag-dashboard-metric ag-monitor-runtime-card h-[190px]">
       <Card.Content className="flex h-full flex-col p-3">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">

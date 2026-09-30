@@ -1,8 +1,10 @@
+import { Panel } from '../../shared/components/Panel';
 import { TokenTrendChart } from '../../shared/charts/TokenTrendChart';
 import { useState, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Card, Tabs } from '@heroui/react';
+import { Card } from '../../shared/components/Card';
+import { Tabs } from '@heroui/react';
 import {
   Wallet, Zap, Activity, Coins,
 } from 'lucide-react';
@@ -27,17 +29,6 @@ const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
   indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
 };
 
-function DashboardCard({ children, title }: { children: ReactNode; title: string }) {
-  return (
-    <Card className="ag-dashboard-panel">
-      <div className="flex items-center justify-between gap-3 p-3 pb-2">
-        <h3 className="text-base font-semibold leading-none text-text">{title}</h3>
-      </div>
-      <Card.Content className="px-3 pb-3">{children}</Card.Content>
-    </Card>
-  );
-}
-
 function StatCard({
   icon,
   tone,
@@ -50,7 +41,7 @@ function StatCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric ag-overview-metric-card min-h-[72px]">
+    <Card density="compact" className="ag-dashboard-metric ag-overview-metric-card min-h-[72px]">
       <Card.Content className="ag-dashboard-metric-content ag-overview-metric-content p-3">
         <div className="ag-dashboard-metric-copy">
           <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
@@ -175,7 +166,7 @@ export default function UserOverviewPage() {
       {/* 模型分布 + Token 趋势 */}
       <div className="ag-overview-detail-grid grid grid-cols-1 gap-4">
         {/* 模型分布 */}
-        <DashboardCard title={t('dashboard.model_distribution')}>
+        <Panel title={t('dashboard.model_distribution')}>
           <div className="ag-distribution-table-scroll">
             <CompactDataTable
               ariaLabel={t('dashboard.model_distribution')}
@@ -221,10 +212,10 @@ export default function UserOverviewPage() {
               ]}
             />
           </div>
-        </DashboardCard>
+        </Panel>
 
         {/* Token 趋势 */}
-        <DashboardCard title={t('dashboard.token_trend')}>
+        <Panel title={t('dashboard.token_trend')}>
           {trendData.length > 0 ? (
             <div className="ag-overview-chart flex h-[248px] w-full min-w-0 flex-col">
               <TokenTrendChart data={trendData} metrics={TOKEN_TREND_LINE_ORDER} />
@@ -232,7 +223,7 @@ export default function UserOverviewPage() {
           ) : (
             <div className="ag-overview-chart flex h-[248px] items-center justify-center text-sm text-text">{t('common.no_data')}</div>
           )}
-        </DashboardCard>
+        </Panel>
       </div>
     </div>
   );

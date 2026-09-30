@@ -1,0 +1,13 @@
+.toolbar.toolbar {
+  position: relative;
+  gap: 0.875rem;
+  padding: 0;
+  margin-bottom: var(--ag-page-gap);
+  border: 0;
+  border-radius: 0;
+  background: var(--background);
+  box-shadow: none;
+}
+
+.toolbar[data-flow='stack'] { margin-bottom: 0; }
+

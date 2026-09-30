@@ -1,7 +1,9 @@
+import { PageToolbarFrame } from '../../shared/components/PageToolbar';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, Meter } from '@heroui/react';
+import { Card } from '../../shared/components/Card';
+import { Button, Meter } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
@@ -125,7 +127,7 @@ function StatCard({
   value: ReactNode;
 }) {
   return (
-    <Card className="ag-dashboard-metric ag-overview-metric-card min-h-[72px]">
+    <Card density="compact" className="ag-dashboard-metric ag-overview-metric-card min-h-[72px]">
       <Card.Content className="ag-dashboard-metric-content ag-overview-metric-content p-3">
         <div className="ag-dashboard-metric-copy">
           <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
@@ -514,7 +516,7 @@ export default function UserUsageContent() {
         isFetching={isPlaceholderData && isUsageFetching && !isLoading}
       >
       {/* 筛选栏 */}
-      <div className="ag-page-toolbar">
+      <PageToolbarFrame>
         <div className="ag-page-toolbar-filters">
           <div className="ag-page-toolbar-filter-row">
             <div className="w-full sm:w-72">
@@ -586,7 +588,7 @@ export default function UserUsageContent() {
             isRefreshing={isRefreshing}
           />
         </div>
-      </div>
+      </PageToolbarFrame>
 
       {/* 使用记录表格 */}
       <UsageRichTooltipProvider>

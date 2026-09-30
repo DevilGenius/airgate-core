@@ -7,11 +7,11 @@
   --ag-table-row-alt-background: color-mix(in oklab, var(--surface-secondary) 62%, var(--surface) 38%);
   --ag-table-row-hover-background: color-mix(in oklab, var(--default) 82%, var(--background) 18%);
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
-  border-radius: calc(var(--radius) * 2.5) !important;
-  background: var(--surface) !important;
-  box-shadow: var(--surface-shadow) !important;
-  padding: 0 !important;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: var(--ag-panel-radius);
+  background: var(--surface);
+  box-shadow: var(--ag-panel-shadow);
+  padding: 0;
 }
 
 :where(.ag-resource-table, .ag-usage-records-table) :where([data-slot="table"]) {

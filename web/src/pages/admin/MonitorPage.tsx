@@ -1,3 +1,4 @@
+import { PageToolbarFrame } from '../../shared/components/PageToolbar';
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -933,7 +934,7 @@ export default function MonitorPage() {
         )}
         isFetching={activeIsTableFetching}
       >
-        <div className="ag-page-toolbar">
+        <PageToolbarFrame>
           <div className="ag-page-toolbar-filters">
             <div className="ag-page-toolbar-filter-row">
               <FilterSelect
@@ -1164,7 +1165,7 @@ export default function MonitorPage() {
               </Button>
             ) : null}
           </div>
-        </div>
+        </PageToolbarFrame>
 
         <RecordsTable
           ariaLabel={activeTableLabel}

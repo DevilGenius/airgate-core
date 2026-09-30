@@ -1,7 +1,9 @@
+import styles from './PublicPage.module.css';
 import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Card, FieldError, Form, Input, Label, Link as HeroLink, Tabs, TextField as HeroTextField } from '@heroui/react';
+import { Card } from '../shared/components/Card';
+import { Alert, Button, FieldError, Form, Input, Label, Link as HeroLink, Tabs, TextField as HeroTextField } from '@heroui/react';
 import { useAuth } from '../app/providers/AuthProvider';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { authApi } from '../shared/api/auth';
@@ -503,25 +505,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden bg-bg-deep text-text">
+    <div className={`${styles.page} flex relative overflow-hidden`}>
       {/* ===== 左侧装饰面板（桌面端） ===== */}
-      <div
-        className="hidden lg:flex lg:w-[45%] xl:w-[50%] relative items-center justify-center overflow-hidden"
-        style={{
-          background: theme === 'dark'
-            ? 'radial-gradient(circle at 25% 35%, oklch(29% 0.018 250), transparent 32%), linear-gradient(135deg, oklch(18% 0.012 250), oklch(12% 0.006 250))'
-            : 'radial-gradient(circle at 25% 35%, oklch(34% 0.025 250), transparent 34%), linear-gradient(135deg, oklch(25% 0.018 250), oklch(16% 0.01 250))',
-          color: 'oklch(96% 0.004 250)',
-        }}
-      >
-        <div
-          className="pointer-events-none absolute -left-28 -top-28 h-72 w-72 rounded-full blur-3xl"
-          style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.07)' }}
-        />
-        <div
-          className="pointer-events-none absolute -bottom-32 right-10 h-80 w-80 rounded-full blur-3xl"
-          style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.05)' }}
-        />
+      <div className={`${styles.authAside} hidden lg:flex lg:w-[45%] xl:w-[50%] relative items-center justify-center overflow-hidden`}>
         {/* 内容 */}
         <div className="relative z-10 px-12 max-w-md">
           <div className="flex items-center gap-3 mb-8">
@@ -534,15 +520,11 @@ export default function LoginPage() {
           <p className="text-sm leading-relaxed opacity-65">
             {t('auth.welcome_desc')}
           </p>
-          <div className="flex gap-3 mt-10">
+          <div className={styles.authFeatures}>
             {[t('auth.feature_1'), t('auth.feature_2'), t('auth.feature_3')].map((f) => (
               <span
                 key={f}
-                className="text-[11px] px-3 py-1.5 rounded-[var(--radius)] font-medium border"
-                style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  borderColor: 'rgba(255,255,255,0.10)',
-                }}
+                className={styles.authFeature}
               >
                 {f}
               </span>

@@ -2,6 +2,7 @@ import { memo, type ReactNode } from 'react';
 import { EmptyState } from '@heroui/react';
 import { Inbox } from 'lucide-react';
 import { PageFooterPortal } from './PageFooter';
+import { PageToolbar } from './PageToolbar';
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -28,12 +29,9 @@ export function TablePage({
     <>
       <div className={cx('ag-table-page', className)}>
         {(toolbar || actions) ? (
-          <div className="ag-page-toolbar">
-            {toolbar ? <div className="ag-page-toolbar-filters">{toolbar}</div> : <div />}
-            {actions ? <div className="ag-page-toolbar-actions">{actions}</div> : null}
-          </div>
+          <PageToolbar actions={actions}>{toolbar}</PageToolbar>
         ) : null}
-        <div className={cx('ag-table-page-content', isFetching && 'ag-table-page-content--fetching')}>
+        <div aria-busy={isFetching || undefined} className={cx('ag-table-page-content', isFetching && 'ag-table-page-content--fetching')}>
           <div className={mobile ? 'ag-table-page-desktop' : undefined}>{children}</div>
           {mobile ? <div className="ag-table-page-mobile">{mobile}</div> : null}
         </div>

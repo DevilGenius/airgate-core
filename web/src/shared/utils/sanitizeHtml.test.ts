@@ -56,9 +56,14 @@ describe('sanitizeHtml', () => {
 });
 
 describe('effectiveDocUrl', () => {
-  it('falls back for unsafe documentation URLs', () => {
-    expect(effectiveDocUrl('javascript:alert(1)')).toEqual({ href: '/docs', isExternal: false });
-    expect(effectiveDocUrl('/docs/custom')).toEqual({ href: '/docs/custom', isExternal: false });
+  it('hides missing, unsafe, and removed built-in documentation links', () => {
+    for (const url of [undefined, null, '', '  ', 'javascript:alert(1)', '/docs', '/docs/', '/docs#intro', '/docs?lang=zh', '/docs/custom']) {
+      expect(effectiveDocUrl(url)).toBeNull();
+    }
+  });
+
+  it('preserves explicitly configured safe documentation links', () => {
+    expect(effectiveDocUrl('/help/custom')).toEqual({ href: '/help/custom', isExternal: false });
     expect(effectiveDocUrl('https://docs.example.com')).toEqual({ href: 'https://docs.example.com', isExternal: true });
   });
 });

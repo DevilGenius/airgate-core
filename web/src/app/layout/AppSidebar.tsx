@@ -8,9 +8,8 @@ import {
 import { Button, Tooltip } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { settingsApi } from '../../shared/api/settings';
-import { effectiveDocUrl } from '../../shared/utils/docUrl';
 import { defaultLogoUrl, useSiteSettings } from '../providers/SiteSettingsProvider';
 import { preloadRoutePath } from '../routePreloads';
 import type { MenuItem, MenuSection } from './menuModel';
@@ -18,6 +17,7 @@ import { isMenuItemActive } from './navigationUtils';
 import type { ShellIdentity } from './useShellIdentity';
 import { useMenuNavigation } from './useMenuNavigation';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
+import styles from './AppShell.module.css';
 
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = STORAGE_KEYS.layout.sidebarCollapsed;
 
@@ -89,6 +89,8 @@ const SidebarNavLink = memo(function SidebarNavLink({
     <a
       href={item.path}
       data-active={active ? 'true' : undefined}
+      aria-current={active ? 'page' : undefined}
+      aria-label={collapsed ? label : undefined}
       className={`ag-sidebar-nav-item group relative flex items-center transition-colors duration-150 ${collapsed ? 'mx-auto h-10 w-10 justify-center p-0' : 'px-2 py-1.5'}`}
       onClick={handleClick}
       onFocus={preload}
@@ -108,12 +110,14 @@ const SidebarBrand = memo(function SidebarBrand({
   coreVersion,
   isMobile,
   onCollapsedChange,
+  onClose,
   shell,
 }: {
   collapsed: boolean;
   coreVersion?: { go_version: string; platform: string; version: string };
   isMobile: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  onClose: () => void;
   shell: ShellIdentity;
 }) {
   const { t } = useTranslation();
@@ -152,6 +156,11 @@ const SidebarBrand = memo(function SidebarBrand({
               onPress={() => onCollapsedChange(true)}
             >
               <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+          {isMobile && (
+            <Button aria-label={t('common.close')} isIconOnly size="sm" variant="ghost" onPress={onClose}>
+              <X className="h-4 w-4" />
             </Button>
           )}
         </div>
@@ -228,43 +237,6 @@ const SidebarNav = memo(function SidebarNav({
   );
 });
 
-const SidebarFooter = memo(function SidebarFooter({ collapsed, isMobile }: { collapsed: boolean; isMobile: boolean }) {
-  const { t } = useTranslation();
-  const site = useSiteSettings();
-
-  const openDocs = () => {
-    window.location.href = effectiveDocUrl(site.doc_url).href;
-  };
-
-  return (
-    <div className="ag-sidebar-footer space-y-1 border-t border-border p-3">
-      {!collapsed && (
-        <Button
-          className="w-full justify-center"
-          size="sm"
-          variant="ghost"
-          onPress={openDocs}
-        >
-          <HelpCircle className="h-4 w-4" />
-          {t('nav.docs')}
-        </Button>
-      )}
-      {!isMobile && collapsed && (
-        <Button
-          aria-label={t('nav.docs')}
-          className="w-full"
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          onPress={openDocs}
-        >
-          <HelpCircle className="h-4 w-4" />
-        </Button>
-      )}
-    </div>
-  );
-});
-
 export const AppSidebar = memo(function AppSidebar({
   collapsed,
   isMobile,
@@ -294,6 +266,7 @@ export const AppSidebar = memo(function AppSidebar({
         coreVersion={coreVersion}
         isMobile={isMobile}
         onCollapsedChange={onCollapsedChange}
+        onClose={() => onMobileOpenChange(false)}
         shell={shell}
       />
       <SidebarNav
@@ -302,14 +275,20 @@ export const AppSidebar = memo(function AppSidebar({
         onNavigate={navigate}
         sections={sections}
       />
-      <SidebarFooter collapsed={sidebarCollapsed} isMobile={isMobile} />
+
     </>
   );
 
   if (isMobile) {
     return (
       <aside
-        className="fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-transform duration-150 ease-out"
+        id="app-mobile-navigation"
+        data-mobile-sidebar
+        inert={!mobileOpen}
+        role={mobileOpen ? 'dialog' : undefined}
+        aria-modal={mobileOpen || undefined}
+        aria-label={shell.displayName}
+        className={`${styles.sidebar} fixed inset-y-0 left-0 z-50 flex flex-col transition-transform duration-150 ease-out`}
         style={{ width: 'var(--ag-sidebar-width)', transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
       >
         {content}
@@ -319,7 +298,7 @@ export const AppSidebar = memo(function AppSidebar({
 
   return (
     <aside
-      className="relative flex flex-col border-r border-border bg-surface transition-[width] duration-150 ease-out"
+      className={`${styles.sidebar} relative flex flex-col transition-[width] duration-150 ease-out`}
       style={{ width: collapsed ? 'var(--ag-sidebar-collapsed)' : 'var(--ag-sidebar-width)' }}
     >
       {content}

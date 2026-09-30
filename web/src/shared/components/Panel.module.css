@@ -1,0 +1,33 @@
+.panel { min-width: 0; }
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.125rem 1.25rem 0.875rem;
+}
+
+.title {
+  min-width: 0;
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+.actions { margin-left: auto; min-width: 0; }
+
+.panel > .content {
+  min-width: 0;
+  padding: 1.25rem;
+}
+
+.panel > .content[data-has-header] { padding-top: 0; }
+
+@media (max-width: 639px) {
+  .header { padding: 1rem 1rem 0.75rem; }
+  .panel > .content { padding: 1rem; }
+}

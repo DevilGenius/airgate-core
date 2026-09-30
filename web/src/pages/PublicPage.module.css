@@ -1,0 +1,59 @@
+.page {
+  min-height: 100dvh;
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.home {
+  background-image: radial-gradient(ellipse at 50% 0, var(--accent-soft), transparent 42rem);
+}
+
+.navigation {
+  min-height: 4.5rem;
+  gap: 1rem;
+}
+
+.brand {
+  border-radius: var(--ag-control-radius);
+}
+
+.hero {
+  padding-block: clamp(4rem, 10vh, 8rem);
+}
+
+.hero h1 {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+}
+
+.authAside {
+  background: linear-gradient(145deg, #1d2738, #111827);
+  color: #f3f4f6;
+}
+
+.authFeatures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 2.5rem;
+}
+
+.authFeature {
+  border: 1px solid #ffffff24;
+  border-radius: 999px;
+  background: #ffffff0a;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.setup {
+  padding: clamp(1rem, 4vw, 3rem);
+  background-image: radial-gradient(ellipse at 50% 0, var(--accent-soft), transparent 40rem);
+}
+
+@media (max-width: 639px) {
+  .navigation { flex-wrap: wrap; justify-content: center; }
+}

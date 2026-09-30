@@ -118,7 +118,6 @@ export function AccountStatsModal({
   return (
     <CommonModal
       className="ag-account-page-modal ag-account-stats-modal"
-      dialogStyle={{ maxWidth: '880px', width: 'min(100%, calc(100vw - 2rem))' }}
       icon={<Activity className="size-5" />}
       size="lg"
       state={modalState}

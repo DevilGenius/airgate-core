@@ -14,87 +14,52 @@
 }
 
 :where(.modal__container, .alert-dialog__container):has(.ag-elevation-modal) {
-  padding-inline: clamp(0.75rem, 2.5vw, 3rem) !important;
-  padding-block: clamp(1rem, 3vh, 3rem) !important;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding-inline: clamp(0.75rem, 2.5vw, 3rem);
+  padding-block: clamp(1rem, 3vh, 3rem);
 }
 
-:where(.modal__backdrop,
-  .modal__backdrop--opaque,
-  .modal__backdrop--blur,
-  .alert-dialog__backdrop,
-  .alert-dialog__backdrop--opaque,
-  .alert-dialog__backdrop--blur):has(.ag-elevation-modal) {
+:where(.modal__backdrop, .alert-dialog__backdrop):has(.ag-elevation-modal) {
+  /* Original frosted treatment; keep the backdrop static without filter animation. */
   background:
-    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 24rem),
+    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 24rem),
     radial-gradient(circle at 82% 18%, color-mix(in oklab, white 10%, transparent), transparent 22rem),
     repeating-linear-gradient(135deg, color-mix(in oklab, white 4%, transparent) 0 1px, transparent 1px 12px),
-    color-mix(in oklab, var(--background) 58%, transparent) !important;
-  -webkit-backdrop-filter: saturate(125%) blur(10px);
+    color-mix(in oklab, var(--background) 58%, transparent);
   backdrop-filter: saturate(125%) blur(10px);
+  -webkit-backdrop-filter: saturate(125%) blur(10px);
   animation: none;
 }
 
-[data-theme="dark"] :where(.modal__backdrop,
-  .modal__backdrop--opaque,
-  .modal__backdrop--blur,
-  .alert-dialog__backdrop,
-  .alert-dialog__backdrop--opaque,
-  .alert-dialog__backdrop--blur):has(.ag-elevation-modal),
-.dark :where(.modal__backdrop,
-  .modal__backdrop--opaque,
-  .modal__backdrop--blur,
-  .alert-dialog__backdrop,
-  .alert-dialog__backdrop--opaque,
-  .alert-dialog__backdrop--blur):has(.ag-elevation-modal) {
+:is([data-theme="dark"], .dark) :where(.modal__backdrop, .alert-dialog__backdrop):has(.ag-elevation-modal) {
   background:
-    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--primary) 11%, transparent), transparent 24rem),
+    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--accent) 11%, transparent), transparent 24rem),
     radial-gradient(circle at 82% 18%, color-mix(in oklab, white 4%, transparent), transparent 22rem),
     repeating-linear-gradient(135deg, color-mix(in oklab, white 3%, transparent) 0 1px, transparent 1px 12px),
-    color-mix(in oklab, var(--background) 68%, transparent) !important;
+    color-mix(in oklab, var(--background) 68%, transparent);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :where(.modal__backdrop, .alert-dialog__backdrop):has(.ag-elevation-modal) {
+    background: color-mix(in oklab, var(--background) 88%, transparent);
+  }
 }
 
 .ag-elevation-modal {
   position: relative;
   box-sizing: border-box;
-  width: min(var(--ag-modal-width, var(--ag-modal-md-width)), 100%) !important;
-  max-width: min(var(--ag-modal-width, var(--ag-modal-md-width)), calc(100vw - clamp(1.5rem, 5vw, 6rem))) !important;
+  width: min(var(--ag-modal-width, var(--ag-modal-md-width)), 100%);
+  max-width: min(var(--ag-modal-width, var(--ag-modal-md-width)), calc(100vw - clamp(1.5rem, 5vw, 6rem)));
   overflow: hidden;
-  max-height: min(var(--ag-modal-max-height, 86dvh), var(--ag-modal-max-height-cap, 62rem)) !important;
-  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
-  border-radius: var(--radius-3xl) !important;
-  background-color: var(--overlay) !important;
-  background-image:
-    linear-gradient(180deg, color-mix(in oklab, white 12%, transparent), transparent 34%),
-    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 5%, transparent), transparent 18rem) !important;
-  color: var(--overlay-foreground) !important;
-  box-shadow:
-    0 1px 0 color-mix(in oklab, white 32%, transparent) inset,
-    0 12px 28px color-mix(in oklab, black 12%, transparent) !important;
+  max-height: min(var(--ag-modal-max-height, 86dvh), var(--ag-modal-max-height-cap, 62rem));
+  border: 1px solid var(--ag-panel-border);
+  border-radius: var(--ag-panel-radius);
+  background: var(--overlay);
+  color: var(--overlay-foreground);
+  box-shadow: 0 20px 64px color-mix(in oklab, black 20%, transparent);
 }
-
-[data-theme="dark"] .ag-elevation-modal,
-.dark .ag-elevation-modal {
-  background-color: var(--overlay) !important;
-  background-image:
-    linear-gradient(180deg, color-mix(in oklab, white 6%, transparent), transparent 34%),
-    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 7%, transparent), transparent 18rem) !important;
-  box-shadow:
-    0 1px 0 color-mix(in oklab, white 8%, transparent) inset,
-    0 12px 28px color-mix(in oklab, black 24%, transparent) !important;
-}
-
-@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-
-  :where(.modal__backdrop,
-    .modal__backdrop--opaque,
-    .modal__backdrop--blur,
-    .alert-dialog__backdrop,
-    .alert-dialog__backdrop--opaque,
-    .alert-dialog__backdrop--blur):has(.ag-elevation-modal) {
-    background: color-mix(in oklab, var(--background) 88%, transparent) !important;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
 
   :where(.modal__backdrop,

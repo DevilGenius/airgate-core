@@ -246,12 +246,17 @@ export function AccountTestModal({
                 {/* 账号信息卡片 */}
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--ag-bg-surface)] border border-[var(--ag-glass-border)]">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-[var(--ag-text)] truncate">
-                      {account.name}
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="min-w-0 truncate font-medium text-sm text-[var(--ag-text)]" title={account.name}>
+                        {account.name}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Chip color="default" size="sm" variant="soft">{account.platform.toUpperCase()}</Chip>
+                        {account.type && <Chip color="accent" size="sm" variant="soft">{account.type}</Chip>}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Chip color="default" size="sm" variant="soft">{account.platform.toUpperCase()}</Chip>
-                      {account.type && <Chip color="accent" size="sm" variant="soft">{account.type}</Chip>}
+                    <div className="mt-1 truncate text-xs text-[var(--ag-text-secondary)]" title={account.email || undefined}>
+                      {account.email || '—'}
                     </div>
                   </div>
                 </div>

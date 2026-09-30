@@ -1,3 +1,4 @@
+import { PageToolbarFrame } from '../../shared/components/PageToolbar';
 import { useState, useRef, useEffect, useMemo, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,7 +8,8 @@ import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
-import { AlertDialog, Button, Card, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Card } from '../../shared/components/Card';
+import { AlertDialog, Button, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   Trash2, Download, Loader2, RefreshCw,
@@ -158,7 +160,7 @@ export default function PluginsPage() {
         onSelectionChange={(key) => setActiveTab(key as typeof activeTab)}
       >
         {/* Tab 切换 + 操作按钮 */}
-        <div className="ag-page-toolbar">
+        <PageToolbarFrame>
           <div className="ag-page-toolbar-filters">
             <div className="ag-page-toolbar-filter-row">
               <Tabs.ListContainer className="ag-page-tabs w-full sm:w-auto">
@@ -202,7 +204,7 @@ export default function PluginsPage() {
               {t('plugins.install_plugin')}
             </Button>
           </div>
-        </div>
+        </PageToolbarFrame>
 
       {/* 已安装 Tab */}
       <Tabs.Panel id="installed" className="ag-tabs-panel-flush">

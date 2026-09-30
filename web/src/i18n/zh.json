@@ -107,6 +107,7 @@
   },
 
   "nav": {
+    "skip_content": "跳转到主要内容",
     "overview": "概览",
     "management": "管理",
     "system": "系统",
@@ -1318,11 +1319,6 @@
     "asset_retention_section_hint": "当前仅管理 Studio 任务生命周期。到期后会清理终态任务记录及其关联的输入、输出资源；留空使用默认值，0 表示永久保留。",
     "asset_retention_generated_days": "Studio 任务保留天数",
     "asset_retention_generated_days_hint": "Studio 生成任务、生成图片和任务输入资源会一起清理。留空使用默认值，填 0 可关闭自动清理，默认 7 天。"
-  },
-
-  "docs": {
-    "cta_hint": "准备好了吗？立即开始使用。",
-    "toc": "目录"
   },
 
   "profile": {

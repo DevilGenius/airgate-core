@@ -110,7 +110,6 @@ const MANUAL_CHUNK_PACKAGES: Record<string, string[]> = {
   icons: ['lucide-react'],
   motion: ['motion'],
   charts: ['echarts', 'zrender'],
-  markdown: ['react-markdown', 'remark-gfm'],
 };
 
 function getHeroUiComponentChunk(normalizedId: string) {

@@ -27,9 +27,7 @@
     "motion": "^12.34.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-i18next": "^15.4.0",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "react-i18next": "^15.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

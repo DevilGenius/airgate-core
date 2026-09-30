@@ -16,7 +16,6 @@ import {
   AccountsPage,
   APIKeysPage,
   DashboardPage,
-  DocsPage,
   GroupsPage,
   lazyWithPreload,
   LoginPage,
@@ -80,18 +79,6 @@ const homeRoute = createRoute({
 // 注意：/status 不再注册客户端路由，整个公开状态页交给 airgate-health 插件维护。
 // 后端 GET /status 直接反代到插件的 handlePublicIndex，前端用普通 href 跳转。
 // 这样避免 core 与插件出现两份重复的状态页实现。
-
-// 内置默认文档页 —— 当管理员未在 系统设置 → 站点品牌 → 文档链接 中填写外部 URL 时，
-// 所有"文档"按钮 fallback 到这里。公开可访问，独立布局（不挂 AppShell）。
-const docsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/docs',
-  component: () => (
-    <Suspense fallback={<FullPageLoading />}>
-      <DocsPage />
-    </Suspense>
-  ),
-});
 
 // 登录页（无需认证，懒加载）
 const loginRoute = createRoute({
@@ -223,7 +210,6 @@ const routeTree = rootRoute.addChildren([
   setupRoute,
   homeRoute,
   loginRoute,
-  docsRoute,
   playgroundLegacyRoute,
   authLayout.addChildren([
     dashboardRoute,
