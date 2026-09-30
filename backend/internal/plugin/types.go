@@ -37,7 +37,7 @@ type forwardState struct {
 	continuationRecoveryApplied bool
 	modelReroutes               int
 
-	// 推理强度档位快照。
+	// 归一化后的原始请求推理强度快照；上游限制、重试和插件结果不得覆盖。
 	reasoningEffort string
 
 	requestedPlatform string
@@ -69,7 +69,7 @@ type parsedRequest struct {
 	HasToolCallContext  bool
 	HasEncryptedContent bool
 	HasCompactionReplay bool
-	ReasoningEffort     string // 推理强度档位
+	ReasoningEffort     string // 归一化后的客户端推理强度；缺省或未知值为空
 }
 
 // requestFields 一次性 Unmarshal 的 JSON 字段结构。
@@ -91,7 +91,6 @@ type requestFields struct {
 	OutputConfig *struct {
 		Effort string `json:"effort"`
 	} `json:"output_config"`
-	Thinking *struct{} `json:"thinking"`
 }
 
 func (s *forwardState) advanceDispatchCandidate() bool {

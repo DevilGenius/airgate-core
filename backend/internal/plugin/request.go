@@ -277,7 +277,7 @@ func requestedPlatform(c *gin.Context, keyInfo *auth.APIKeyInfo) string {
 func parseBody(body []byte, contentType string) parsedRequest {
 	var fields requestFields
 	if json.Unmarshal(body, &fields) == nil {
-		effort := extractAndNormalizeReasoningEffort(fields)
+		effort := extractRequestedReasoningEffort(fields)
 		signals := analyzeContinuationSignals(fields)
 		return parsedRequest{
 			Model:               strings.TrimSpace(fields.Model),
@@ -562,43 +562,43 @@ func asString(value any) string {
 	return fmt.Sprint(value)
 }
 
-// extractAndNormalizeReasoningEffort 提取并归一化推理强度档位。
-func extractAndNormalizeReasoningEffort(fields requestFields) string {
-	effort := fields.ReasoningEffort
-	if effort == "" && fields.Reasoning != nil {
+// extractRequestedReasoningEffort records the normalized client request, without
+// applying provider limits or inferring an effort from a thinking budget.
+func extractRequestedReasoningEffort(fields requestFields) string {
+	// Match the plugin's Responses > Chat > Anthropic field precedence.
+	var effort string
+	if fields.Reasoning != nil {
 		effort = fields.Reasoning.Effort
 	}
+	if strings.TrimSpace(effort) == "" {
+		effort = fields.ReasoningEffort
+	}
 
-	if effort == "" && fields.OutputConfig != nil {
+	if strings.TrimSpace(effort) == "" && fields.OutputConfig != nil {
 		effort = fields.OutputConfig.Effort
 	}
 
-	if effort == "" && (fields.OutputConfig != nil || fields.Thinking != nil) {
-		effort = "high"
-	}
-
-	return normalizeReasoningEffort(effort)
+	return normalizeRequestedReasoningEffort(effort)
 }
 
-// normalizeReasoningEffort 归一化推理强度档位。
-func normalizeReasoningEffort(effort string) string {
+func normalizeRequestedReasoningEffort(effort string) string {
 	normalized := strings.ToLower(strings.TrimSpace(effort))
 	normalized = strings.ReplaceAll(normalized, "-", "")
 	normalized = strings.ReplaceAll(normalized, "_", "")
-
+	normalized = strings.ReplaceAll(normalized, " ", "")
 	switch normalized {
-	case "low":
-		return "low"
-	case "medium":
+	case "none", "off", "disabled":
+		return "none"
+	case "minimal", "min":
+		return "minimal"
+	case "low", "medium", "high", "max", "ultra":
+		return normalized
+	case "mid", "normal", "default":
 		return "medium"
-	case "high":
-		return "high"
-	case "xhigh", "extrahigh":
+	case "xhigh", "extrahigh", "veryhigh":
 		return "xhigh"
-	case "max", "maximum":
+	case "maximum":
 		return "max"
-	case "ultra":
-		return "ultra"
 	default:
 		return ""
 	}

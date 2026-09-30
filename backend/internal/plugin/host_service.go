@@ -1296,7 +1296,6 @@ func (h *HostService) recordHostForwardUsage(
 		Billing: route.EffectiveRate, Sell: sellRate, Account: accFull.RateMultiplier,
 	})
 	usageValues, calc, usageMetadata := settled.Usage, settled.Costs, settled.Metadata
-	reasoningEffort := resolveReasoningEffort(hostForwardReasoningEffort(req), usage)
 
 	h.scheduler.AddWindowCost(ctx, accountID, calc.AccountCost)
 
@@ -1335,7 +1334,7 @@ func (h *HostService) recordHostForwardUsage(
 		AccountRateMultiplier: calc.AccountRateMultiplier,
 		ServiceTier:           usageValues.ServiceTier,
 		Endpoint:              req.Path,
-		ReasoningEffort:       reasoningEffort,
+		ReasoningEffort:       hostForwardReasoningEffort(req),
 		Stream:                req.Stream,
 		DurationMs:            duration.Milliseconds(),
 		FirstEventMs:          usageValues.FirstEventMs,

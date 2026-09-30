@@ -313,7 +313,7 @@ func TestForwarderRecordUsagePersistsFallbackRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query usage log: %v", err)
 	}
-	if log.Model != "gpt-4.1-mini" || log.Endpoint != "/v1/responses" || log.ReasoningEffort != "medium" {
+	if log.Model != "gpt-4.1-mini" || log.Endpoint != "/v1/responses" || log.ReasoningEffort != "low" {
 		t.Fatalf("usage log core fields = model:%q endpoint:%q reasoning:%q", log.Model, log.Endpoint, log.ReasoningEffort)
 	}
 	if log.InputTokens != 100 || log.OutputTokens != 20 || log.FirstEventMs != 123 || log.FirstTokenMs != 456 || log.WsDialMs != 23 || !log.Stream {

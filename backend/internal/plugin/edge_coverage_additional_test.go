@@ -45,7 +45,7 @@ func TestContinuationRecoveryAdditionalEdges(t *testing.T) {
 		previousResponseID: "resp_old",
 	}
 	recovered, err := recoverContinuationAffinityMissing(state)
-	if err != nil || !recovered || state.reasoningEffort != "xhigh" {
+	if err != nil || !recovered || state.reasoningEffort != "" {
 		t.Fatalf("reasoning recover = recovered %v effort %q err %v", recovered, state.reasoningEffort, err)
 	}
 }

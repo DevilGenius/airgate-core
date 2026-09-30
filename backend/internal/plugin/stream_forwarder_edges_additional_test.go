@@ -294,13 +294,6 @@ func TestForwarderRouteAndOutcomeTinyHelpers(t *testing.T) {
 	if judgmentReason(forwardExecution{}) != "" {
 		t.Fatal("empty judgmentReason should be empty")
 	}
-	if got := resolveReasoningEffort("low", nil); got != "low" {
-		t.Fatalf("resolveReasoningEffort request = %q", got)
-	}
-	if got := resolveReasoningEffort("", nil); got != "" {
-		t.Fatalf("resolveReasoningEffort empty = %q", got)
-	}
-
 	release, ok := (&HostService{}).acquireHostForwardAccountCapacity(context.Background(), nil)
 	if !ok {
 		t.Fatal("nil host concurrency should allow capacity")

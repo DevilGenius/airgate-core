@@ -31,9 +31,6 @@ func recoverContinuationAffinityMissingWithManager(manager *Manager, state *forw
 	state.previousResponseID = ""
 	state.requireContinuationAffinity = false
 	state.continuationRecoveryApplied = true
-	if parsed.ReasoningEffort != "" {
-		state.reasoningEffort = parsed.ReasoningEffort
-	}
 	return true, nil
 }
 

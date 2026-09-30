@@ -411,7 +411,6 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		Billing: billing.ResolveBillingRate(state.keyInfo), Sell: state.keyInfo.SellRate, Account: state.account.RateMultiplier,
 	})
 	usageValues, calc, usageMetadata := settled.Usage, settled.Costs, settled.Metadata
-	reasoningEffort := resolveReasoningEffort(state.reasoningEffort, usage)
 
 	// 窗口费用沿用 account_cost（= total × account_rate），与用户账单解耦。
 	f.scheduler.AddWindowCost(ctx, state.account.ID, calc.AccountCost)
@@ -453,21 +452,11 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		UserAgent:             c.Request.UserAgent(),
 		IPAddress:             middleware.AuditClientIP(c),
 		Endpoint:              state.requestPath,
-		ReasoningEffort:       reasoningEffort,
+		ReasoningEffort:       state.reasoningEffort,
 		UsageMetadata:         usageMetadata,
 	}); err != nil {
 		slog.Error("billing_record_not_confirmed", "account_id", state.account.ID, "error", err)
 	}
-}
-
-func resolveReasoningEffort(fromRequest string, usage *sdk.Usage) string {
-	if usage != nil && usage.ReasoningEffort != "" {
-		return normalizeReasoningEffort(usage.ReasoningEffort)
-	}
-	if fromRequest != "" {
-		return fromRequest
-	}
-	return ""
 }
 
 // writeUpstream 把上游原始响应透传给客户端。

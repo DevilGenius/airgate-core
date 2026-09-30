@@ -664,9 +664,34 @@ func TestParseBody_ReasoningEffort(t *testing.T) {
 			want: "ultra",
 		},
 		{
-			name: "anthropic default",
+			name: "thinking budget does not supply effort",
 			body: `{"model":"claude-opus-4-6","thinking":{"type":"enabled","budget_tokens":32768}}`,
-			want: "high",
+			want: "",
+		},
+		{
+			name: "openai max",
+			body: `{"model":"gpt-6-astra","reasoning":{"effort":"max"}}`,
+			want: "max",
+		},
+		{
+			name: "openai ultra",
+			body: `{"model":"gpt-6-astra","reasoning":{"effort":"ultra"}}`,
+			want: "ultra",
+		},
+		{
+			name: "openai none",
+			body: `{"model":"gpt-6-astra","reasoning":{"effort":"none"}}`,
+			want: "none",
+		},
+		{
+			name: "missing effort",
+			body: `{"model":"gpt-6-astra","input":"hello"}`,
+			want: "",
+		},
+		{
+			name: "empty output config does not supply effort",
+			body: `{"model":"claude-opus-4-6","output_config":{}}`,
+			want: "",
 		},
 	}
 

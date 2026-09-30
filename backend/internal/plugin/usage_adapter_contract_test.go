@@ -32,9 +32,6 @@ func TestUsageSnapshotFromSDKReadsPluginMetadata(t *testing.T) {
 	if snap.ImageUnitPrice != 0.2 || snap.ImageUnit != "USD/image" {
 		t.Fatalf("snapshot image price = (%v, %q)", snap.ImageUnitPrice, snap.ImageUnit)
 	}
-	if got := resolveReasoningEffort("", usage); got != "high" {
-		t.Fatalf("resolveReasoningEffort = %q, want high", got)
-	}
 }
 
 func TestUsageMetadataFromSDKPreservesPluginMetadata(t *testing.T) {
