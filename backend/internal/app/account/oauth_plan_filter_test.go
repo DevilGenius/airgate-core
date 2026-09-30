@@ -1,9 +1,10 @@
 package account
 
 import (
+	"testing"
+
 	"github.com/DevilGenius/airgate-core/internal/plugin"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
-	"testing"
 )
 
 func TestUnknownOAuthPlanFilterUsesPlatformRules(t *testing.T) {

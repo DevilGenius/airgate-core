@@ -1,8 +1,9 @@
 package plantype
 
 import (
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"testing"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestPlatformFilters(t *testing.T) {

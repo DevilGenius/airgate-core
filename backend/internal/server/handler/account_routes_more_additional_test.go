@@ -24,7 +24,7 @@ import (
 
 func TestAccountPlanTypeUpdateRoutes(t *testing.T) {
 	db := testdb.OpenMemoryEnt(t, t.Name(), schema.WithGlobalUniqueID(false))
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	item := db.Account.Create().SetName("locked").SetPlatform("openai").SetType("oauth").
 		SetCredentials(map[string]string{"plan_type": "plus", "access_token": "secret"}).
 		SetExtra(map[string]any{"plan_type_locked": true, "keep": "value"}).SaveX(t.Context())

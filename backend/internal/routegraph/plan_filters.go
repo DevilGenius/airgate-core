@@ -1,10 +1,11 @@
 package routegraph
 
 import (
-	"github.com/DevilGenius/airgate-core/internal/plantype"
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"sync"
 	"time"
+
+	"github.com/DevilGenius/airgate-core/internal/plantype"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 var platformPlanFilters sync.Map // platform -> immutable []plantype.Filter

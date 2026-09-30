@@ -1,9 +1,10 @@
 package store
 
 import (
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"strings"
 	"testing"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/ent"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
@@ -25,7 +26,7 @@ func TestUnknownPlanPoliciesAcrossPlatforms(t *testing.T) {
 			routegraph.SetPlatformAccountPlans(test.platform, test.definitions)
 			defer routegraph.SetPlatformAccountPlans(test.platform, nil)
 			db := enttestOpen(t)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			group := &ent.Group{ID: 123, Platform: test.platform, AccountTypeModelPolicies: map[string]modelpolicy.Policy{"oauth": {Deny: []string{"blocked"}}}}
 			plans := []string{test.known, "", "unrecognized_plan"}
 			if test.platform == "kiro" {

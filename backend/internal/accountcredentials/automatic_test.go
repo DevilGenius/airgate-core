@@ -23,7 +23,7 @@ func TestAutomaticPlanLock(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			db := testdb.OpenMemoryEnt(t, t.Name())
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			credentials := map[string]string{"access_token": "old", "refresh_token": "keep"}
 			if test.hasPlan {
 				credentials["plan_type"] = test.plan
@@ -49,7 +49,7 @@ func TestAutomaticPlanLock(t *testing.T) {
 
 func TestAutomaticPlanLockConcurrentManualEdit(t *testing.T) {
 	db := testdb.OpenMemoryEnt(t, t.Name())
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	item := db.Account.Create().SetName("race").SetPlatform("openai").SetCredentials(map[string]string{"plan_type": "plus", "access_token": "old"}).SaveX(t.Context())
 	interfered := false
 	db.Account.Use(func(next ent.Mutator) ent.Mutator {

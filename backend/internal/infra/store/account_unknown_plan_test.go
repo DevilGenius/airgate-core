@@ -1,8 +1,9 @@
 package store
 
 import (
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"testing"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
 	"github.com/DevilGenius/airgate-core/ent"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
@@ -19,7 +20,7 @@ func TestAccountStoreUnknownOAuthPlanFilter(t *testing.T) {
 	routegraph.SetPlatformAccountPlans("openai", plans)
 	defer routegraph.SetPlatformAccountPlans("openai", nil)
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	fixtures := []struct {
 		name, platform, kind string
 		credentials          map[string]string

@@ -1,9 +1,10 @@
 package handler
 
 import (
+	"testing"
+
 	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
-	"testing"
 )
 
 func TestPluginResponseProvidesPlatformPlanRules(t *testing.T) {

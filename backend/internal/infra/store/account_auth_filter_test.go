@@ -1,13 +1,14 @@
 package store
 
 import (
-	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	"testing"
+
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 )
 
 func TestAccountAuthFilterIntersectsPlanForListAndExport(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	for _, item := range []struct{ name, auth, plan string }{
 		{"plus-oauth", "oauth", "plus"},
 		{"free-oauth", "oauth", "free"},

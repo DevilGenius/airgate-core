@@ -1,8 +1,9 @@
 package plantype
 
 import (
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"strings"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 type Filter struct {

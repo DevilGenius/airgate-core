@@ -77,7 +77,7 @@ func TestAccountStoreOccupiedPrioritiesGroupsAndExcludes(t *testing.T) {
 
 func TestAccountStoreObserveUsageGrowthTracksWindowPresence(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ctx := context.Background()
 	item, err := db.Account.Create().SetName("window-presence").SetPlatform("openai").SetType("oauth").Save(ctx)
 	if err != nil {
