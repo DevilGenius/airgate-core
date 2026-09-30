@@ -56,7 +56,8 @@ html[data-theme="dark"] {
   --ag-panel-border: color-mix(in oklab, var(--ag-border) 72%, transparent);
   --ag-panel-shadow: 0 1px 3px color-mix(in oklab, var(--ag-text) 4%, transparent);
   --ag-page-gap: 1.25rem;
-  --ag-page-gutter: clamp(1rem, 1.6vw, 1.75rem);
+  --ag-page-gutter: clamp(0.5rem, 0.8vw, 0.75rem);
+  --ag-content-max-width: 120rem;
   --ag-control-radius: 0.625rem;
   --cursor-interactive: pointer;
   --cursor-disabled: not-allowed;

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Chip, Label, useOverlayState } from '@heroui/react';
-import { AlertTriangle, Check, Loader2, Play, RotateCcw, X } from 'lucide-react';
+import { Button, Label, useOverlayState } from '@heroui/react';
+import { AlertTriangle, Check, Loader2, Play, RotateCcw, X, Server } from 'lucide-react';
+import { getPluginPlatformIcon, getPlatformIconVersion, onPlatformIconChange } from '../../../app/plugin-frontend-registry';
+import { AccountPlatformTypeIcons } from './AccountPlatformTypeIcons';
 import { accountsApi } from '../../../shared/api/accounts';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
@@ -46,6 +48,7 @@ export function BulkAccountTestModal({
   open: boolean;
 }) {
   const { t } = useTranslation();
+  useSyncExternalStore(onPlatformIconChange, getPlatformIconVersion, getPlatformIconVersion);
   const groups = useMemo(() => groupSimilarAccounts(accounts), [accounts]);
   const [groupModels, setGroupModels] = useState<Record<string, PlatformModelState>>({});
   const [items, setItems] = useState<ItemState[]>([]);
@@ -278,19 +281,15 @@ export function BulkAccountTestModal({
                 className="space-y-2 rounded-lg border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] p-3"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Chip color="accent" size="sm" variant="soft">
-                      {group.platform.toUpperCase()}
-                    </Chip>
-                    {group.type ? (
-                      <Chip color="default" size="sm" variant="soft">
-                        {group.type}
-                      </Chip>
-                    ) : null}
-                  </div>
-                  <span className="shrink-0 text-xs text-[var(--ag-text-secondary)]">
+                  <span className="min-w-0 text-xs text-[var(--ag-text-secondary)]">
                     {t('accounts.bulk_test_group_count', { count: group.accounts.length })}
                   </span>
+                  <AccountPlatformTypeIcons
+                    PlatformGlyph={getPluginPlatformIcon(group.platform) ?? Server}
+                    platformLabel={group.platform.toUpperCase()}
+                    type={group.type}
+                    size="md"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>{t('accounts.select_model')}</Label>
@@ -356,9 +355,10 @@ export function BulkAccountTestModal({
             const groupDone = groupStats.get(group.key) ?? 0;
             return (
               <div key={group.key}>
-                <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--ag-border-subtle)] bg-[var(--ag-bg-surface)] px-3 py-2 text-xs font-medium">
-                  <span>{group.platform.toUpperCase()}</span>
-                  {group.type ? <span className="text-[var(--ag-text-secondary)]">{group.type}</span> : null}
+                <div
+                  className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--ag-border-subtle)] bg-[var(--ag-bg-surface)] px-3 py-2 text-xs font-medium"
+                  title={[group.platform.toUpperCase(), group.type].filter(Boolean).join(' · ')}
+                >
                   <span className="min-w-0 truncate text-[var(--ag-text-tertiary)]">
                     {groupModels[group.key]?.selectedModel ?? ''}
                   </span>

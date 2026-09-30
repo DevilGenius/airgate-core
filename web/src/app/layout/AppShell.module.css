@@ -3,14 +3,62 @@
 }
 
 .header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 20;
   height: var(--ag-header-height);
-  padding-inline: var(--ag-page-gutter);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   border-bottom: 1px solid var(--ag-panel-border);
   background: var(--background);
 }
 
+.headerContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--ag-content-max-width);
+  height: 100%;
+  margin-inline: auto;
+  padding-inline: var(--ag-page-gutter);
+}
+
 .main {
   padding-top: var(--ag-header-height);
+}
+
+.accountGroup {
+  position: relative;
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  padding-inline: 1px;
+}
+
+.accountIdentity {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding-inline: 0.75rem;
+}
+
+.accountGroup::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: calc(50% - 0.75rem);
+  box-sizing: border-box;
+  height: 1.5rem;
+  border-inline: 1px solid var(--border);
+  pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  .accountGroup { display: flex; }
 }
 
 .sidebar {

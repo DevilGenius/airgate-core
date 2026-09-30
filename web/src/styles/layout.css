@@ -433,7 +433,8 @@
 .ag-main-content {
   container-name: ag-main-shell;
   container-type: inline-size;
-  padding: var(--ag-page-gutter);
+  max-width: var(--ag-content-max-width);
+  padding: clamp(1rem, 1.6vw, 1.75rem) var(--ag-page-gutter);
 }
 
 .ag-centered-page {

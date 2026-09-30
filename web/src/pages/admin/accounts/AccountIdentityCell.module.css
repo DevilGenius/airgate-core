@@ -10,21 +10,46 @@
   min-width: 0;
 }
 
+.icons {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--ag-account-icon-gap, 0.25rem);
+}
+
+.icons[data-size='md'] {
+  --ag-account-icon-size: 2rem;
+  --ag-account-glyph-size: 1rem;
+  --ag-account-icon-gap: 0.375rem;
+  --ag-account-icon-radius: 0.5rem;
+}
+
+.icons[data-size='lg'] {
+  --ag-account-icon-size: 2.5rem;
+  --ag-account-glyph-size: 1.25rem;
+  --ag-account-icon-gap: 0.5rem;
+  --ag-account-icon-radius: 0.5rem;
+}
+
 .icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: var(--ag-account-icon-size, 1.25rem);
+  height: var(--ag-account-icon-size, 1.25rem);
   flex-shrink: 0;
-  border-radius: 0.375rem;
+  border-radius: var(--ag-account-icon-radius, 0.375rem);
   border: 1px solid color-mix(in oklab, var(--ag-text) 14%, transparent);
   background: color-mix(in oklab, var(--ag-text) 9%, var(--ag-bg-surface));
   color: var(--ag-text);
 }
 
-.icon svg { width: 0.875rem; height: 0.875rem; flex-shrink: 0; }
+.icon svg {
+  width: var(--ag-account-glyph-size, 0.875rem);
+  height: var(--ag-account-glyph-size, 0.875rem);
+  flex-shrink: 0;
+}
 
 .plan {
   --ag-plan-color: var(--ag-text-secondary);

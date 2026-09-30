@@ -1,13 +1,26 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AccountResp } from '../../../shared/types';
 import { accountIdentityDisplay, AccountIdentityCell } from './AccountIdentityCell';
+import { AccountPlatformTypeIcons } from './AccountPlatformTypeIcons';
 
 afterEach(cleanup);
 const account = { platform: 'openai', type: 'oauth', credentials: {} } satisfies Pick<AccountResp, 'platform' | 'type' | 'credentials'>;
 const now = Date.parse('2026-10-01T00:00:00Z');
 
 describe('core account identity', () => {
+  it('reuses modal icons during output updates and handles a replaced platform glyph', () => {
+    const glyph = vi.fn(() => <svg />);
+    const { rerender } = render(<AccountPlatformTypeIcons PlatformGlyph={glyph} platformLabel="OpenAI" type="api_key" />);
+    expect(screen.getByRole('img', { name: 'API Key' })).toHaveAttribute('title', 'API Key');
+    rerender(<AccountPlatformTypeIcons PlatformGlyph={glyph} platformLabel="OpenAI" type="api_key" />);
+    expect(glyph).toHaveBeenCalledTimes(1);
+    const replacement = vi.fn(() => <svg />);
+    rerender(<AccountPlatformTypeIcons PlatformGlyph={replacement} platformLabel="OpenAI" type="api_key" />);
+    expect(replacement).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('API Key')).not.toBeInTheDocument();
+  });
+
   it.each([['plus', 'Free'], ['pro', 'Free'], ['team', 'Team'], ['Self_serve_business_prolite', 'ProLite']])('preserves %s expiry rules', (plan, label) => {
     const result = accountIdentityDisplay({ ...account, credentials: { plan_type: plan, subscription_active_until: '2020-01-01' } }, undefined, now);
     expect(result.planLabel).toBe(label);

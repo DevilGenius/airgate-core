@@ -45,108 +45,109 @@ export const AppHeader = memo(function AppHeader({
   };
 
   return (
-    <header className={`${styles.header} pointer-events-auto absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3`}>
-      <div className="flex min-w-0 items-center gap-3">
-        {isMobile && (
-          <Button
-            aria-label={t('nav.open_menu', 'Open menu')}
-            aria-controls="app-mobile-navigation"
-            aria-expanded={mobileMenuOpen}
-            aria-haspopup="dialog"
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            onPress={onOpenMobileMenu}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        )}
-      </div>
-
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-        {showStatusEntry && (
-          <HeroLink
-            href="/status"
-            aria-label={t('nav.status')}
-            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text"
-          >
-            <Activity className="h-5 w-5" />
-          </HeroLink>
-        )}
-        {docs && <HeroLink
-          href={docs.href}
-          {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-          aria-label={t('nav.docs')}
-          className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
-        >
-          <BookOpen className="h-5 w-5" />
-        </HeroLink>}
-        {site.contact_info && (
-          <div className="hidden items-center gap-2 text-text-tertiary lg:flex">
-            <MessageCircle className="h-5 w-5 shrink-0" />
-            <span className="text-sm">{site.contact_info}</span>
-          </div>
-        )}
-        <Button
-          aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
-          className="h-10 px-3"
-          size="sm"
-          variant="ghost"
-          onPress={toggleLanguage}
-        >
-          <Languages className="h-5 w-5" />
-          <span className="hidden w-8 text-center font-mono text-xs uppercase sm:inline-block">
-            {i18n.language === 'zh' ? 'EN' : '中文'}
-          </span>
-        </Button>
-        <Button
-          aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
-          className="h-10 w-10"
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          onPress={toggleTheme}
-        >
-          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </Button>
-
-        <div className="mx-1.5 hidden h-6 w-px bg-border sm:block" />
-
-        <div className="hidden items-center gap-2.5 pl-1 sm:flex">
-          {!shell.isAPIKeySession && shell.balanceValue !== null && (
-            <div
-              className="flex h-7 items-center rounded-[calc(var(--radius)-2px)] px-2.5 text-text"
-              title={`${t('user_overview.balance', 'Balance')}: ${shell.balanceText}`}
+    <header className={styles.header}>
+      <div className={styles.headerContent}>
+        <div className="flex min-w-0 items-center gap-3">
+          {isMobile && (
+            <Button
+              aria-label={t('nav.open_menu', 'Open menu')}
+              aria-controls="app-mobile-navigation"
+              aria-expanded={mobileMenuOpen}
+              aria-haspopup="dialog"
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={onOpenMobileMenu}
             >
-              <span className="font-mono text-sm font-bold tabular-nums">
-                <span className="text-success">$</span>
-                {shell.balanceValue.toFixed(4)}
-              </span>
-            </div>
-          )}
-          {!shell.isAPIKeySession && (
-            <div className="hidden text-right md:block">
-              <p className="text-sm font-medium leading-tight text-text">
-                {shell.displayName}
-              </p>
-              <p className="text-xs leading-tight text-text-tertiary">
-                {shell.user?.email}
-              </p>
-            </div>
+              <Menu className="h-5 w-5" />
+            </Button>
           )}
         </div>
 
-        <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
-        <Button
-          aria-label={t('common.logout')}
-          className="h-10 w-10 text-text-secondary hover:bg-danger/10 hover:text-danger"
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          onPress={shell.logout}
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+          {showStatusEntry && (
+            <HeroLink
+              href="/status"
+              aria-label={t('nav.status')}
+              className="flex h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text"
+            >
+              <Activity className="h-5 w-5" />
+            </HeroLink>
+          )}
+          {docs && <HeroLink
+            href={docs.href}
+            {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            aria-label={t('nav.docs')}
+            className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
+          >
+            <BookOpen className="h-5 w-5" />
+          </HeroLink>}
+          {site.contact_info && (
+            <div className="hidden items-center gap-2 text-text-tertiary lg:flex">
+              <MessageCircle className="h-5 w-5 shrink-0" />
+              <span className="text-sm">{site.contact_info}</span>
+            </div>
+          )}
+          <Button
+            aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+            className="h-10 px-3"
+            size="sm"
+            variant="ghost"
+            onPress={toggleLanguage}
+          >
+            <Languages className="h-5 w-5" />
+            <span className="hidden w-8 text-center font-mono text-xs uppercase sm:inline-block">
+              {i18n.language === 'zh' ? 'EN' : '中文'}
+            </span>
+          </Button>
+          <Button
+            aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+            className="h-10 w-10"
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            onPress={toggleTheme}
+          >
+            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
+
+          {!shell.isAPIKeySession && (
+            <div className={styles.accountGroup}>
+              <div className={styles.accountIdentity}>
+                {shell.balanceValue !== null && (
+                  <div
+                    className="flex h-7 items-center text-text"
+                    title={`${t('user_overview.balance', 'Balance')}: ${shell.balanceText}`}
+                  >
+                    <span className="font-mono text-sm font-bold tabular-nums">
+                      <span className="text-success">$</span>
+                      {shell.balanceValue.toFixed(4)}
+                    </span>
+                  </div>
+                )}
+                <div className="hidden text-right md:block">
+                  <p className="text-sm font-medium leading-tight text-text">
+                    {shell.displayName}
+                  </p>
+                  <p className="text-xs leading-tight text-text-tertiary">
+                    {shell.user?.email}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Button
+            aria-label={t('common.logout')}
+            className="h-10 w-10 text-text-secondary hover:bg-danger/10 hover:text-danger"
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            onPress={shell.logout}
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
     </header>
   );

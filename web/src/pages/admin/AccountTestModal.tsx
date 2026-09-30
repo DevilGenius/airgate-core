@@ -1,7 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Chip, Label, useOverlayState } from '@heroui/react';
-import { Play, RotateCcw, Copy, Check, X } from 'lucide-react';
+import { Button, Label, useOverlayState } from '@heroui/react';
+import { Play, RotateCcw, Copy, Check, X, Server } from 'lucide-react';
+import { getPluginPlatformIcon, getPlatformIconVersion, onPlatformIconChange } from '../../app/plugin-frontend-registry';
+import { AccountPlatformTypeIcons } from './accounts/AccountPlatformTypeIcons';
+import { accountIdentityDisplay } from './accounts/AccountIdentityCell';
 import { accountsApi } from '../../shared/api/accounts';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { CommonModal } from '../../shared/components/CommonModal';
@@ -43,6 +46,8 @@ export function AccountTestModal({
   onTestComplete,
 }: AccountTestModalProps) {
   const { t } = useTranslation();
+  useSyncExternalStore(onPlatformIconChange, getPlatformIconVersion, getPlatformIconVersion);
+  const identity = useMemo(() => account ? accountIdentityDisplay(account) : null, [account]);
 
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
@@ -203,7 +208,7 @@ export function AccountTestModal({
     },
   });
 
-  if (!account) return null;
+  if (!account || !identity) return null;
 
   const canStart = status !== 'connecting' && status !== 'streaming' && !!selectedModel;
   const modelOptions = loadingModels
@@ -250,15 +255,18 @@ export function AccountTestModal({
                       <span className="min-w-0 truncate font-medium text-sm text-[var(--ag-text)]" title={account.name}>
                         {account.name}
                       </span>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Chip color="default" size="sm" variant="soft">{account.platform.toUpperCase()}</Chip>
-                        {account.type && <Chip color="accent" size="sm" variant="soft">{account.type}</Chip>}
-                      </div>
                     </div>
                     <div className="mt-1 truncate text-xs text-[var(--ag-text-secondary)]" title={account.email || undefined}>
                       {account.email || '—'}
                     </div>
                   </div>
+                  <AccountPlatformTypeIcons
+                    PlatformGlyph={getPluginPlatformIcon(account.platform) ?? Server}
+                    platformLabel={account.platform.toUpperCase()}
+                    type={identity.type}
+                    typeLabel={identity.typeLabel}
+                    size="lg"
+                  />
                 </div>
 
                 {/* 模型选择 */}
