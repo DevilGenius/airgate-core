@@ -411,14 +411,12 @@ export function EditAccountModal({
                   </div>
 
                   <div className="grid items-end gap-4 md:grid-cols-2">
-                    <HeroTextField fullWidth className="min-w-0">
-                      <Label>{t('accounts.plan_type')}</Label>
                       <AccountPlanTypeInput
+                        showLabel
                         label={t('accounts.plan_type')}
                         value={planType}
                         onChange={setPlanType}
                       />
-                    </HeroTextField>
                     <div className="flex flex-wrap items-center gap-4 pb-2">
                       <NativeCheckbox
                         isSelected={form.extra?.plan_type_locked === true}

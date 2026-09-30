@@ -1,6 +1,6 @@
 .pagination {
-  --control-height: 1.875rem;
-  --control-radius: 0.4375rem;
+  --control-height: var(--ag-dropdown-control-height, 2.5rem);
+  --control-radius: var(--field-radius, 0.625rem);
   container: table-pagination / inline-size;
   width: 100%;
   min-width: 0;
@@ -103,7 +103,6 @@
 }
 
 .button svg,
-.selectControl svg,
 .refresh svg {
   flex: none;
   width: 0.875rem;
@@ -187,14 +186,17 @@
 .select {
   appearance: none;
   min-width: 3.5rem;
-  padding-inline: 0.5rem 1.5rem;
+  padding-inline-start: var(--ag-dropdown-padding-inline, 0.75rem);
+  padding-inline-end: calc(var(--ag-dropdown-arrow-width, 2.25rem) + 0.5rem);
   cursor: pointer;
   font-family: var(--font-mono);
 }
 
 .selectControl svg {
   position: absolute;
-  inset-inline-end: 0.375rem;
+  width: var(--ag-dropdown-icon-size, 1rem);
+  height: var(--ag-dropdown-icon-size, 1rem);
+  inset-inline-end: calc((var(--ag-dropdown-arrow-width, 2.25rem) - var(--ag-dropdown-icon-size, 1rem)) / 2 + 1px);
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;

@@ -1,10 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditAccountModal } from './EditAccountModal';
 import { BulkEditAccountModal } from './BulkEditAccountModal';
 import type { AccountResp, CredentialSchemaResp } from '../../../shared/types';
 
-vi.mock('@heroui/react', async () => import('../../../test/herouiMock'));
+vi.mock('@heroui/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@heroui/react')>();
+  return {
+    ...await import('../../../test/herouiMock'),
+    ComboBox: actual.ComboBox,
+    ListBox: actual.ListBox,
+    Input: actual.Input,
+  };
+});
 
 vi.mock('react-i18next', () => ({
   initReactI18next: {
@@ -212,13 +221,15 @@ describe('EditAccountModal model policy', () => {
     expect(screen.getByLabelText('accounts.model_denylist')).toHaveValue('gpt-5.4-nano');
   });
 
-  it('offers backend plan presets and allows editing a selected preset', () => {
+  it('offers upstream plan presets and allows editing a selected preset', async () => {
+    const user = userEvent.setup();
     const onSubmit = renderModal(account());
     const input = screen.getByRole('combobox', { name: 'accounts.plan_type' });
-    const options = document.getElementById(input.getAttribute('list')!);
-    expect(Array.from(options!.querySelectorAll('option'), (option) => option.value))
-      .toEqual(['free', 'plus', 'team', 'prolite', 'pro', 'k12', 'enterprise']);
-    fireEvent.change(input, { target: { value: 'team' } });
+    await user.click(screen.getByRole('button', { name: 'accounts.plan_type' }));
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent))
+      .toEqual(['free', 'plus', 'pro', 'team', 'self_serve_business_prolite', 'prolite', 'k12', 'enterprise']);
+    await user.click(screen.getByRole('option', { name: 'self_serve_business_prolite' }));
+    expect(input).toHaveValue('self_serve_business_prolite');
     fireEvent.change(input, { target: { value: 'custom-team-plan' } });
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ plan_type: 'custom-team-plan' }));

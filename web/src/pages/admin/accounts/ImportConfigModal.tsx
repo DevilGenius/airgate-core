@@ -10,6 +10,7 @@ import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import { DropdownIndicator } from '../../../shared/components/DropdownIndicator';
 import { ToolbarMenuItem } from '../../../shared/components/ToolbarMenu';
 import type { GroupResp, ProxyResp } from '../../../shared/types';
 import { ProxyBindingFields, resolveProxyBinding } from './ProxyBindingFields';
@@ -629,7 +630,7 @@ export function ImportConfigModal({
                           >
                             <ComboBox.InputGroup>
                               <Input placeholder={t('accounts.import_config_field')} />
-                              <ComboBox.Trigger />
+                              <ComboBox.Trigger><DropdownIndicator slot="combo-box-trigger-default-icon" /></ComboBox.Trigger>
                             </ComboBox.InputGroup>
                             <ComboBox.Popover className="ag-import-config-field-popover">
                               <ListBox>

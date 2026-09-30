@@ -218,9 +218,7 @@
 
 /* 下拉和浮层 */
 
-:where(.select__popover,
-  .combo-box__popover,
-  .date-picker__popover,
+:where(.date-picker__popover,
   .date-range-picker__popover,
   .dropdown__popover,
   .popover) {
@@ -243,10 +241,6 @@
 .dropdown__popover {
   min-width: min(15rem, calc(100vw - 2rem)) !important;
   max-width: min(24rem, calc(100vw - 2rem)) !important;
-}
-
-:where(.select__popover, .combo-box__popover) {
-  min-width: max(var(--trigger-width), 12rem) !important;
 }
 
 @media (min-width: 96rem) {

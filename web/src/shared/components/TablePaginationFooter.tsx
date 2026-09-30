@@ -11,7 +11,8 @@ import {
   type FormEvent,
 } from 'react';
 import { flushSync } from 'react-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
+import { DropdownIndicator } from './DropdownIndicator';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getPaginationItems } from '../utils/pagination';
 import styles from './TablePaginationFooter.module.css';
 
@@ -236,7 +237,7 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
                 >
                   {pageSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}
                 </select>
-                <ChevronDown aria-hidden="true" />
+                <DropdownIndicator />
               </span>
               条
             </label>

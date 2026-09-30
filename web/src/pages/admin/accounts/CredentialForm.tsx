@@ -12,7 +12,8 @@ import {
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Input, Label, TextArea, TextField as HeroTextField } from '@heroui/react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
+import { DropdownIndicator } from '../../../shared/components/DropdownIndicator';
 import {
   getSchemaAccountTypes,
   getSchemaSelectedAccountType,
@@ -373,7 +374,7 @@ export function GroupCheckboxList({
             {selectedLabel}
           </span>
         </span>
-        <ChevronDown className="select__indicator h-4 w-4" />
+        <DropdownIndicator className="select__indicator" />
       </button>
       {isOpen ? (
         <div

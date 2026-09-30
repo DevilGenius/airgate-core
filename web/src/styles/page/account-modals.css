@@ -749,8 +749,8 @@
 .ag-import-config .input,
 .ag-import-config .ag-simple-select-trigger {
   box-sizing: border-box;
-  height: 2.25rem;
-  min-height: 2.25rem;
+  height: var(--ag-dropdown-control-height, 2.5rem);
+  min-height: var(--ag-dropdown-control-height, 2.5rem);
   padding-block: 0;
 }
 

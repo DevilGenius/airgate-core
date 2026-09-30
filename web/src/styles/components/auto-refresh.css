@@ -4,12 +4,13 @@
   display: inline-flex !important;
   box-sizing: border-box;
   min-width: var(--ag-auto-refresh-trigger-min-width, 7.5rem) !important;
-  height: var(--ag-auto-refresh-trigger-height, 2rem) !important;
-  min-height: var(--ag-auto-refresh-trigger-height, 2rem) !important;
+  height: var(--ag-dropdown-control-height, 2.5rem);
+  min-height: var(--ag-dropdown-control-height, 2.5rem);
   align-items: center !important;
   justify-content: space-between !important;
   gap: 0.25rem !important;
-  padding-inline: var(--ag-auto-refresh-trigger-padding-inline, 0.5rem) !important;
+  padding-inline-start: var(--ag-dropdown-padding-inline, 0.75rem);
+  padding-inline-end: calc(var(--ag-dropdown-arrow-width, 2.25rem) + 0.5rem);
   line-height: 1 !important;
   vertical-align: middle !important;
 }
@@ -37,21 +38,18 @@
 }
 
 .ag-auto-refresh-trigger--account-fixed {
-  --ag-auto-refresh-trigger-height: 2.5rem;
   --ag-auto-refresh-trigger-min-width: 8rem;
 
   width: 8rem !important;
 }
 
 .ag-auto-refresh-trigger--toolbar-fixed {
-  --ag-auto-refresh-trigger-height: 2.5rem;
   --ag-auto-refresh-trigger-min-width: 8rem;
 
   width: 8rem !important;
 }
 
 .ag-auto-refresh-trigger--dashboard-compact {
-  --ag-auto-refresh-trigger-height: 1.875rem;
   --ag-auto-refresh-trigger-min-width: 7.5rem;
 }
 
@@ -64,10 +62,10 @@
 }
 
 .ag-auto-refresh-refresh--dashboard-compact.button {
-  width: 1.875rem;
-  min-width: 1.875rem;
-  height: 1.875rem;
-  min-height: 1.875rem;
+  width: var(--ag-dropdown-control-height, 2.5rem);
+  min-width: var(--ag-dropdown-control-height, 2.5rem);
+  height: var(--ag-dropdown-control-height, 2.5rem);
+  min-height: var(--ag-dropdown-control-height, 2.5rem);
   padding: 0;
 }
 
@@ -127,11 +125,4 @@
 
 .ag-auto-refresh-label-value:empty {
   display: none;
-}
-
-.ag-auto-refresh-trigger > .ag-toolbar-menu-caret {
-  flex: 0 0 auto;
-  width: 0.75rem !important;
-  height: 0.75rem !important;
-  margin: 0 !important;
 }

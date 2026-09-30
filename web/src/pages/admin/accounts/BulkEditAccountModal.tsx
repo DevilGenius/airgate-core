@@ -505,14 +505,12 @@ export function BulkEditAccountModal({
           onToggle={setEnablePlanType}
           label={t('accounts.plan_type_label')}
         >
-          <HeroTextField fullWidth isDisabled={!enablePlanType}>
             <AccountPlanTypeInput
               label={t('accounts.plan_type_label')}
               value={planType}
               disabled={!enablePlanType}
               onChange={setPlanType}
             />
-          </HeroTextField>
         </FieldRow>
 
         {/* 模型降级阈值 */}

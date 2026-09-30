@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
+import { DropdownIndicator } from './DropdownIndicator';
 import { useFloatingPopover } from '../hooks/useFloatingPopover';
 
 interface ToolbarMenuProps {
@@ -105,7 +106,7 @@ export const ToolbarMenu = memo(function ToolbarMenu({
       >
         {icon}
         <span className="ag-toolbar-menu-trigger-label">{label}</span>
-        <ChevronDown className="ag-toolbar-menu-caret" aria-hidden="true" />
+        <DropdownIndicator className="ag-toolbar-menu-caret" />
       </button>
       {isOpen ? (
         <div

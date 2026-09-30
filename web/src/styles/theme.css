@@ -59,6 +59,10 @@ html[data-theme="dark"] {
   --ag-page-gutter: clamp(0.5rem, 0.8vw, 0.75rem);
   --ag-content-max-width: 120rem;
   --ag-control-radius: 0.625rem;
+  --ag-dropdown-control-height: 2.5rem;
+  --ag-dropdown-icon-size: 1rem;
+  --ag-dropdown-arrow-width: 2.25rem;
+  --ag-dropdown-padding-inline: 0.75rem;
   --cursor-interactive: pointer;
   --cursor-disabled: not-allowed;
   --skeleton-animation: shimmer;

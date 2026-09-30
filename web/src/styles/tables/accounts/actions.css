@@ -206,8 +206,8 @@
 }
 
 .ag-account-type-trigger-indicator {
-  width: 1rem;
-  height: 1rem;
+  width: var(--ag-dropdown-icon-size, 1rem);
+  height: var(--ag-dropdown-icon-size, 1rem);
 }
 
 .ag-account-type-menu.select__popover {

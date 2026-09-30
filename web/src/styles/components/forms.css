@@ -2,7 +2,7 @@
    HeroUI Form Controls
    ========================================================================== */
 
-/* 表单基础控件 */
+/* 表单基础控件。ComboBox 的 trigger 只是输入框内的箭头，不能套用完整字段的背景、边框和阴影。 */
 
 #root :where(.textfield,
   .select,
@@ -26,14 +26,12 @@
   .date-input-group,
   .select__trigger,
   .ag-simple-select-trigger,
-  .combo-box__trigger,
   .search-field__input),
 .ag-elevation-modal :where(.input,
   .textarea,
   .date-input-group,
   .select__trigger,
   .ag-simple-select-trigger,
-  .combo-box__trigger,
   .search-field__input) {
   background-color: var(--field-background) !important;
   border-color: var(--field-border) !important;
@@ -48,28 +46,24 @@
   .date-input-group:hover,
   .select__trigger:hover,
   .ag-simple-select-trigger:hover,
-  .combo-box__trigger:hover,
   .search-field__input:hover,
   .input[data-hovered="true"],
   .textarea[data-hovered="true"],
   .date-input-group[data-hovered="true"],
   .select__trigger[data-hovered="true"],
   .ag-simple-select-trigger[data-open="true"],
-  .combo-box__trigger[data-hovered="true"],
   .search-field__input[data-hovered="true"]),
 .ag-elevation-modal :where(.input:hover,
   .textarea:hover,
   .date-input-group:hover,
   .select__trigger:hover,
   .ag-simple-select-trigger:hover,
-  .combo-box__trigger:hover,
   .search-field__input:hover,
   .input[data-hovered="true"],
   .textarea[data-hovered="true"],
   .date-input-group[data-hovered="true"],
   .select__trigger[data-hovered="true"],
   .ag-simple-select-trigger[data-open="true"],
-  .combo-box__trigger[data-hovered="true"],
   .search-field__input[data-hovered="true"]) {
   background-color: color-mix(in oklab, var(--field-background) 86%, var(--surface) 14%) !important;
   border-color: color-mix(in oklab, var(--border) 92%, var(--foreground) 8%) !important;
@@ -80,33 +74,100 @@
   .date-input-group:focus-within,
   .select__trigger:focus-visible,
   .ag-simple-select-trigger:focus-visible,
-  .combo-box__trigger:focus-visible,
   .search-field__input:focus,
   .input[data-focused="true"],
   .textarea[data-focused="true"],
   .date-input-group[data-focus-within="true"],
   .select__trigger[data-focus-visible="true"],
   .ag-simple-select-trigger[data-open="true"],
-  .combo-box__trigger[data-focus-visible="true"],
   .search-field__input[data-focused="true"]),
 .ag-elevation-modal :where(.input:focus,
   .textarea:focus,
   .date-input-group:focus-within,
   .select__trigger:focus-visible,
   .ag-simple-select-trigger:focus-visible,
-  .combo-box__trigger:focus-visible,
   .search-field__input:focus,
   .input[data-focused="true"],
   .textarea[data-focused="true"],
   .date-input-group[data-focus-within="true"],
   .select__trigger[data-focus-visible="true"],
   .ag-simple-select-trigger[data-open="true"],
-  .combo-box__trigger[data-focus-visible="true"],
   .search-field__input[data-focused="true"]) {
   background-color: color-mix(in oklab, var(--field-background) 72%, var(--surface) 28%) !important;
   border-color: var(--focus) !important;
   box-shadow: var(--field-shadow), 0 0 0 1px var(--focus) !important;
   outline: none !important;
+}
+
+/* Editable dropdown arrows stay inside the field on every page. */
+.select__trigger,
+.ag-simple-select > .ag-simple-select-trigger,
+.combo-box .combo-box__input-group > input,
+.ag-search-combobox .ag-search-combobox-input {
+  box-sizing: border-box;
+  height: var(--ag-dropdown-control-height, 2.5rem);
+  min-height: var(--ag-dropdown-control-height, 2.5rem);
+  padding-block: 0;
+  line-height: 1.25rem;
+}
+
+.combo-box .combo-box__input-group {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  isolation: isolate;
+  width: 100%;
+  min-width: 0;
+}
+
+.combo-box .combo-box__input-group > input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding-inline-end: calc(var(--ag-dropdown-arrow-width, 2.25rem) + 0.5rem);
+}
+
+.combo-box .combo-box__input-group > .combo-box__trigger {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  inset-inline-start: auto;
+  inset-inline-end: 1px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: var(--ag-dropdown-arrow-width, 2.25rem);
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--field-radius, 0.625rem) - 1px);
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  appearance: none;
+  transform: none;
+  translate: none;
+  cursor: pointer;
+}
+
+.combo-box .combo-box__trigger[data-hovered='true'],
+.combo-box .combo-box__trigger[data-open='true'] {
+  color: var(--accent);
+}
+
+.combo-box .combo-box__trigger[data-focus-visible='true'] {
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
+.combo-box .combo-box__trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .ag-simple-select {
@@ -120,20 +181,49 @@
   width: 100%;
 }
 
-.ag-simple-select-trigger {
-  display: inline-flex !important;
+.ag-simple-select > .ag-simple-select-trigger {
+  position: relative;
+  display: inline-flex;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 0.5rem !important;
-  border: 1px solid var(--field-border) !important;
-  border-radius: var(--field-radius) !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
   cursor: pointer;
   font: inherit;
-  min-height: 2.5rem;
-  padding-inline: 0.75rem !important;
+  min-height: var(--ag-dropdown-control-height, 2.5rem);
+  padding-inline-start: var(--ag-dropdown-padding-inline, 0.75rem);
+  padding-inline-end: calc(var(--ag-dropdown-arrow-width, 2.25rem) + 0.5rem);
+}
+
+.select__trigger:has(.select__indicator) {
+  align-items: center;
+  padding-inline-end: calc(var(--ag-dropdown-arrow-width, 2.25rem) + 0.5rem);
+}
+
+.ag-simple-select .ag-toolbar-menu-caret,
+.select__trigger .select__indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-end: calc((var(--ag-dropdown-arrow-width, 2.25rem) - var(--ag-dropdown-icon-size, 1rem)) / 2 + 1px);
+  width: var(--ag-dropdown-icon-size, 1rem);
+  height: var(--ag-dropdown-icon-size, 1rem);
+  margin-block: auto;
+  flex: 0 0 auto;
+  pointer-events: none;
+  stroke-width: 2;
+}
+
+.combo-box .combo-box__trigger > svg,
+.select__trigger .select__indicator svg {
+  width: var(--ag-dropdown-icon-size, 1rem);
+  height: var(--ag-dropdown-icon-size, 1rem);
+  flex: 0 0 auto;
+  stroke-width: 2;
 }
 
 .ag-simple-select-trigger .ag-toolbar-menu-trigger-label {
@@ -144,9 +234,50 @@
   white-space: nowrap;
 }
 
-.ag-simple-select .ag-toolbar-menu-popover {
-  width: min(var(--ag-floating-trigger-width, 100%), 18rem);
-  min-width: min(var(--ag-floating-trigger-width, 100%), 18rem);
+/* Field dropdowns share the trigger's border-box width. Action menus and
+   calendars retain their content-driven sizes. */
+.ag-simple-select .ag-toolbar-menu-popover,
+.ag-search-combobox-popover,
+.select__popover:not(.ag-account-type-menu),
+.combo-box__popover {
+  box-sizing: border-box;
+  width: var(--ag-floating-trigger-width, var(--trigger-width, auto));
+  min-width: 0;
+  max-width: calc(100vw - 24px);
+  max-height: min(20rem, calc(100dvh - 24px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ag-simple-select .ag-toolbar-menu-popover,
+.ag-search-combobox-popover,
+.select__popover,
+.combo-box__popover {
+  padding: 0.375rem;
+  border: 1px solid var(--border);
+  border-radius: var(--field-radius);
+  background: var(--overlay);
+  color: var(--overlay-foreground);
+  box-shadow: var(--overlay-shadow);
+  animation: none;
+  transition: none;
+}
+
+.ag-simple-select .ag-toolbar-menu-item {
+  min-width: 0;
+  min-height: 2.25rem;
+}
+
+.select__popover .list-box-item,
+.combo-box__popover .list-box-item {
+  min-width: 0;
+  min-height: 2.25rem;
+}
+
+.ag-simple-select .ag-toolbar-menu-item[aria-checked='true'],
+.ag-search-combobox-item[aria-selected='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-soft-foreground);
 }
 
 .ag-simple-select-popover-content {
@@ -223,17 +354,6 @@
   right: auto;
   bottom: auto;
   margin: 0;
-  width: min(var(--ag-floating-trigger-width, 100%), 20rem);
-  min-width: min(var(--ag-floating-trigger-width, 100%), 20rem);
-  max-width: min(20rem, calc(100vw - 2rem));
-  max-height: min(28rem, calc(100dvh - 1.5rem));
-  overflow-y: auto;
-  border: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
-  border-radius: var(--field-radius);
-  background: var(--overlay);
-  box-shadow: var(--overlay-shadow);
-  color: var(--overlay-foreground);
-  padding: 0.25rem;
   animation: none !important;
   transition: none !important;
 }
@@ -268,7 +388,8 @@
 .ag-search-combobox-item {
   display: flex;
   width: 100%;
-  min-height: 2.125rem;
+  min-width: 0;
+  min-height: 2.25rem;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;

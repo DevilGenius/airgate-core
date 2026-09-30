@@ -7,7 +7,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     setupFiles: ['./src/test/setup.ts'],
-    css: false,
+    // Keep ordinary CSS mocked; allow explicit raw stylesheet imports for cascade regressions.
+    css: { include: [/\.css\?raw$/] },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

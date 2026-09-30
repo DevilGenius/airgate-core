@@ -23,8 +23,12 @@ export function useFloatingPopover<T extends HTMLElement>({
     if (!trigger || !popover) return;
 
     const triggerRect = trigger.getBoundingClientRect();
-    const popoverWidth = popover.offsetWidth || triggerRect.width;
-    const popoverHeight = popover.offsetHeight;
+    // Publish width before measuring: right-edge alignment must use the newly
+    // sized panel, not its previous/default width. Preserve fractional pixels.
+    popover.style.setProperty('--ag-floating-trigger-width', `${triggerRect.width}px`);
+    const popoverRect = popover.getBoundingClientRect();
+    const popoverWidth = popoverRect.width || triggerRect.width;
+    const popoverHeight = popoverRect.height;
     const viewportPadding = 12;
     const gap = 6;
     const preferredLeft = align === 'start'
@@ -40,9 +44,8 @@ export function useFloatingPopover<T extends HTMLElement>({
       ? below
       : triggerRect.top - popoverHeight - gap;
 
-    popover.style.setProperty('--ag-floating-left', `${Math.round(left)}px`);
+    popover.style.setProperty('--ag-floating-left', `${left}px`);
     popover.style.setProperty('--ag-floating-top', `${Math.round(Math.max(viewportPadding, top))}px`);
-    popover.style.setProperty('--ag-floating-trigger-width', `${Math.round(triggerRect.width)}px`);
   }, [align]);
 
   useLayoutEffect(() => {
@@ -58,13 +61,25 @@ export function useFloatingPopover<T extends HTMLElement>({
         }
       }
       updatePosition();
-      const frame = window.requestAnimationFrame(updatePosition);
-      window.addEventListener('resize', updatePosition);
-      window.addEventListener('scroll', updatePosition, true);
+      let frame: number | undefined;
+      const scheduleUpdate = () => {
+        if (frame != null) return;
+        frame = window.requestAnimationFrame(() => {
+          frame = undefined;
+          updatePosition();
+        });
+      };
+      scheduleUpdate();
+      const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(scheduleUpdate);
+      if (triggerRef.current) observer?.observe(triggerRef.current);
+      observer?.observe(popover);
+      window.addEventListener('resize', scheduleUpdate);
+      window.addEventListener('scroll', scheduleUpdate, true);
       return () => {
-        window.cancelAnimationFrame(frame);
-        window.removeEventListener('resize', updatePosition);
-        window.removeEventListener('scroll', updatePosition, true);
+        if (frame != null) window.cancelAnimationFrame(frame);
+        observer?.disconnect();
+        window.removeEventListener('resize', scheduleUpdate);
+        window.removeEventListener('scroll', scheduleUpdate, true);
       };
     }
 
