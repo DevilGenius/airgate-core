@@ -1,3 +1,6 @@
+import { TokenTrendChart } from '../shared/charts/TokenTrendChart';
+import { TimeSeriesChart } from '../shared/charts/TimeSeriesChart';
+import { buildAPIKeyTrendModel } from '../shared/charts/apiKeyTrend';
 import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -16,19 +19,9 @@ import {
   ToggleRight,
   Zap,
 } from 'lucide-react';
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { decorativePalette } from '@devilgenius/airgate-theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { queryKeys } from '../shared/queryKeys';
-import { DISTRIBUTION_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
+import { DISTRIBUTION_COLORS } from '../shared/constants';
 import { AutoRefreshControl } from '../shared/components/AutoRefreshControl';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
 import { CostPair, CostValue } from '../shared/components/CostValue';
@@ -37,17 +30,9 @@ import { UserSearchFilterComboBox } from '../shared/components/UserSearchFilterC
 import { usePersistentAutoRefresh } from '../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../shared/storageKeys';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../shared/ui/metricTones';
-import type { DashboardAPIKeyTrend, DashboardStatsResp, DashboardTrendResp, DashboardUsageEstimate } from '../shared/types';
+import type { DashboardStatsResp, DashboardTrendResp, DashboardUsageEstimate } from '../shared/types';
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
-const USER_COLORS = [...decorativePalette];
-const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
-const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
-const DASHBOARD_TOKEN_TREND_INITIAL_DIMENSION = { width: 600, height: 248 };
-const DASHBOARD_TOP_USERS_INITIAL_DIMENSION = { width: 1200, height: 268 };
-const DASHBOARD_TOKEN_Y_AXIS_WIDTH = 56;
-const DASHBOARD_RATIO_Y_AXIS_WIDTH = 36;
-const DASHBOARD_TIME_AXIS_HEIGHT = 40;
 const DASHBOARD_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminDashboardAutoRefresh;
 const DASHBOARD_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 
@@ -65,9 +50,6 @@ const META_TONE_CLASSES: Record<MetaTone, string> = {
   warning: 'text-amber-600 dark:text-amber-400',
 };
 
-function getUserTrendColor(index: number) {
-  return USER_COLORS[index % USER_COLORS.length] ?? 'var(--ag-primary)';
-}
 
 function fmtNum(n: number | undefined | null): string {
   if (n == null) return '0';
@@ -177,68 +159,6 @@ export function UsageEstimateCell({ estimate }: { estimate?: DashboardUsageEstim
       </span>{' '}
       <span className="ag-dashboard-metric-value text-xl leading-none">{duration}</span>
     </span>
-  );
-}
-
-type DashboardTimeLabel = {
-  primary: string;
-  secondary?: string;
-  tooltip: string;
-};
-
-function formatDashboardTime(timeStr: string): DashboardTimeLabel {
-  const [datePart, hourPart] = timeStr.split(' ');
-  const dateParts = datePart?.split('-') ?? [];
-  const compactDate = dateParts.length === 3 ? `${dateParts[1]}/${dateParts[2]}` : datePart;
-  if (hourPart) {
-    const hour = hourPart.slice(0, 5) || hourPart;
-    return {
-      primary: compactDate || timeStr,
-      secondary: hour,
-      tooltip: compactDate ? `${compactDate} ${hour}` : timeStr,
-    };
-  }
-  return {
-    primary: compactDate || timeStr,
-    tooltip: compactDate || timeStr,
-  };
-}
-
-function dashboardTooltipLabel(label: string | undefined, payload?: Array<{ payload?: unknown }>) {
-  const datum = payload?.[0]?.payload;
-  const timeLabel = datum && typeof datum === 'object' && 'timeLabel' in datum
-    ? (datum as { timeLabel?: unknown }).timeLabel
-    : undefined;
-  if (timeLabel && typeof timeLabel === 'object' && 'tooltip' in timeLabel) {
-    return String((timeLabel as DashboardTimeLabel).tooltip);
-  }
-  return label ?? '';
-}
-
-function DashboardTimeAxisTick({
-  x = 0,
-  y = 0,
-  payload,
-}: {
-  x?: number;
-  y?: number;
-  payload?: { value?: string | number };
-}) {
-  const label = formatDashboardTime(String(payload?.value ?? ''));
-  if (label.secondary) {
-    return (
-      <g transform={`translate(${x},${y + 8})`}>
-        <text fill="var(--ag-text)" fontSize={10} textAnchor="middle">
-          <tspan x={0} dy={0}>{label.primary}</tspan>
-          <tspan x={0} dy={13}>{label.secondary}</tspan>
-        </text>
-      </g>
-    );
-  }
-  return (
-    <g transform={`translate(${x},${y + 10})`}>
-      <text fill="var(--ag-text)" fontSize={11} textAnchor="middle">{label.primary}</text>
-    </g>
   );
 }
 
@@ -545,101 +465,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
   );
 }
 
-export function ChartTooltip({
-  active,
-  label,
-  payload,
-  seriesOrder,
-}: {
-  active?: boolean;
-  label?: string;
-  payload?: Array<{ color?: string; dataKey?: string; name?: string; payload?: Record<string, unknown>; value?: number }>;
-  seriesOrder?: string[];
-}) {
-  if (!active || !payload?.length) return null;
-  // 行顺序固定为当前时间桶的 token 使用量由多到少，不依赖图表库内部的注册顺序。
-  const rows = sortTooltipPayloadByTokenUsage(payload, seriesOrder);
-  const title = dashboardTooltipLabel(label, rows);
-  return (
-    <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
-      <div className="mb-1 font-medium">{title}</div>
-      {/* 网格布局：色点 / Key 名称 / Token / 计费金额各占一列，多行数字上下对齐。 */}
-      <div className="grid grid-cols-[0.5rem_minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1">
-        {rows.map((item) => {
-          // 每个 Key 一行：token 使用量后面紧跟该时间桶的计费金额。
-          const billedCost = chartTooltipBilledCost(item.dataKey, item.payload);
-          return (
-            <Fragment key={`${item.dataKey}-${item.name}`}>
-              <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
-              <span className="min-w-0 truncate text-text">{item.name ?? item.dataKey}</span>
-              {/* 数值列给固定最小宽度：切换时间桶时内容长短变化不会改变提示框尺寸。 */}
-              <span className="min-w-[4.25rem] text-right font-mono tabular-nums">{fmtNum(Number(item.value ?? 0))}</span>
-              {billedCost == null
-                ? <span aria-hidden="true" />
-                : <CostValue className="min-w-[5rem] text-right font-mono tabular-nums" tone="actual" value={billedCost} />}
-            </Fragment>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-export function TokenTrendTooltip({
-  active,
-  label,
-  payload,
-}: {
-  active?: boolean;
-  label?: string;
-  payload?: Array<{ color?: string; dataKey?: string; payload?: { actualCost?: number; standardCost?: number; timeLabel?: DashboardTimeLabel }; value?: number }>;
-}) {
-  const { t } = useTranslation();
-  if (!active || !payload?.length) return null;
-  const datum = payload[0]?.payload;
-  const title = dashboardTooltipLabel(label, payload);
-  const labels: Record<string, string> = {
-    input: t('dashboard.input'),
-    output: t('dashboard.output'),
-    cacheCreation: t('dashboard.cache_creation'),
-    cacheRead: t('dashboard.cache_read'),
-    cacheRatio: t('dashboard.cache_ratio'),
-    cacheCumulativeRatio: t('dashboard.cache_cumulative_ratio'),
-  };
-  // 指标顺序与图表图例一致（input → output → 缓存 → 比例），不按数值重排，避免 Token 与百分比混排。
-  const orderedPayload = [...payload].sort((a, b) => {
-    const aIndex = TOKEN_TREND_LINE_ORDER.indexOf(String(a.dataKey) as keyof typeof USAGE_TOKEN_COLORS);
-    const bIndex = TOKEN_TREND_LINE_ORDER.indexOf(String(b.dataKey) as keyof typeof USAGE_TOKEN_COLORS);
-    return (aIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : aIndex) - (bIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : bIndex);
-  });
-
-  return (
-    <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
-      <div className="mb-1 font-medium">{title}</div>
-      {/* 网格布局：色点 / 指标 / 数值各占一列，多行数字上下对齐。
-          费用口径也放在同一网格里（而不是独立一行文字），这样提示框宽度只由固定列宽决定，
-          切换时间桶时数值长短变化不会改变窗口尺寸。 */}
-      <div className="grid grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1">
-        {orderedPayload.map((item) => (
-          <Fragment key={item.dataKey}>
-            <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
-            <span className="min-w-0 truncate text-text">{labels[item.dataKey ?? ''] ?? item.dataKey}</span>
-            {/* 数值列给固定最小宽度：切换时间桶时内容长短变化不会改变提示框尺寸。 */}
-            <span className="min-w-[4.25rem] text-right font-mono tabular-nums">
-              {TOKEN_TREND_RATIO_KEYS.has(item.dataKey as keyof typeof USAGE_TOKEN_COLORS) ? `${Number(item.value ?? 0).toFixed(1)}%` : fmtNum(Number(item.value ?? 0))}
-            </span>
-          </Fragment>
-        ))}
-        <span aria-hidden="true" className="col-span-3 mt-1 border-t border-border" />
-        <span className="col-start-2 text-text">{t('dashboard.actual')}</span>
-        <CostValue className="min-w-[4.25rem] text-right font-mono tabular-nums" tone="actual" value={datum?.actualCost} />
-        <span className="col-start-2 text-text">{t('dashboard.standard')}</span>
-        <CostValue className="min-w-[4.25rem] text-right font-mono tabular-nums" tone="standard" value={datum?.standardCost} />
-      </div>
-    </div>
-  );
-}
-
 type DashboardDistributionTableRow = {
   actualCost: number;
   key: string | number;
@@ -762,272 +587,33 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
 
 function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
-  const lineLabels: Record<string, string> = {
-    input: t('dashboard.input'),
-    output: t('dashboard.output'),
-    cacheCreation: t('dashboard.cache_creation'),
-    cacheRead: t('dashboard.cache_read'),
-    cacheRatio: t('dashboard.cache_ratio'),
-    cacheCumulativeRatio: t('dashboard.cache_cumulative_ratio'),
-  };
-  const chartData = useMemo(() => {
-    let cumulativeCache = 0;
-    let cumulativeTotal = 0;
-
-    return (trend.token_trend ?? []).map((item) => {
-      const cacheRead = item.cache_read ?? item.cached_input ?? 0;
-      const cacheCreation = item.cache_creation ?? 0;
-      const cacheTokens = cacheRead + cacheCreation;
-      const totalTokens = item.input_tokens + item.output_tokens + cacheTokens;
-      cumulativeCache += cacheTokens;
-      cumulativeTotal += totalTokens;
-      const cacheRatio = totalTokens > 0
-        ? Math.min(100, Math.max(0, (cacheTokens / totalTokens) * 100))
-        : 0;
-      const cacheCumulativeRatio = cumulativeTotal > 0
-        ? Math.min(100, Math.max(0, (cumulativeCache / cumulativeTotal) * 100))
-        : 0;
-
-      return {
-        actualCost: item.actual_cost,
-        cacheCreation,
-        cacheCumulativeRatio,
-        cacheRatio,
-        cacheRead,
-        input: item.input_tokens,
-        output: item.output_tokens,
-        standardCost: item.standard_cost,
-        time: item.time,
-        timeLabel: formatDashboardTime(item.time),
-      };
-    });
-  }, [trend]);
-
+  const data = useMemo(() => (trend.token_trend ?? []).map(item => ({
+    time: item.time, input: item.input_tokens, output: item.output_tokens,
+    cacheRead: item.cached_input, cacheCreation: item.cache_creation,
+    actualCost: item.actual_cost, standardCost: item.standard_cost,
+  })), [trend.token_trend]);
   return (
     <DashboardCard title={t('dashboard.token_trend')}>
-      {chartData.length > 0 ? (
-        <div className="ag-dashboard-token-trend-chart flex h-[248px] w-full min-w-0 flex-col">
-          <div className="min-h-0 flex-1">
-            <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOKEN_TREND_INITIAL_DIMENSION}>
-              <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 4, top: 4 }}>
-                <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-                <XAxis
-                  axisLine={false}
-                  dataKey="time"
-                  height={DASHBOARD_TIME_AXIS_HEIGHT}
-                  minTickGap={18}
-                  tick={<DashboardTimeAxisTick />}
-                  tickLine={false}
-                />
-                <YAxis
-                  yAxisId="tokens"
-                  allowDecimals={false}
-                  axisLine={false}
-                  domain={[0, 'dataMax']}
-                  tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
-                  tickFormatter={fmtNum}
-                  tickLine={false}
-                  width={DASHBOARD_TOKEN_Y_AXIS_WIDTH}
-                />
-                <YAxis
-                  yAxisId="ratio"
-                  axisLine={false}
-                  domain={[0, 100]}
-                  orientation="right"
-                  tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
-                  tickFormatter={(value: number) => `${Math.round(value)}%`}
-                  tickLine={false}
-                  width={DASHBOARD_RATIO_Y_AXIS_WIDTH}
-                />
-                <RechartsTooltip content={<TokenTrendTooltip />} />
-                <Line yAxisId="tokens" dataKey="input" dot={false} isAnimationActive={false} name={lineLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} type="monotone" />
-                <Line yAxisId="tokens" dataKey="output" dot={false} isAnimationActive={false} name={lineLabels.output} stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2.5} type="monotone" />
-                <Line yAxisId="tokens" dataKey="cacheCreation" dot={false} isAnimationActive={false} name={lineLabels.cacheCreation} stroke={USAGE_TOKEN_COLORS.cacheCreation} strokeWidth={2.5} type="monotone" />
-                <Line yAxisId="tokens" dataKey="cacheRead" dot={false} isAnimationActive={false} name={lineLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} type="monotone" />
-                <Line yAxisId="ratio" dataKey="cacheRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheRatio} stroke={USAGE_TOKEN_COLORS.cacheRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
-                <Line yAxisId="ratio" dataKey="cacheCumulativeRatio" dot={false} isAnimationActive={false} name={lineLabels.cacheCumulativeRatio} stroke={USAGE_TOKEN_COLORS.cacheCumulativeRatio} strokeDasharray="5 5" strokeWidth={2} type="monotone" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <TokenTrendLegend lineLabels={lineLabels} />
-        </div>
-      ) : (
-        <div className="ag-dashboard-token-trend-chart flex h-[248px] items-center justify-center text-sm text-text">{t('common.no_data')}</div>
-      )}
+      <div className="ag-dashboard-token-trend-chart h-[248px] w-full min-w-0">
+        {data.length > 0 ? <TokenTrendChart data={data} /> : (
+          <div className="flex h-full items-center justify-center text-sm text-text">{t('common.no_data')}</div>
+        )}
+      </div>
     </DashboardCard>
   );
-}
-
-function TokenTrendLegend({ lineLabels }: { lineLabels: Record<string, string> }) {
-  return (
-    <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
-      {TOKEN_TREND_LINE_ORDER.map((key) => (
-        <span key={key} className="inline-flex items-center gap-1.5">
-          {TOKEN_TREND_RATIO_KEYS.has(key) ? (
-            <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: USAGE_TOKEN_COLORS[key] }} />
-          ) : (
-            <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
-          )}
-          <span>{lineLabels[key]}</span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function topAPIKeySeriesKey(apiKeyID: number, index: number) {
-  return apiKeyID > 0 ? `api_key_${apiKeyID}` : `api_key_index_${index}`;
-}
-
-/** 单个 Key 在选中时间范围内的 token 消耗量合计，即卡片排序依据。 */
-export function topAPIKeyTotalTokens(apiKey: DashboardAPIKeyTrend): number {
-  return apiKey.trend.reduce((total, point) => total + (point.tokens ?? 0), 0);
-}
-
-/**
- * 按 token 消耗量由多到少排序，整张卡片（折线、颜色、图例、悬浮提示行）共用这一顺序。
- * 消耗量并列时与后端 Top 12 口径保持一致，按 API Key ID 升序。
- */
-export function sortTopAPIKeysByTokens(topAPIKeys: DashboardAPIKeyTrend[]): DashboardAPIKeyTrend[] {
-  return topAPIKeys
-    .map((apiKey) => ({ apiKey, tokens: topAPIKeyTotalTokens(apiKey) }))
-    .sort((left, right) => (right.tokens - left.tokens) || (left.apiKey.api_key_id - right.apiKey.api_key_id))
-    .map((entry) => entry.apiKey);
-}
-
-/** 计费金额与 token 序列共用同一数据行，用后缀区分键名，避免新增额外的图表数据数组。 */
-const API_KEY_BILLED_COST_DATA_KEY_SUFFIX = '__billed_cost';
-
-export function apiKeyBilledCostDataKey(seriesKey: string): string {
-  return `${seriesKey}${API_KEY_BILLED_COST_DATA_KEY_SUFFIX}`;
-}
-
-/** 悬浮提示框读取同一数据行内该 Key 的计费金额；数据缺失时返回 undefined，由调用方决定不渲染。 */
-export function chartTooltipBilledCost(dataKey: string | undefined, data: Record<string, unknown> | undefined): number | undefined {
-  if (!dataKey || !data) return undefined;
-  const value = data[apiKeyBilledCostDataKey(dataKey)];
-  return typeof value === 'number' ? value : undefined;
-}
-
-/**
- * 按当前时间桶内该 Key 的 token 使用量由多到少排列提示框行（即提示框里显示的数字）。
- * 用量并列（含该桶无用量）时回落到卡片排名顺序，未在顺序表中的条目排在最后。
- * recharts 的自定义 content 拿到的是内部注册顺序（push/splice），折线重新注册时会漂移，因此这里显式排序。
- */
-export function sortTooltipPayloadByTokenUsage<T extends { dataKey?: string; value?: number }>(
-  payload: T[],
-  seriesOrder?: string[],
-): T[] {
-  const rank = new Map((seriesOrder ?? []).map((key, index) => [key, index]));
-  const tokensOf = (value: number | undefined) => {
-    const numeric = value ?? 0;
-    return Number.isFinite(numeric) ? numeric : 0;
-  };
-  return payload
-    .map((item, index) => ({ index, item, tokens: tokensOf(item.value) }))
-    .sort((left, right) => {
-      if (right.tokens !== left.tokens) return right.tokens - left.tokens;
-      const leftRank = rank.get(String(left.item.dataKey)) ?? Number.MAX_SAFE_INTEGER;
-      const rightRank = rank.get(String(right.item.dataKey)) ?? Number.MAX_SAFE_INTEGER;
-      return (leftRank - rightRank) || (left.index - right.index);
-    })
-    .map((entry) => entry.item);
-}
-
-/** 构建 Key Top 12 折线图数据：token 序列 + 同桶计费金额，时间轴取所有 Key 出现过的桶的并集。 */
-export function buildTopAPIKeyChartData(
-  topAPIKeys: DashboardAPIKeyTrend[],
-  seriesKeys: string[],
-): Array<Record<string, DashboardTimeLabel | number | string>> {
-  if (topAPIKeys.length === 0) return [];
-  const timeSet = new Set<string>();
-  topAPIKeys.forEach((apiKey) => apiKey.trend.forEach((point) => timeSet.add(point.time)));
-  const trendByAPIKey = topAPIKeys.map((apiKey) => new Map(apiKey.trend.map((point) => [point.time, point])));
-  return Array.from(timeSet).sort().map((time) => {
-    const row: Record<string, DashboardTimeLabel | number | string> = {
-      time,
-      timeLabel: formatDashboardTime(time),
-    };
-    seriesKeys.forEach((seriesKey, index) => {
-      const point = trendByAPIKey[index]?.get(time);
-      row[seriesKey] = point?.tokens ?? 0;
-      row[apiKeyBilledCostDataKey(seriesKey)] = point?.billed_cost ?? 0;
-    });
-    return row;
-  });
 }
 
 function TopAPIKeysCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
-  const topAPIKeys = useMemo(
-    () => sortTopAPIKeysByTokens(trend.top_api_keys ?? []),
-    [trend.top_api_keys],
-  );
-  const apiKeySeries = useMemo(
-    () => topAPIKeys.map((apiKey, index) => ({
-      color: getUserTrendColor(index),
-      id: apiKey.api_key_id,
-      key: topAPIKeySeriesKey(apiKey.api_key_id, index),
-      label: apiKey.name || (apiKey.api_key_id > 0 ? `#${apiKey.api_key_id}` : t('usage.api_key_plugin_call')),
-    })),
-    [t, topAPIKeys],
-  );
-  const chartData = useMemo(
-    () => buildTopAPIKeyChartData(topAPIKeys, apiKeySeries.map((series) => series.key)),
-    [apiKeySeries, topAPIKeys],
-  );
-
+  const model = useMemo(() => buildAPIKeyTrendModel(trend.top_api_keys ?? [], t('usage.api_key_plugin_call')), [trend.top_api_keys, t]);
   return (
     <DashboardCard title={t('dashboard.top_api_keys')}>
-      {topAPIKeys.length > 0 ? (
-        <div className="ag-dashboard-api-key-trend-chart flex h-[268px] w-full min-w-0 flex-col">
-          <div className="min-h-0 flex-1">
-            <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={DASHBOARD_TOP_USERS_INITIAL_DIMENSION}>
-              <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 8, top: 4 }}>
-                <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-                <XAxis
-                  axisLine={false}
-                  dataKey="time"
-                  height={DASHBOARD_TIME_AXIS_HEIGHT}
-                  minTickGap={18}
-                  tick={<DashboardTimeAxisTick />}
-                  tickLine={false}
-                />
-                <YAxis
-                  allowDecimals={false}
-                  axisLine={false}
-                  domain={[0, 'dataMax']}
-                  tick={{ fill: 'var(--ag-text)', fontSize: 11 }}
-                  tickFormatter={fmtNum}
-                  tickLine={false}
-                  width={DASHBOARD_TOKEN_Y_AXIS_WIDTH}
-                />
-                <RechartsTooltip content={<ChartTooltip seriesOrder={apiKeySeries.map((series) => series.key)} />} />
-                {apiKeySeries.map((apiKey) => (
-                  <Line key={apiKey.key} dataKey={apiKey.key} dot={false} isAnimationActive={false} name={apiKey.label} stroke={apiKey.color} strokeWidth={2.5} type="monotone" />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <TopAPIKeysLegend apiKeys={apiKeySeries} />
-        </div>
-      ) : (
-        <div className="ag-dashboard-api-key-trend-chart flex h-[268px] items-center justify-center text-sm text-text">{t('common.no_data')}</div>
-      )}
+      <div className="ag-dashboard-api-key-trend-chart h-[268px] w-full min-w-0">
+        {model.times.length > 0 ? <TimeSeriesChart model={model} label={t('dashboard.top_api_keys')} /> : (
+          <div className="flex h-full items-center justify-center text-sm text-text">{t('common.no_data')}</div>
+        )}
+      </div>
     </DashboardCard>
-  );
-}
-
-function TopAPIKeysLegend({ apiKeys }: { apiKeys: Array<{ color: string; id: number; label: string }> }) {
-  return (
-    <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
-      {apiKeys.map((apiKey) => (
-        <span key={apiKey.id} className="inline-flex min-w-0 items-center gap-1.5">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: apiKey.color }} />
-          <span className="max-w-40 truncate">{apiKey.label}</span>
-        </span>
-      ))}
-    </div>
   );
 }
 

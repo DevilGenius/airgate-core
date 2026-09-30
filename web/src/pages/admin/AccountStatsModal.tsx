@@ -1,3 +1,5 @@
+import { TimeSeriesChart } from '../../shared/charts/TimeSeriesChart';
+import { compactNumber, type TimeSeriesModel } from '../../shared/charts/timeSeries';
 import { useState, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -6,15 +8,6 @@ import {
   DollarSign, Activity, TrendingUp, Clock, Calendar,
   Cpu, Zap,
 } from 'lucide-react';
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { PlatformIcon } from '../../shared/ui';
 import {
   accountsApi,
@@ -489,82 +482,26 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
 function TrendChart({ data }: { data: AccountStatsResp }) {
   const { t } = useTranslation();
   const isMobile = useMediaQuery('(max-width: 767px)');
-
-  const chartData = useMemo(() =>
-    (data.daily_trend ?? []).map((d) => ({
-      date: fmtDate(d.date),
-      // 趋势图的"上游计费"线读 account_cost（含 account_rate），匹配卡片数字
-      totalCost: Number(d.account_cost.toFixed(4)),
-      actualCost: Number(d.actual_cost.toFixed(4)),
-      count: d.count,
-    })),
-    [data.daily_trend],
-  );
-
-  if (chartData.length === 0) return null;
-
+  const model = useMemo<TimeSeriesModel>(() => {
+    const points = data.daily_trend ?? [];
+    const money = (value: number) => '$' + value.toFixed(4);
+    return {
+      times: points.map(point => point.date),
+      axes: [{ format: value => '$' + compactNumber(value) }, {}],
+      series: [
+        { key: 'accountCost', label: t('accounts.stats_total_cost_label'), color: '#3b82f6', values: points.map(point => point.account_cost), format: money, area: true },
+        { key: 'actualCost', label: t('accounts.stats_actual_cost_label'), color: '#10b981', values: points.map(point => point.actual_cost), format: money, area: true },
+        { key: 'requests', label: t('accounts.stats_requests'), color: '#f59e0b', values: points.map(point => point.count), axis: 1, dashed: true },
+      ],
+    };
+  }, [data.daily_trend, t]);
+  if (model.times.length === 0) return null;
   return (
     <div className="rounded-lg border border-border-subtle p-3">
-      <h4 className="text-xs font-semibold text-text mb-2">{t('accounts.stats_trend_title')}</h4>
-      <ResponsiveContainer width="100%" height={isMobile ? 160 : 190} debounce={80}>
-        <LineChart data={chartData} margin={isMobile ? { top: 5, right: 4, left: 0, bottom: 5 } : { top: 5, right: 20, left: 10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
-          <XAxis
-            dataKey="date"
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={{ stroke: 'var(--ag-border)' }}
-            tickLine={false}
-          />
-          <YAxis
-            yAxisId="cost"
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => `$${v}`}
-          />
-          <YAxis
-            yAxisId="count"
-            orientation="right"
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => fmtNum(v)}
-          />
-          <RechartsTooltip
-            contentStyle={{
-              background: 'var(--ag-bg-elevated)',
-              border: '1px solid var(--ag-border)',
-              borderRadius: 8,
-              fontSize: 12,
-              padding: '8px 12px',
-            }}
-            labelStyle={{ color: 'var(--ag-text)', fontWeight: 600, marginBottom: 4 }}
-            itemStyle={{ padding: '2px 0' }}
-            formatter={(value, name) => {
-              const v = Number(value);
-              if (name === 'count') return [fmtNum(v), t('accounts.stats_requests')];
-              return [`$${v.toFixed(4)}`, name === 'totalCost' ? t('accounts.stats_total_cost_label') : t('accounts.stats_actual_cost_label')];
-            }}
-          />
-          <Line yAxisId="cost" type="monotone" dataKey="totalCost" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} name="totalCost" />
-          <Line yAxisId="cost" type="monotone" dataKey="actualCost" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} name="actualCost" />
-          <Line yAxisId="count" type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={2} dot={false} isAnimationActive={false} name="count" />
-        </LineChart>
-      </ResponsiveContainer>
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-0.5 mt-1">
-        <LegendDot color="#3b82f6" label={`${t('accounts.stats_total_cost_label')} (USD)`} />
-        <LegendDot color="#10b981" label={`${t('accounts.stats_actual_cost_label')} (USD)`} />
-        <LegendDot color="#f59e0b" label={t('accounts.stats_requests')} />
+      <h4 className="mb-2 text-xs font-semibold text-text">{t('accounts.stats_trend_title')}</h4>
+      <div style={{ height: isMobile ? 190 : 220 }}>
+        <TimeSeriesChart model={model} label={t('accounts.stats_trend_title')} />
       </div>
-    </div>
-  );
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="flex items-center gap-1.5 text-[11px] text-text-tertiary">
-      <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-      {label}
     </div>
   );
 }

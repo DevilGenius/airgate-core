@@ -1,3 +1,4 @@
+import { TokenTrendChart } from '../../shared/charts/TokenTrendChart';
 import { useState, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -5,29 +6,18 @@ import { Card, Tabs } from '@heroui/react';
 import {
   Wallet, Zap, Activity, Coins,
 } from 'lucide-react';
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CostValue } from '../../shared/components/CostValue';
-import { DISTRIBUTION_COLORS, USAGE_TOKEN_COLORS } from '../../shared/constants';
+import { DISTRIBUTION_COLORS } from '../../shared/constants';
 
 const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 const TOKEN_TREND_LINE_ORDER = ['input', 'output', 'cacheRead'] as const;
-const USER_OVERVIEW_TOKEN_TREND_INITIAL_DIMENSION = { width: 600, height: 248 };
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 type MetricTone = 'blue' | 'emerald' | 'amber' | 'indigo';
-type TokenTrendKey = typeof TOKEN_TREND_LINE_ORDER[number];
 
 const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
 const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
@@ -100,65 +90,6 @@ function rangeToDate(range: RangePreset): { start_date: string; end_date: string
   return { start_date: start, end_date: end };
 }
 
-/** 格式化趋势图时间标签：含小时取 HH:00，纯日期取 MM/DD。
- *
- * 后端从 v1 起会按调用方时区（client.ts 自动附带的 tz 参数）格式化桶 key，
- * 因此 timeStr 已经是用户本地时区下的字符串，前端只需直接截取，不要再做时区换算。
- */
-function fmtTime(timeStr: string): string {
-  if (timeStr.includes(' ')) {
-    const time = timeStr.split(' ')[1] ?? '';
-    return time.slice(0, 5) || timeStr;
-  }
-  const parts = timeStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[1]}/${parts[2]}`;
-  }
-  return timeStr;
-}
-
-function TokenTrendTooltip({
-  active,
-  label,
-  payload,
-}: {
-  active?: boolean;
-  label?: string;
-  payload?: Array<{ color?: string; dataKey?: string; name?: string; value?: number }>;
-}) {
-  const { t } = useTranslation();
-  if (!active || !payload?.length) return null;
-
-  const labels: Record<TokenTrendKey, string> = {
-    cacheRead: t('usage.cache_read'),
-    input: t('usage.input'),
-    output: t('usage.output'),
-  };
-  const orderedPayload = [...payload].sort((a, b) => {
-    const aIndex = TOKEN_TREND_LINE_ORDER.indexOf(a.dataKey as TokenTrendKey);
-    const bIndex = TOKEN_TREND_LINE_ORDER.indexOf(b.dataKey as TokenTrendKey);
-    return (aIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : aIndex) - (bIndex < 0 ? TOKEN_TREND_LINE_ORDER.length : bIndex);
-  });
-
-  return (
-    <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
-      <div className="mb-1 font-medium">{label}</div>
-      <div className="space-y-1">
-        {orderedPayload.map((item) => {
-          const key = item.dataKey as TokenTrendKey;
-          return (
-            <div key={item.dataKey} className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
-              <span className="text-text">{labels[key] ?? item.name ?? item.dataKey}</span>
-              <span className="font-mono">{fmtNum(Number(item.value ?? 0))}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export default function UserOverviewPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -183,18 +114,13 @@ export default function UserOverviewPage() {
 
   const trendData = useMemo(
     () => (trend ?? []).map((b) => ({
-      time: fmtTime(b.time),
+      time: b.time,
       input: b.input_tokens,
       output: b.output_tokens,
       cacheRead: b.cache_read,
     })),
     [trend],
   );
-  const tokenTrendLabels: Record<TokenTrendKey, string> = {
-    cacheRead: t('usage.cache_read'),
-    input: t('usage.input'),
-    output: t('usage.output'),
-  };
 
   return (
     <div className="ag-overview-page">
@@ -301,39 +227,13 @@ export default function UserOverviewPage() {
         <DashboardCard title={t('dashboard.token_trend')}>
           {trendData.length > 0 ? (
             <div className="ag-overview-chart flex h-[248px] w-full min-w-0 flex-col">
-              <div className="min-h-0 flex-1">
-                <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={USER_OVERVIEW_TOKEN_TREND_INITIAL_DIMENSION}>
-                  <LineChart data={trendData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
-                    <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
-                    <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
-                    <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={(v: number) => fmtNum(v)} tickLine={false} />
-                    <RechartsTooltip content={<TokenTrendTooltip />} />
-                    <Line type="monotone" dataKey="input" name={tokenTrendLabels.input} stroke={USAGE_TOKEN_COLORS.input} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                    <Line type="monotone" dataKey="output" name={tokenTrendLabels.output} stroke={USAGE_TOKEN_COLORS.output} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                    <Line type="monotone" dataKey="cacheRead" name={tokenTrendLabels.cacheRead} stroke={USAGE_TOKEN_COLORS.cacheRead} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <TokenTrendLegend labels={tokenTrendLabels} />
+              <TokenTrendChart data={trendData} metrics={TOKEN_TREND_LINE_ORDER} />
             </div>
           ) : (
             <div className="ag-overview-chart flex h-[248px] items-center justify-center text-sm text-text">{t('common.no_data')}</div>
           )}
         </DashboardCard>
       </div>
-    </div>
-  );
-}
-
-function TokenTrendLegend({ labels }: { labels: Record<TokenTrendKey, string> }) {
-  return (
-    <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1 text-[11px] text-text">
-      {TOKEN_TREND_LINE_ORDER.map((key) => (
-        <span key={key} className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ background: USAGE_TOKEN_COLORS[key] }} />
-          <span>{labels[key]}</span>
-        </span>
-      ))}
     </div>
   );
 }

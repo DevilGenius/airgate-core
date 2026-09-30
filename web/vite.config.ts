@@ -109,7 +109,7 @@ const MANUAL_CHUNK_PACKAGES: Record<string, string[]> = {
   intlDate: ['@internationalized/date', '@internationalized/number'],
   icons: ['lucide-react'],
   motion: ['motion'],
-  charts: ['recharts'],
+  charts: ['echarts', 'zrender'],
   markdown: ['react-markdown', 'remark-gfm'],
 };
 

@@ -975,8 +975,7 @@ export interface DashboardTimeBucket {
   input_tokens: number;
   output_tokens: number;
   cached_input: number;
-  cache_read?: number;
-  cache_creation?: number;
+  cache_creation: number;
   actual_cost: number;
   standard_cost: number;
 }
