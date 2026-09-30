@@ -113,6 +113,12 @@ html[data-theme="dark"] {
   --segment: var(--ag-segment);
   --segment-foreground: var(--ag-segment-foreground);
 
+  /* 用量元数据与套餐标签共享配色。 */
+  --ag-meta-low-color: rgb(34,197,94);
+  --ag-meta-medium-color: rgb(59,130,246);
+  --ag-meta-high-color: rgb(249,115,22);
+  --ag-meta-service-tier-color: rgb(168,85,247);
+
   --ag-usage-token-input: #10b981;
   --ag-usage-token-output: #0ea5e9;
   --ag-usage-token-reasoning: var(--ag-text-secondary);

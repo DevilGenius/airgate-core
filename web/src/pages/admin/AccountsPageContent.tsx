@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Input, Spinner, TextField as HeroTextField } from '@heroui/react';
@@ -19,10 +19,6 @@ import { proxiesApi } from '../../shared/api/proxies';
 import { AccountTestModal } from './AccountTestModal';
 import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import {
-  getAccountIdentityVersion,
-  subscribeAccountIdentityChange,
-} from '../../app/plugin-frontend-registry';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { usePersistentUrlQueryParam, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
@@ -301,7 +297,6 @@ export default function AccountsPageContent() {
     openAIPluginConfig?.config?.[ACCOUNT_POOL_ADJUSTMENT_SHOW_5H_CONFIG_KEY],
   );
   const { toast } = useToast();
-  useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
 
   const applyTokenRefreshResult = useCallback((
     id: number,

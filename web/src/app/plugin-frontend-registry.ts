@@ -72,6 +72,10 @@ export function onPlatformIconChange(listener: RegistryListener): () => void {
   return platformIconRegistry.subscribe(listener);
 }
 
+export function getPlatformIconVersion(): number {
+  return platformIconRegistry.getVersion();
+}
+
 export function registerAccountIdentity(
   platform: string,
   component: ComponentType<AccountSurfaceProps>,

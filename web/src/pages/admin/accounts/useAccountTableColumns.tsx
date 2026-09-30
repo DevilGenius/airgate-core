@@ -1,8 +1,9 @@
-import { memo, useMemo, useRef, type CSSProperties, type MouseEvent } from 'react';
+import { memo, useMemo, useRef, useSyncExternalStore, type CSSProperties, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
-import { getPluginAccountIdentity } from '../../../app/plugin-frontend-registry';
+import { RefreshCw, Server } from 'lucide-react';
+import { getPluginPlatformIcon, getPlatformIconVersion, onPlatformIconChange } from '../../../app/plugin-frontend-registry';
+import { AccountIdentityCell } from './AccountIdentityCell';
 import { accountsApi } from '../../../shared/api/accounts';
 import { queryKeys } from '../../../shared/queryKeys';
 import type { AccountResp } from '../../../shared/types';
@@ -462,6 +463,8 @@ export function useAccountTableColumns({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  // 图标注册表由整张表订阅一次，避免每个账号都挂载 PlatformIcon 的监听器。
+  const platformIconVersion = useSyncExternalStore(onPlatformIconChange, getPlatformIconVersion, getPlatformIconVersion);
   const resetNow = useUsageResetClock(Boolean(usageData?.accounts));
   const rowMetaCacheRef = useRef<Map<number, AccountRowRenderMeta>>(new Map());
 
@@ -556,31 +559,14 @@ export function useAccountTableColumns({
       width: '96px',
       mobileWidth: '84px',
       render: (row) => {
-        const PluginAccountIdentity = getPluginAccountIdentity(row.platform);
-        const displayOverrides = isAccountPoolProAdjusted(row, accountPoolAdjustmentPlans)
-          ? { plan_type: 'pro' }
-          : undefined;
+        const PlatformGlyph = getPluginPlatformIcon(row.platform) ?? Server;
         return (
-          <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
-            <span className="max-w-full min-w-0 truncate">
-              {platformName(row.platform)}
-            </span>
-            {PluginAccountIdentity ? (
-              <PluginAccountIdentity
-                accountId={row.id}
-                accountType={row.type}
-                context={{
-                  account: row,
-                  credentials: row.credentials,
-                  ...(displayOverrides ? { display_overrides: displayOverrides } : {}),
-                }}
-              />
-            ) : row.type ? (
-              <span className="max-w-full truncate rounded px-1 py-0 text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
-                {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
-              </span>
-            ) : null}
-          </div>
+          <AccountIdentityCell
+            row={row}
+            platformLabel={platformName(row.platform)}
+            PlatformGlyph={PlatformGlyph}
+            planOverride={isAccountPoolProAdjusted(row, accountPoolAdjustmentPlans) ? 'pro' : undefined}
+          />
         );
       },
     },
@@ -903,6 +889,7 @@ export function useAccountTableColumns({
     onToggleScheduling,
     platformFilter,
     platformName,
+    platformIconVersion,
     platformsKey,
     queryClient,
     t,

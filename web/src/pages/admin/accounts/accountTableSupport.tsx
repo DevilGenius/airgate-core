@@ -178,6 +178,10 @@ export function accountTableCellRowsEqual(columnKey: string, left: AccountResp, 
       return left.name === right.name
         && left.email === right.email;
     case 'platform':
+      // 身份列只读取这些字段；用量时间戳、状态和并发刷新不应重绘图标。
+      return left.platform === right.platform
+        && left.type === right.type
+        && left.credentials === right.credentials;
     case 'actions':
       return sameAccountExceptCapacity(left, right);
     case 'groups':
