@@ -9,11 +9,8 @@ import (
 
 const (
 	oauthPlanFilterPrefix      = "oauth_plan:"
-	oauthPlanMetadataKey       = "account.oauth_plans"
 	defaultOAuthPlanCredential = "plan_type"
 )
-
-type oauthPlanFilterMeta = plantype.Filter
 
 type oauthPlanFilter struct {
 	Platform      string
@@ -47,7 +44,7 @@ func pluginOAuthPlanFilters(meta plugin.PluginMeta) []oauthPlanFilter {
 	if meta.Platform == "" {
 		return nil
 	}
-	definitions := plantype.ParseFilters(meta.Metadata[oauthPlanMetadataKey])
+	definitions := plantype.ResolveFilters(meta.AccountPlans)
 	result := make([]oauthPlanFilter, 0, len(definitions))
 	for _, item := range definitions {
 		plan := oauthPlanFilter{Platform: meta.Platform, Key: item.Key, Label: item.Label, CredentialKey: item.CredentialKey, MatchMode: item.MatchMode, Matches: item.Matches}
@@ -63,9 +60,6 @@ func pluginOAuthPlanFilters(meta plugin.PluginMeta) []oauthPlanFilter {
 	return result
 }
 
-func normalizedPlanMatches(values []string, fallback string) []string {
-	return plantype.NormalizeMatches(values, fallback)
-}
 func (s *Service) resolveOAuthPlanFilter(value string) (oauthPlanFilter, bool) {
 	platform, key, ok := parseOAuthPlanFilterID(value)
 	if !ok || s.plugins == nil {

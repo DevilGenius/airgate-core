@@ -26,7 +26,6 @@ import (
 	pluginent "github.com/DevilGenius/airgate-core/ent/plugin"
 	settingent "github.com/DevilGenius/airgate-core/ent/setting"
 	"github.com/DevilGenius/airgate-core/internal/dispatchresolver"
-	"github.com/DevilGenius/airgate-core/internal/plantype"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
 )
 
@@ -316,6 +315,10 @@ func (m *Manager) preparePlugin(ctx context.Context, op *pluginUpdate, requested
 	if !pluginIDPattern.MatchString(info.ID) {
 		return nil, errors.New("plugin must declare a valid canonical ID")
 	}
+	info.AccountPlans, err = sdk.NormalizeAccountPlans(info.AccountPlans)
+	if err != nil {
+		return nil, fmt.Errorf("invalid account plan contract: %w", err)
+	}
 	if err := m.bindUpdate(op, info.ID); err != nil {
 		return nil, err
 	}
@@ -330,6 +333,7 @@ func (m *Manager) preparePlugin(ctx context.Context, op *pluginUpdate, requested
 	inst := &PluginInstance{Name: info.ID, SourceName: requested, Generation: a.Generation, Artifact: a,
 		DisplayName: info.Name, Version: info.Version, Author: info.Author, Type: string(info.Type),
 		ConfigSchema: cloneConfigSchema(info.ConfigSchema), Metadata: cloneMetadata(info.Metadata),
+		AccountPlans: sdk.CloneAccountPlans(info.AccountPlans),
 		Capabilities: sdkCapabilitiesToStrings(info.Capabilities), Priority: info.Priority, Client: client, stopped: make(chan struct{})}
 	p := &preparedPlugin{instance: inst, info: info, detachPreparation: stopCancel}
 	var lifecycle lifecycleClient
@@ -476,7 +480,7 @@ func (m *Manager) publishPlugin(ctx context.Context, op *pluginUpdate, p *prepar
 			m.credCache[inst.Platform] = cloneCredentialFields(p.info.AccountTypes[0].Fields)
 		}
 		dispatchresolver.RegisterPlatformDSL(inst.Platform, p.info.DispatchDSL)
-		routegraph.SetPlatformPlanMetadata(inst.Platform, p.info.Metadata[plantype.FiltersMetadataKey])
+		routegraph.SetPlatformAccountPlans(inst.Platform, p.info.AccountPlans)
 	}
 	if inst.Artifact.SourcePath != "" {
 		m.devPaths[inst.Name] = inst.Artifact.SourcePath
@@ -586,7 +590,7 @@ func (m *Manager) stopPlugin(name string, parents ...context.Context) {
 	m.unregisterAliasesLocked(name, inst.SourceName)
 	if inst.Platform != "" {
 		dispatchresolver.UnregisterPlatformDSL(inst.Platform)
-		routegraph.SetPlatformPlanMetadata(inst.Platform, "")
+		routegraph.SetPlatformAccountPlans(inst.Platform, nil)
 	}
 	m.mu.Unlock()
 	if m.devWatcher != nil {

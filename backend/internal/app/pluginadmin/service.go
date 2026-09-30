@@ -47,6 +47,7 @@ func (s *Service) List() []PluginMeta {
 			Type:          item.Type,
 			Platform:      item.Platform,
 			AccountTypes:  append([]sdk.AccountType(nil), item.AccountTypes...),
+			AccountPlans:  sdk.CloneAccountPlans(item.AccountPlans),
 			FrontendPages: append([]sdk.FrontendPage(nil), item.FrontendPages...),
 			ConfigSchema:  append([]sdk.ConfigField(nil), item.ConfigSchema...),
 			Metadata:      cloneStringMap(item.Metadata),

@@ -68,6 +68,8 @@ func TestAccountsForModelAppliesModelPolicies(t *testing.T) {
 }
 
 func TestAccountsForModelOAuthDefaultAndTeamPolicies(t *testing.T) {
+	SetPlatformAccountPlans("openai", []sdk.AccountPlan{{Key: "team", MatchMode: sdk.AccountPlanNormalizedContains, Matches: []string{"team", "k12", "prolite"}}})
+	t.Cleanup(func() { SetPlatformAccountPlans("openai", nil) })
 	defaultOAuth := &ent.Account{ID: 1, Platform: "openai", Type: "oauth"}
 	k12OAuth := &ent.Account{
 		ID:          2,
@@ -632,6 +634,8 @@ func TestSnapshotAndNodeHelpers(t *testing.T) {
 }
 
 func TestCloneAndCategoryHelpers(t *testing.T) {
+	SetPlatformAccountPlans("category-test", []sdk.AccountPlan{{Key: "team", MatchMode: sdk.AccountPlanNormalizedContains, Matches: []string{"team", "k12", "prolite"}}})
+	t.Cleanup(func() { SetPlatformAccountPlans("category-test", nil) })
 	if accountCategoryKeys(nil) != nil {
 		t.Fatal("accountCategoryKeys(nil) should return nil")
 	}
@@ -657,7 +661,7 @@ func TestCloneAndCategoryHelpers(t *testing.T) {
 		}
 	}
 	for _, plan := range []string{"team", "k12", "Self_serve_business_prolite", "ChatGPT ProLite", "pro_lite"} {
-		planKeys := accountCategoryKeys(&ent.Account{Type: "oauth", Credentials: map[string]string{"plan_type": plan}})
+		planKeys := accountCategoryKeys(&ent.Account{Platform: "category-test", Type: "oauth", Credentials: map[string]string{"plan_type": plan}})
 		if len(planKeys) != 1 || planKeys[0] != "team" {
 			t.Fatalf("account plan %q category keys = %v, want [team]", plan, planKeys)
 		}

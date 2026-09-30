@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { pluginsApi } from '../api/plugins';
 import { queryKeys } from '../queryKeys';
 import { FETCH_ALL_PARAMS } from '../constants';
+import type { PluginResp } from '../types';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { loadPluginFrontend } from '../../app/plugin-loader';
 import { registerPluginFrontendModule } from '../../app/plugin-frontend-registry';
@@ -19,15 +20,6 @@ function capitalize(s: string) {
 }
 
 const loadedPlatformFrontendPlugins = new Set<string>();
-const OAUTH_PLANS_METADATA_KEY = 'account.oauth_plans';
-
-type PluginOAuthPlanMeta = {
-  key?: string;
-  label?: string;
-  match?: string;
-  credential_key?: string;
-};
-
 export type OAuthPlanFilterOption = {
   id: string;
   platform: string;
@@ -37,31 +29,12 @@ export type OAuthPlanFilterOption = {
 
 const EMPTY_OAUTH_PLAN_FILTERS: OAuthPlanFilterOption[] = [];
 
-export function parseOAuthPlanFilters(platform: string, platformLabel: string, raw?: string): OAuthPlanFilterOption[] {
-  if (!raw) return [];
-  try {
-    const items = JSON.parse(raw) as PluginOAuthPlanMeta[];
-    if (!Array.isArray(items)) return [];
-    return items
-      .map((item) => {
-        let key = item.key?.trim();
-        if (!key) return null;
-        if (key === 'none' && item.match?.trim().toLowerCase() === 'empty'
-          && (!item.credential_key?.trim() || item.credential_key.trim() === 'plan_type')) key = 'unknown';
-        const planLabel = key === 'unknown' ? 'Unknown' : item.label?.trim() || key;
-        return {
-          id: `oauth_plan:${platform}:${key}`,
-          platform,
-          platformLabel,
-          planLabel,
-        };
-      })
-      .filter((item): item is OAuthPlanFilterOption => item != null);
-  } catch {
-    return [];
-  }
+export function parseOAuthPlanFilters(platform: string, platformLabel: string, plans: PluginResp['account_plans']): OAuthPlanFilterOption[] {
+  return (plans ?? []).map((plan) => ({
+    id: 'oauth_plan:' + platform + ':' + plan.key,
+    platform, platformLabel, planLabel: plan.label,
+  }));
 }
-
 /**
  * 从已安装的 gateway 插件中动态获取可用平台列表。
  * 同时返回 platform → 显示名的映射。
@@ -88,7 +61,7 @@ export function usePlatforms() {
         if (!nameMap[p.platform]) {
           nameMap[p.platform] = platformLabel;
         }
-        for (const option of parseOAuthPlanFilters(p.platform, platformLabel, p.metadata?.[OAUTH_PLANS_METADATA_KEY])) {
+        for (const option of parseOAuthPlanFilters(p.platform, platformLabel, p.account_plans)) {
           if (oauthPlanFilterIDs.has(option.id)) continue;
           oauthPlanFilterIDs.add(option.id);
           oauthPlanFilters.push(option);

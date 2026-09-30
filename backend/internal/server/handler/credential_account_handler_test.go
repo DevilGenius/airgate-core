@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"net/http"
 	"strings"
 	"testing"
@@ -66,11 +67,9 @@ func TestCredentialAccountOverviewReturnsSanitizedSnapshot(t *testing.T) {
 		store.NewAccountStore(db),
 		accountHandlerPluginCatalogStub{allPluginMetadata: []plugin.PluginMeta{{
 			Platform: "openai",
-			Metadata: map[string]string{
-				"account.oauth_plans": `[
-					{"key":"plus","credential_key":"plan_type","matches":["plus"]},
-					{"key":"team","credential_key":"plan_type","match":"normalized_contains","matches":["team","k12","prolite"]}
-				]`,
+			AccountPlans: []sdk.AccountPlan{
+				{Key: "plus", Matches: []string{"plus"}},
+				{Key: "team", MatchMode: sdk.AccountPlanNormalizedContains, Matches: []string{"team", "k12", "prolite"}},
 			},
 		}}},
 		scheduler.NewConcurrencyManager(nil),

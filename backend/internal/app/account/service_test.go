@@ -554,10 +554,8 @@ func TestListResolvesPluginOAuthPlanFilter(t *testing.T) {
 		},
 	}, stubPluginCatalog{
 		metas: []plugin.PluginMeta{{
-			Platform: "kiro",
-			Metadata: map[string]string{
-				oauthPlanMetadataKey: `[{"key":"pro","label":"Pro","credential_key":"plan_type","match":"contains","matches":["Builder Id Pro"]}]`,
-			},
+			Platform:     "kiro",
+			AccountPlans: []sdk.AccountPlan{{Key: "pro", Label: "Pro", CredentialKey: "plan_type", MatchMode: sdk.AccountPlanContains, Matches: []string{"Builder Id Pro"}}},
 		}},
 	}, noOpConcurrency{}, nil)
 

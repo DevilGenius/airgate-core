@@ -1,30 +1,27 @@
 package handler
 
 import (
-	"encoding/json"
-	"testing"
-
 	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
-	"github.com/DevilGenius/airgate-core/internal/plantype"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
+	"testing"
 )
 
 func TestPluginResponseProvidesPlatformPlanRules(t *testing.T) {
-	custom, _ := json.Marshal([]plantype.Filter{{Key: "power", Label: "Power", MatchMode: "contains", Matches: []string{"Power"}}})
 	for _, test := range []struct {
-		platform, raw string
-		count         int
-	}{{"kiro", string(custom), 2}, {"claude", "", len(plantype.DefaultFilters()) + 1}} {
-		metadata := map[string]string{plantype.FiltersMetadataKey: test.raw, "keep": "value"}
-		resp := toPluginResp(apppluginadmin.PluginMeta{Platform: test.platform, Metadata: metadata})
-		var filters []plantype.Filter
-		if err := json.Unmarshal([]byte(resp.Metadata[plantype.FiltersMetadataKey]), &filters); err != nil {
-			t.Fatal(err)
+		platform string
+		plans    []sdk.AccountPlan
+		count    int
+	}{
+		{"kiro", []sdk.AccountPlan{{Key: "power", Label: "Power", MatchMode: sdk.AccountPlanContains, Matches: []string{"Power"}}}, 2},
+		{"claude", nil, 1},
+	} {
+		metadata := map[string]string{"account.oauth_plans": "[{\"key\":\"max\"}]", "keep": "value"}
+		resp := toPluginResp(apppluginadmin.PluginMeta{Platform: test.platform, AccountPlans: test.plans, Metadata: metadata})
+		if len(resp.AccountPlans) != test.count || resp.AccountPlans[test.count-1].Key != "unknown" || resp.Metadata["keep"] != "value" {
+			t.Fatalf("invalid contract response: %+v", resp)
 		}
-		if len(filters) != test.count || filters[len(filters)-1].Key != "unknown" || resp.Metadata["keep"] != "value" {
-			t.Fatalf("invalid platform metadata: %+v", filters)
-		}
-		if metadata[plantype.FiltersMetadataKey] != test.raw {
-			t.Fatal("response mapping mutated plugin metadata")
+		if metadata["account.oauth_plans"] != resp.Metadata["account.oauth_plans"] {
+			t.Fatal("metadata was repurposed")
 		}
 	}
 }

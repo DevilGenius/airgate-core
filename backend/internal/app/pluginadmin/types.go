@@ -43,6 +43,7 @@ type PluginMeta struct {
 	Type             string
 	Platform         string
 	AccountTypes     []sdk.AccountType
+	AccountPlans     []sdk.AccountPlan
 	FrontendPages    []sdk.FrontendPage
 	ConfigSchema     []sdk.ConfigField
 	Metadata         map[string]string

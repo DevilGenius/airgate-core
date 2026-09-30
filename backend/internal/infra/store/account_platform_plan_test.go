@@ -1,7 +1,7 @@
 package store
 
 import (
-	"encoding/json"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"strings"
 	"testing"
 
@@ -15,20 +15,15 @@ import (
 func TestUnknownPlanPoliciesAcrossPlatforms(t *testing.T) {
 	for _, test := range []struct {
 		platform, known string
-		definitions     []plantype.Filter
+		definitions     []sdk.AccountPlan
 	}{
-		{"kiro", "Builder Id Power", []plantype.Filter{{Key: "power", MatchMode: "contains", Matches: []string{"Power"}}}},
-		{"claude", "max_20x", []plantype.Filter{{Key: "max", Matches: []string{"max_20x", "max_5x"}}}},
-		{"custom", "plus", nil},
+		{"kiro", "Builder Id Power", []sdk.AccountPlan{{Key: "power", MatchMode: "contains", Matches: []string{"Power"}}}},
+		{"example", "custom_max", []sdk.AccountPlan{{Key: "max", Matches: []string{"custom_max"}}}},
+		{"custom", "plus", []sdk.AccountPlan{{Key: "plus"}}},
 	} {
 		t.Run(test.platform, func(t *testing.T) {
-			raw := ""
-			if test.definitions != nil {
-				encoded, _ := json.Marshal(test.definitions)
-				raw = string(encoded)
-			}
-			routegraph.SetPlatformPlanMetadata(test.platform, raw)
-			defer routegraph.SetPlatformPlanMetadata(test.platform, "")
+			routegraph.SetPlatformAccountPlans(test.platform, test.definitions)
+			defer routegraph.SetPlatformAccountPlans(test.platform, nil)
 			db := enttestOpen(t)
 			defer db.Close()
 			group := &ent.Group{ID: 123, Platform: test.platform, AccountTypeModelPolicies: map[string]modelpolicy.Policy{"oauth": {Deny: []string{"blocked"}}}}
@@ -43,7 +38,7 @@ func TestUnknownPlanPoliciesAcrossPlatforms(t *testing.T) {
 			restore := routegraph.SetSnapshotForTesting([]*ent.Group{group})
 			defer restore()
 			filter := appaccount.CredentialStringFilter{Platform: test.platform, AccountType: "oauth", Key: "plan_type", MatchMode: "unknown"}
-			for _, known := range plantype.ParseFilters(raw) {
+			for _, known := range plantype.ResolveFilters(test.definitions) {
 				if known.Known() {
 					filter.KnownPlans = append(filter.KnownPlans, appaccount.CredentialStringFilter{Key: known.CredentialKey, MatchMode: known.MatchMode, Values: known.Matches})
 				}
@@ -62,12 +57,12 @@ func TestUnknownPlanPoliciesAcrossPlatforms(t *testing.T) {
 				}
 			}
 			// A plugin update must reclassify existing nodes without another DB refresh.
-			routegraph.SetPlatformPlanMetadata(test.platform, "[]")
+			routegraph.SetPlatformAccountPlans(test.platform, nil)
 			if got := routegraph.Group(group.ID).AccountsForModel("blocked"); len(got) != 0 {
 				t.Fatalf("stale plan cache after metadata change: %+v", got)
 			}
 			// Restore its declaration and verify cached nodes recover their known plan.
-			routegraph.SetPlatformPlanMetadata(test.platform, raw)
+			routegraph.SetPlatformAccountPlans(test.platform, test.definitions)
 			if got := routegraph.Group(group.ID).AccountsForModel("blocked"); len(got) != 1 {
 				t.Fatalf("plan cache did not recover: %+v", got)
 			}

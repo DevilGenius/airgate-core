@@ -1,26 +1,26 @@
 package plantype
 
 import (
-	"encoding/json"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"testing"
 )
 
 func TestPlatformFilters(t *testing.T) {
-	raw, _ := json.Marshal([]Filter{{Key: "power", MatchMode: "contains", Matches: []string{"Power"}}, {Key: "power", Matches: []string{"ignored"}}})
-	filters := ParseFilters(string(raw))
+	filters := ResolveFilters([]sdk.AccountPlan{{Key: "power", MatchMode: sdk.AccountPlanContains, Matches: []string{"Power"}}})
 	if len(filters) != 2 || filters[1].Key != "unknown" {
 		t.Fatalf("filters: %+v", filters)
 	}
 	if !filters[0].MatchesValue("Builder Id Power") || filters[0].MatchesValue("plus") || filters[0].MatchesValue("power") {
 		t.Fatal("declared matching semantics changed")
 	}
-	if empty := ParseFilters("[]"); len(empty) != 1 || empty[0].Key != "unknown" {
-		t.Fatalf("explicit empty declarations: %+v", empty)
-	}
-	for _, raw := range []string{"", "invalid"} {
-		defaults := ParseFilters(raw)
-		if len(defaults) < 2 || defaults[len(defaults)-1].Key != "unknown" {
-			t.Fatalf("missing default rules: %+v", defaults)
+	for _, plans := range [][]sdk.AccountPlan{nil, {}, {{Key: "oauth"}}} {
+		got := ResolveFilters(plans)
+		if len(got) != 1 || got[0].Key != "unknown" {
+			t.Fatalf("must not invent platform plans: %+v", got)
 		}
+	}
+	alternate := ResolveFilters([]sdk.AccountPlan{{Key: "max", CredentialKey: "subscription"}})
+	if alternate[1].CredentialKey != "subscription" {
+		t.Fatal("Unknown must use the declared identity field")
 	}
 }

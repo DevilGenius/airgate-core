@@ -36,6 +36,7 @@ type PluginInstance struct {
 	Type            string // "gateway", "extension", "middleware"
 	ConfigSchema    []sdk.ConfigField
 	Metadata        map[string]string
+	AccountPlans    []sdk.AccountPlan
 	Capabilities    []string // 插件声明的 host capability 列表（仅展示用）
 	Priority        int32    // 仅对 type=middleware 生效，决定 chain 顺序
 
@@ -208,6 +209,7 @@ type PluginMeta struct {
 	Type             string
 	Platform         string
 	AccountTypes     []sdk.AccountType
+	AccountPlans     []sdk.AccountPlan
 	FrontendPages    []sdk.FrontendPage
 	ConfigSchema     []sdk.ConfigField
 	Metadata         map[string]string

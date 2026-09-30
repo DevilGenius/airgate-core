@@ -2,12 +2,13 @@ package routegraph
 
 import (
 	"github.com/DevilGenius/airgate-core/internal/plantype"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"sync"
 	"time"
 )
 
 var platformPlanFilters sync.Map // platform -> immutable []plantype.Filter
-var defaultPlanFilters = plantype.ParseFilters("")
+var defaultPlanFilters = plantype.ResolveFilters(nil)
 
 func accountPlanFilters(platform string) []plantype.Filter {
 	if filters, ok := platformPlanFilters.Load(platform); ok {
@@ -16,13 +17,13 @@ func accountPlanFilters(platform string) []plantype.Filter {
 	return defaultPlanFilters
 }
 
-// SetPlatformPlanMetadata runs at plugin publication/removal, not per request.
+// SetPlatformAccountPlans runs at plugin publication/removal, not per request.
 // Reclassify cached account nodes so hot updates take effect immediately.
-func SetPlatformPlanMetadata(platform, raw string) {
+func SetPlatformAccountPlans(platform string, plans []sdk.AccountPlan) {
 	if platform == "" {
 		return
 	}
-	filters := plantype.ParseFilters(raw)
+	filters := plantype.ResolveFilters(plans)
 	updateMu.Lock()
 	defer updateMu.Unlock()
 	platformPlanFilters.Store(platform, filters)

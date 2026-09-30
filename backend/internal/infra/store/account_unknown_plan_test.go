@@ -1,7 +1,7 @@
 package store
 
 import (
-	"encoding/json"
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"testing"
 
 	"github.com/DevilGenius/airgate-core/ent"
@@ -12,12 +12,12 @@ import (
 )
 
 func TestAccountStoreUnknownOAuthPlanFilter(t *testing.T) {
-	raw, _ := json.Marshal([]plantype.Filter{
+	plans := []sdk.AccountPlan{
 		{Key: "free", Matches: []string{"free"}}, {Key: "plus", Matches: []string{"plus"}}, {Key: "pro", Matches: []string{"pro"}},
 		{Key: "team", MatchMode: "normalized_contains", Matches: []string{"team", "k12", "prolite"}},
-	})
-	routegraph.SetPlatformPlanMetadata("openai", string(raw))
-	defer routegraph.SetPlatformPlanMetadata("openai", "")
+	}
+	routegraph.SetPlatformAccountPlans("openai", plans)
+	defer routegraph.SetPlatformAccountPlans("openai", nil)
 	db := enttestOpen(t)
 	defer db.Close()
 	fixtures := []struct {
@@ -57,7 +57,7 @@ func TestAccountStoreUnknownOAuthPlanFilter(t *testing.T) {
 		}
 	}
 	knownPlans := []appaccount.CredentialStringFilter{}
-	for _, rule := range plantype.ParseFilters(string(raw)) {
+	for _, rule := range plantype.ResolveFilters(plans) {
 		if !rule.Known() {
 			continue
 		}

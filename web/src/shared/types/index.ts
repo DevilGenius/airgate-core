@@ -806,6 +806,7 @@ export interface TestProxyResp {
 // ==================== Plugin ====================
 
 export interface PluginResp {
+  account_plans?: Array<{ key: string; label: string; credential_key: string; match: 'exact' | 'contains' | 'normalized_contains' | 'unknown'; matches?: string[] }>;
   generation: string;
   update_state: 'active' | 'preparing' | 'draining';
   draining_requests: number;

@@ -198,6 +198,7 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 			Platform:     inst.Platform,
 			ConfigSchema: cloneConfigSchema(inst.ConfigSchema),
 			Metadata:     cloneMetadata(inst.Metadata),
+			AccountPlans: sdk.CloneAccountPlans(inst.AccountPlans),
 			IsDev:        isDev,
 		}
 		if m.updates[inst.Name] != nil {

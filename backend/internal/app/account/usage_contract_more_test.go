@@ -11,50 +11,20 @@ import (
 func TestAdditionalOAuthPlanFilterBranches(t *testing.T) {
 	for _, raw := range []string{"plain", "oauth_plan:openai", "oauth_plan::plus", "oauth_plan:openai:"} {
 		if _, _, ok := parseOAuthPlanFilterID(raw); ok {
-			t.Fatalf("parseOAuthPlanFilterID(%q) returned ok", raw)
+			t.Fatalf("accepted malformed filter %q", raw)
 		}
 	}
 	if platform, key, ok := parseOAuthPlanFilterID("oauth_plan: openai : plus "); !ok || platform != "openai" || key != "plus" {
-		t.Fatalf("parse valid filter = %q %q %v", platform, key, ok)
+		t.Fatal("filter parsing failed")
 	}
-
 	if got := pluginOAuthPlanFilters(plugin.PluginMeta{}); got != nil {
-		t.Fatalf("empty plugin filters = %#v", got)
+		t.Fatalf("empty plugin filters: %+v", got)
 	}
-	if got := pluginOAuthPlanFilters(plugin.PluginMeta{Platform: "openai", Metadata: map[string]string{oauthPlanMetadataKey: "{"}}); len(got) == 0 || got[len(got)-1].Key != "unknown" {
-		t.Fatalf("invalid metadata must use common defaults with Unknown, got %#v", got)
-	}
-	meta := plugin.PluginMeta{
-		Platform: "openai",
-		Metadata: map[string]string{oauthPlanMetadataKey: `[
-			{"key":" ", "label":"ignored"},
-			{"key":"plus", "label":" Plus ", "credential_key":" plan ", "match":"contains", "matches":["plus"," plus ",""]},
-			{"key":"team", "match":"normalized_contains", "matches":["team","k12","prolite"]},
-			{"key":"team", "matches":[" "]},
-			{"key":"pro"}
-		]`},
-	}
-	filters := pluginOAuthPlanFilters(meta)
-	if len(filters) != 4 {
-		t.Fatalf("filters = %+v, want three valid filters plus Unknown", filters)
-	}
-	if filters[0].Key != "plus" || filters[0].Label != "Plus" || filters[0].CredentialKey != "plan" ||
-		filters[0].MatchMode != "contains" || len(filters[0].Matches) != 1 || filters[0].Matches[0] != "plus" {
-		t.Fatalf("contains filter = %+v", filters[0])
-	}
-	if filters[1].Key != "team" || filters[1].MatchMode != "normalized_contains" || len(filters[1].Matches) != 3 {
-		t.Fatalf("normalized filter = %+v", filters[1])
-	}
-	if filters[2].Key != "pro" || filters[2].Label != "pro" || filters[2].CredentialKey != defaultOAuthPlanCredential ||
-		filters[2].MatchMode != "exact" || len(filters[2].Matches) != 1 || filters[2].Matches[0] != "pro" {
-		t.Fatalf("fallback filter = %+v", filters[2])
-	}
-
-	if got := normalizedPlanMatches([]string{" a ", "a", "", "b"}, "fallback"); len(got) != 2 || got[0] != "a" || got[1] != "b" {
-		t.Fatalf("normalized matches = %#v", got)
+	filters := pluginOAuthPlanFilters(plugin.PluginMeta{Platform: "claude"})
+	if len(filters) != 1 || filters[0].Key != "unknown" || len(filters[0].KnownPlans) != 0 {
+		t.Fatalf("undeclared plans must not use guessed defaults: %+v", filters)
 	}
 }
-
 func TestAdditionalUsageContractCacheAndWindowBranches(t *testing.T) {
 	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
 	if (accountUsageCachePayload{}).valid() {

@@ -12,11 +12,21 @@ type PluginResp struct {
 	Type             string             `json:"type,omitempty"`
 	Platform         string             `json:"platform"`
 	AccountTypes     []AccountTypeResp  `json:"account_types,omitempty"`
+	AccountPlans     []AccountPlanResp  `json:"account_plans"`
 	FrontendPages    []FrontendPageResp `json:"frontend_pages,omitempty"`
 	ConfigSchema     []ConfigFieldResp  `json:"config_schema,omitempty"`
 	Metadata         map[string]string  `json:"metadata,omitempty"`
 	HasWebAssets     bool               `json:"has_web_assets"`
 	IsDev            bool               `json:"is_dev"`
+}
+
+// AccountPlanResp exposes SDK-declared plans plus Core's Unknown category.
+type AccountPlanResp struct {
+	Key           string   `json:"key"`
+	Label         string   `json:"label"`
+	CredentialKey string   `json:"credential_key"`
+	MatchMode     string   `json:"match"`
+	Matches       []string `json:"matches,omitempty"`
 }
 
 // ConfigFieldResp 插件配置字段声明
