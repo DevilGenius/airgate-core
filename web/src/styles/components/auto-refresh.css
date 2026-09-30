@@ -3,7 +3,7 @@
 .ag-auto-refresh-trigger {
   display: inline-flex !important;
   box-sizing: border-box;
-  min-width: var(--ag-auto-refresh-trigger-min-width, 7.5rem) !important;
+  min-width: var(--ag-auto-refresh-trigger-width, 8rem) !important;
   height: var(--ag-dropdown-control-height, 2.5rem);
   min-height: var(--ag-dropdown-control-height, 2.5rem);
   align-items: center !important;
@@ -13,6 +13,7 @@
   padding-inline-end: calc(var(--ag-dropdown-arrow-width, 2.25rem) + 0.5rem);
   line-height: 1 !important;
   vertical-align: middle !important;
+  width: max-content;
 }
 
 .ag-auto-refresh-trigger.ag-toolbar-menu-trigger {
@@ -38,19 +39,15 @@
 }
 
 .ag-auto-refresh-trigger--account-fixed {
-  --ag-auto-refresh-trigger-min-width: 8rem;
-
-  width: 8rem !important;
+  --ag-auto-refresh-trigger-width: 8rem;
 }
 
 .ag-auto-refresh-trigger--toolbar-fixed {
-  --ag-auto-refresh-trigger-min-width: 8rem;
-
-  width: 8rem !important;
+  --ag-auto-refresh-trigger-width: 8rem;
 }
 
 .ag-auto-refresh-trigger--dashboard-compact {
-  --ag-auto-refresh-trigger-min-width: 7.5rem;
+  --ag-auto-refresh-trigger-width: 8rem;
 }
 
 .ag-auto-refresh-refresh--toolbar.button {
@@ -110,9 +107,9 @@
 
 .ag-auto-refresh-label-title {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   text-align: left;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 

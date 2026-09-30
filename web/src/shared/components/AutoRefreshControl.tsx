@@ -14,6 +14,7 @@ interface AutoRefreshControlProps {
   afterRefresh?: ReactNode;
   afterAutoRefresh?: ReactNode;
   refreshButtonClassName?: string;
+  showRefreshButton?: boolean;
   triggerClassName?: string;
   ariaLabel: string;
   refreshAriaLabel: string;
@@ -165,6 +166,7 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   afterRefresh,
   afterAutoRefresh,
   refreshButtonClassName,
+  showRefreshButton = true,
   triggerClassName,
   ariaLabel,
   refreshAriaLabel,
@@ -236,17 +238,19 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   return (
     <>
       {beforeRefresh}
-      <Button
-        isIconOnly
-        aria-label={refreshAriaLabel}
-        isDisabled={isDisabled || isRefreshing}
-        size="sm"
-        variant="ghost"
-        className={['h-8 w-8 min-w-8', refreshButtonClassName].filter(Boolean).join(' ')}
-        onPress={handleRefresh}
-      >
-        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-      </Button>
+      {showRefreshButton ? (
+        <Button
+          isIconOnly
+          aria-label={refreshAriaLabel}
+          isDisabled={isDisabled || isRefreshing}
+          size="sm"
+          variant="ghost"
+          className={['h-8 w-8 min-w-8', refreshButtonClassName].filter(Boolean).join(' ')}
+          onPress={handleRefresh}
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
+      ) : null}
       {afterRefresh}
       <ToolbarMenu
         ariaLabel={ariaLabel}

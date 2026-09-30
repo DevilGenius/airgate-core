@@ -54,6 +54,64 @@
   line-height: var(--ag-usage-toolbar-line-height);
 }
 
+/* Keep the three usage actions aligned to one metric-card column. */
+.ag-usage-page .ag-usage-toolbar-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.ag-usage-page .ag-usage-toolbar-actions > .ag-auto-refresh-menu,
+.ag-usage-page .ag-usage-toolbar-actions > .ag-auto-refresh-menu .ag-auto-refresh-trigger {
+  width: 100%;
+  min-width: 0 !important;
+}
+
+.ag-usage-page .ag-usage-toolbar-actions .ag-page-toolbar-button {
+  min-width: 0;
+}
+
+@container ag-main-shell (min-width: 91rem) {
+  .ag-usage-page .ag-page-toolbar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: start;
+  }
+
+  .ag-usage-page .ag-page-toolbar-filters {
+    grid-column: 1 / span 3;
+    min-width: 0;
+  }
+
+  .ag-usage-page .ag-page-toolbar-filter-row {
+    --ag-usage-card-unit: calc((100% - 1.5rem) / 3);
+    --ag-usage-paired-control: calc((var(--ag-usage-card-unit) - 0.75rem) / 2);
+    display: grid;
+    grid-template-columns: var(--ag-usage-card-unit) repeat(4, var(--ag-usage-paired-control));
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+  }
+
+  .ag-usage-page .ag-toolbar-calendar,
+  .ag-usage-page .ag-toolbar-calendar > .ag-usage-date-range,
+  .ag-usage-page .ag-toolbar-control {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .ag-usage-page .ag-usage-toolbar-actions {
+    grid-column: 4;
+    grid-row: 1;
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 .ag-usage-page .ag-column-visibility-menu {
   max-width: 100%;
 }
@@ -82,24 +140,6 @@
 
 .ag-usage-page .ag-column-visibility-menu .ag-toolbar-menu-item-check {
   width: 1.25rem;
-}
-
-/* 移动端筛选栏：日期范围独占一行，其余筛选两列排布，减少纵向占位。 */
-
-@media (max-width: 639px) {
-  .ag-usage-page .ag-page-toolbar-filter-row {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .ag-usage-page .ag-page-toolbar-filter-row > * {
-    flex: 1 1 40%;
-    width: auto;
-  }
-
-  .ag-usage-page .ag-page-toolbar-filter-row > :first-child {
-    flex-basis: 100%;
-  }
 }
 
 .ag-usage-rich-tooltip-content {

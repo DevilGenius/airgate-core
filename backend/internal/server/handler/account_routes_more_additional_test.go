@@ -278,6 +278,9 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 	}{
 		{name: "list", method: http.MethodGet, target: "/accounts?page=1&page_size=10&platform=custom&sort_by=priority&sort_dir=asc", fn: accountHandler.ListAccounts, want: `"total":1`},
 		{name: "export", method: http.MethodGet, target: "/accounts/export?platform=custom", fn: accountHandler.ExportAccounts, want: `"version":2`},
+		{name: "list auth intersection", method: http.MethodGet, target: "/accounts?page=1&page_size=10&auth_type=oauth", fn: accountHandler.ListAccounts, want: `"total":0`},
+		{name: "list auth union", method: http.MethodGet, target: "/accounts?page=1&page_size=10&auth_type=oauth,apikey", fn: accountHandler.ListAccounts, want: `"total":1`},
+		{name: "export auth intersection", method: http.MethodGet, target: "/accounts/export?auth_type=oauth", fn: accountHandler.ExportAccounts, want: `"accounts":[]`},
 		{name: "update", method: http.MethodPut, target: "/accounts/" + accountIDString, params: accountParams, body: `{"name":"primary-updated","priority":99996,"max_concurrency":8,"rate_multiplier":1.4,"extra":{"region":"eu"}}`, fn: accountHandler.UpdateAccount, want: `"name":"primary-updated"`},
 		{name: "models", method: http.MethodGet, target: "/accounts/" + accountIDString + "/models", params: accountParams, fn: accountHandler.GetAccountModels, want: `"id":"model-test"`},
 		{name: "usage", method: http.MethodGet, target: "/accounts/usage?platform=custom&ids=" + accountIDString, fn: accountHandler.GetAccountUsage, want: `"refreshing":false`},

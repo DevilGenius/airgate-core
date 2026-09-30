@@ -356,6 +356,8 @@
     "group": "所属分组",
     "all_platforms": "全部平台",
     "all_types": "全部类型",
+    "plan_filter": "账号计划",
+    "combined_filters": "分组 / 状态 / 代理",
     "select_platform": "请选择平台",
     "credentials": "账号信息",
     "priority": "优先级",

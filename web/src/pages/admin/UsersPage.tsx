@@ -282,7 +282,7 @@ export default function UsersPage() {
       className="ag-users-page ag-toolbar-standard-page"
       toolbar={(
         <div className="ag-page-toolbar-filter-row">
-            <div className="ag-users-toolbar-search w-full sm:w-48">
+            <div className="ag-users-toolbar-search ag-toolbar-control">
               <SearchFilterInput
                 ariaLabel={t('users.search_placeholder')}
                 placeholder={t('users.search_placeholder')}
@@ -290,7 +290,7 @@ export default function UsersPage() {
                 onSearchChange={handleKeywordChange}
               />
             </div>
-            <div className="ag-users-toolbar-status w-full sm:w-48">
+            <div className="ag-users-toolbar-status ag-toolbar-control">
               <SimpleSelect
                 ariaLabel={t('common.status')}
                 fullWidth

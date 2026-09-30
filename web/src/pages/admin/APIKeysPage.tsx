@@ -253,7 +253,7 @@ export default function APIKeysPage() {
       className="ag-api-keys-page"
       toolbar={(
         <div className="ag-page-toolbar-filter-row">
-            <div className="w-full sm:w-56">
+            <div className="ag-toolbar-control">
               <APIKeySearchFilterComboBox
                 ariaLabel={t('usage.search_api_key', '搜索 API Key')}
                 emptyPrompt={t('usage.search_api_key', '搜索 API Key')}
@@ -266,7 +266,7 @@ export default function APIKeysPage() {
                 onSelectionChange={handleAPIKeySelectionChange}
               />
             </div>
-            <div className="w-full sm:w-56">
+            <div className="ag-toolbar-control">
               <UserSearchFilterComboBox
                 ariaLabel={t('api_keys.user_search_placeholder')}
                 emptyPrompt={t('api_keys.user_search_placeholder')}

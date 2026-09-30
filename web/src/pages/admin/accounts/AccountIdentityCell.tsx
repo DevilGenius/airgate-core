@@ -3,6 +3,7 @@ import type { PluginPlatformIconProps } from '@devilgenius/airgate-theme/plugin'
 import type { AccountResp } from '../../../shared/types';
 import { normalizeAccountPlan } from '../../../shared/utils/accountPlan';
 import { AccountTypeIcon } from './AccountTypeIcon';
+import { AccountPlanTag } from './AccountPlanTag';
 import styles from './AccountIdentityCell.module.css';
 
 const PLAN_LABELS: Record<string, string> = {
@@ -60,7 +61,7 @@ export function AccountIdentityCell({ row, platformLabel, PlatformGlyph, planOve
         <PlatformGlyph className="size-3.5" />
       </span>
       {display.type ? <AccountTypeIcon type={display.type} label={display.typeLabel} /> : <span aria-hidden="true" />}
-      {display.planLabel ? <span className={styles.plan} data-plan={display.planKey} title={[display.planLabel, display.planTitle].filter(Boolean).join(' · ')}>{Array.from(display.planLabel).slice(0, 4).join('')}</span> : null}
+      {display.planLabel ? <AccountPlanTag label={display.planLabel} planKey={display.planKey} title={[display.planLabel, display.planTitle].filter(Boolean).join(' · ')} /> : null}
     </div>
   );
 }

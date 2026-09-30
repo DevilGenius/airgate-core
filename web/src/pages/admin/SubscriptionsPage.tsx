@@ -131,7 +131,7 @@ export default function SubscriptionsPage() {
     <TablePage
       toolbar={(
         <div className="ag-page-toolbar-filter-row">
-            <div className="w-full sm:w-48">
+            <div className="ag-toolbar-control">
               <SimpleSelect
                 ariaLabel={t('common.status')}
                 fullWidth

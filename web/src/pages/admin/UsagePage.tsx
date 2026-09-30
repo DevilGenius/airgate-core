@@ -138,7 +138,7 @@ const ColumnVisibilityMenu = memo(function ColumnVisibilityMenu({
   return (
     <ToolbarMenu
       ariaLabel={label}
-      className="ag-page-toolbar-button button button--sm button--secondary inline-flex min-w-[8.5rem] items-center justify-center gap-2 whitespace-nowrap px-3"
+      className="ag-page-toolbar-button button button--sm button--secondary inline-flex min-w-0 items-center justify-center gap-2 whitespace-nowrap px-3"
       icon={<Columns3 className="h-4 w-4 shrink-0" aria-hidden="true" />}
       label={`${label} ${selectedCount}/${options.length}`}
       rootClassName="ag-column-visibility-menu"
@@ -1167,7 +1167,7 @@ export default function UsagePage() {
       <PageToolbarFrame>
         <div className="ag-page-toolbar-filters">
           <div className="ag-page-toolbar-filter-row">
-            <div className="w-full sm:w-72">
+            <div className="ag-toolbar-calendar">
               <UsageDateRangeFilter
                 clearLabel={t('common.clear')}
                 endDate={filters.end_date}
@@ -1179,7 +1179,7 @@ export default function UsagePage() {
                 }}
               />
             </div>
-            <div className="w-full sm:w-48">
+            <div className="ag-toolbar-control">
               <SimpleSelect
                 ariaLabel={t('usage.platform')}
                 fullWidth
@@ -1191,7 +1191,7 @@ export default function UsagePage() {
                 onSelectionChange={(key) => updateFilter('platform', key)}
               />
             </div>
-            <div className="w-full sm:w-48">
+            <div className="ag-toolbar-control">
               <UsageModelFilterInput
                 ariaLabel={t('usage.model', 'Model')}
                 placeholder={t('usage.model_placeholder')}
@@ -1199,7 +1199,7 @@ export default function UsagePage() {
                 onModelChange={handleModelChange}
               />
             </div>
-            <div className="w-full sm:w-48">
+            <div className="ag-toolbar-control">
               <SearchFilterInput
                 ariaLabel={t('usage.upstream_credential')}
                 placeholder={t('usage.upstream_credential')}
@@ -1207,7 +1207,7 @@ export default function UsagePage() {
                 onSearchChange={handleAccountChange}
               />
             </div>
-            <div className="w-full sm:w-48">
+            <div className="ag-toolbar-control">
               <UserOrAPIKeySearchFilterComboBox
                 ariaLabel={t('usage.search_user_or_api_key')}
                 emptyPrompt={t('usage.search_user_or_api_key')}
@@ -1222,13 +1222,14 @@ export default function UsagePage() {
             </div>
           </div>
         </div>
-        <div className="ag-page-toolbar-actions">
+        <div className="ag-page-toolbar-actions ag-usage-toolbar-actions">
           <AutoRefreshControl
             value={autoRefresh}
             options={ADMIN_AUTO_REFRESH_OPTIONS}
             label={autoRefreshLabel}
             offLabel={autoRefreshOffLabel}
             refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
+            showRefreshButton={false}
             triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
             ariaLabel={t('usage.auto_update')}
             refreshAriaLabel={t('common.refresh', 'Refresh')}
@@ -1246,7 +1247,7 @@ export default function UsagePage() {
             onClick={() => setUsageCardsCollapsed((value) => !value)}
           >
             {usageCardsCollapsed ? <ChevronDown className="ag-toolbar-menu-caret" aria-hidden="true" /> : <ChevronUp className="ag-toolbar-menu-caret" aria-hidden="true" />}
-            <span className="ag-toolbar-menu-trigger-label">
+            <span className="ag-toolbar-menu-trigger-label truncate">
               {usageCardsCollapsed ? t('usage.show_analysis_cards') : t('usage.hide_analysis_cards')}
             </span>
           </button>

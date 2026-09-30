@@ -356,6 +356,8 @@
     "group": "Group",
     "all_platforms": "All Platforms",
     "all_types": "All Types",
+    "plan_filter": "Account Plan",
+    "combined_filters": "Group / Status / Proxy",
     "select_platform": "Select platform",
     "credentials": "Account Details",
     "priority": "Priority",

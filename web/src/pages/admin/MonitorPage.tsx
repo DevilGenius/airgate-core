@@ -52,7 +52,7 @@ import type {
   SelectOption,
 } from './monitor/types';
 
-const MONITOR_TOOLBAR_CONTROL_CLASS = 'ag-monitor-toolbar-control';
+const MONITOR_TOOLBAR_CONTROL_CLASS = 'ag-toolbar-control';
 const MONITOR_EVENTS_PAGE_SIZE_SCOPE = 'admin.monitor.events';
 const MONITOR_REQUESTS_PAGE_SIZE_SCOPE = 'admin.monitor.requests';
 const MONITOR_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminMonitorFilters;

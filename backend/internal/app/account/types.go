@@ -110,6 +110,7 @@ type ListFilter struct {
 	Platform    string // 逗号分隔并集：多平台取 OR
 	State       string // 逗号分隔并集：active / rate_limited / degraded / disabled / working / family_limited（后两项仅列表筛选）
 	AccountType string // 逗号分隔并集：oauth / apikey / oauth_plan:<platform>:<key>，取 OR
+	AuthType    string // 真实认证类型的并集，与账号计划及其他筛选取 AND
 	Credentials []CredentialStringFilter
 	GroupIDs    []int // 并集：属于任一分组即匹配；与 Ungrouped 组合时取 OR
 	Ungrouped   bool

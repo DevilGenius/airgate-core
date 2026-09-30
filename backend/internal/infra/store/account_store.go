@@ -58,6 +58,10 @@ func applyAccountListFilters(query *ent.AccountQuery, filter appaccount.ListFilt
 	if filter.State != "" {
 		query = query.Where(entaccount.StateEQ(entaccount.State(filter.State)))
 	}
+	// 认证类型独立取交集，避免 OAuth 选项绕过账号计划筛选。
+	if types := splitCommaSeparated(filter.AuthType); len(types) > 0 {
+		query = query.Where(entaccount.TypeIn(types...))
+	}
 	// 账号类型与 credentials 筛选共同构成 OR 并集：
 	// 选中多个类型 / OAuth 套餐时任一匹配即可。
 	typePredicates := make([]predicate.Account, 0, 1+len(filter.Credentials))

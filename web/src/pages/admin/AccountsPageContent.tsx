@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Input, Spinner, TextField as HeroTextField } from '@heroui/react';
@@ -9,7 +9,10 @@ import {
   Upload,
   FileJson2,
   Settings2,
+  Server,
 } from 'lucide-react';
+import { getPluginPlatformIcon, getPlatformIconVersion, onPlatformIconChange } from '../../app/plugin-frontend-registry';
+import { compareAccountFilterPlatforms } from './accounts/accountFilterOrder';
 import { useToast } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
 import { pluginsApi } from '../../shared/api/plugins';
@@ -21,7 +24,8 @@ import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
-import { usePersistentUrlQueryParam, useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
+import { useAccountFilters } from './accounts/useAccountFilters';
+import { accountFiltersToQuery, accountPlanFilterId, parseAccountPlanFilterIds } from './accounts/accountFilters';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { queryKeys } from '../../shared/queryKeys';
@@ -31,6 +35,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { SimpleMultiSelect } from '../../shared/components/SimpleMultiSelect';
+import { AccountFilterIcons } from './accounts/AccountFilterIcons';
 import type { SimpleSelectOption } from '../../shared/components/SimpleSelect';
 import { MonitorMultiFilterSelect as MultiFilterSelect } from './monitor/MonitorFilterSelect';
 import { TablePage } from '../../shared/components/TablePage';
@@ -105,7 +110,7 @@ import {
 } from './accounts/accountPagePerf';
 
 const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsAutoRefresh;
-const ACCOUNT_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminAccountsFilters;
+
 const ACCOUNT_USAGE_REFRESHING_POLL_MS = 1000;
 const ACCOUNT_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 const ACCOUNT_PRIORITY_SORT_KEY = 'priority';
@@ -165,37 +170,6 @@ const ACCOUNT_STATUS_FILTER_REFETCH_THROTTLE_MS = 750;
 const ACCOUNT_STATUS_BATCH_FALLBACK_MS = 250;
 const ACCOUNT_USAGE_SNAPSHOT_MAX_ACCOUNTS = 5000;
 const EMPTY_ACCOUNT_ROWS: AccountResp[] = [];
-const ACCOUNT_STATE_FILTER_ORDER = [
-  ACCOUNT_WORKING_STATE_FILTER,
-  'active',
-  ACCOUNT_FAMILY_LIMITED_STATE_FILTER,
-  'rate_limited',
-  'degraded',
-  'disabled',
-] as const;
-const ACCOUNT_STATE_FILTER_SET = new Set<string>(ACCOUNT_STATE_FILTER_ORDER);
-
-function parseAccountStateFilters(value: string): string[] {
-  const selected = new Set(
-    value
-      .split(',')
-      .map((item) => item.trim())
-      .filter((item) => ACCOUNT_STATE_FILTER_SET.has(item)),
-  );
-  return ACCOUNT_STATE_FILTER_ORDER.filter((item) => selected.has(item));
-}
-
-// 解析逗号分隔的多选筛选值（去空白、去空项、去重并保持顺序）。
-function parseAccountFilterValues(value: string): string[] {
-  const selected = new Set(
-    value
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean),
-  );
-  return Array.from(selected);
-}
-
 // 多选筛选的标签拼接：未选择任何项时回退到"全部"文案（即不筛选）。
 function joinAccountFilterLabels(
   selected: readonly string[],
@@ -347,25 +321,16 @@ export default function AccountsPageContent() {
 
   // 筛选状态
   const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.accounts');
-  const [keyword, setKeyword] = useUrlQueryParam('q');
+  const { filters, updateFilters } = useAccountFilters();
+  const { keyword, platforms: selectedPlatformFilters, states: selectedStateFilters, accountTypes: selectedAuthFilters, prioritySort: prioritySortDir } = filters;
+  const selectedPlanFilters = useMemo(() => filters.plans.map(accountPlanFilterId), [filters.plans]);
+  const selectedGroupFilters = useMemo(() => [...filters.groupIds.map(String), ...(filters.ungrouped ? [UNGROUPED_GROUP_FILTER] : [])], [filters.groupIds, filters.ungrouped]);
+  const selectedProxyFilters = useMemo(() => filters.proxyIds.map(String), [filters.proxyIds]);
+  const platformFilter = selectedPlatformFilters.join(',');
+  const stateFilter = selectedStateFilters.join(',');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), REMOTE_SEARCH_DEBOUNCE_MS);
-  const [platformFilter, setPlatformFilter] = usePersistentUrlQueryParam('platform', `${ACCOUNT_FILTER_STORAGE_KEY}:platform`);
-  const [stateFilter, setStateFilter] = usePersistentUrlQueryParam('state', `${ACCOUNT_FILTER_STORAGE_KEY}:state`);
-  const [typeFilter, setTypeFilter] = usePersistentUrlQueryParam('type', `${ACCOUNT_FILTER_STORAGE_KEY}:type`);
-  const [groupFilter, setGroupFilter] = usePersistentUrlQueryParam('group', `${ACCOUNT_FILTER_STORAGE_KEY}:group`);
-  const [proxyFilter, setProxyFilter] = usePersistentUrlQueryParam('proxy', `${ACCOUNT_FILTER_STORAGE_KEY}:proxy`);
-  const selectedStateFilters = useMemo(() => parseAccountStateFilters(stateFilter), [stateFilter]);
-  const selectedPlatformFilters = useMemo(() => parseAccountFilterValues(platformFilter), [platformFilter]);
-  const selectedTypeFilters = useMemo(() => parseAccountFilterValues(typeFilter), [typeFilter]);
-  const selectedGroupFilters = useMemo(() => parseAccountFilterValues(groupFilter), [groupFilter]);
-  const selectedProxyFilters = useMemo(() => parseAccountFilterValues(proxyFilter), [proxyFilter]);
-  // 分组筛选拆分为"分组 id 并集"与"未分组"两个查询参数，后端取 OR。
-  const groupIdFilter = useMemo(
-    () => selectedGroupFilters.filter((key) => key !== UNGROUPED_GROUP_FILTER).join(','),
-    [selectedGroupFilters],
-  );
-  const ungroupedFilter = selectedGroupFilters.includes(UNGROUPED_GROUP_FILTER);
-  const [prioritySortDir, setPrioritySortDir] = useState<AccountTableSortDirection | ''>('');
+  const filterQuery = useMemo(() => accountFiltersToQuery(filters), [filters]);
+  const setKeyword = useCallback((value: string) => updateFilters({ keyword: value }), [updateFilters]);
   const sortBy = prioritySortDir ? ACCOUNT_PRIORITY_SORT_KEY : '';
   const sortDir: AccountTableSortDirection = prioritySortDir || 'desc';
 
@@ -426,11 +391,11 @@ export default function AccountsPageContent() {
   // 切换筛选/分页时清空选择，避免不可见行仍被选中导致误操作
   useEffect(() => {
     selectionStore.clear();
-  }, [groupFilter, keyword, page, pageSize, platformFilter, proxyFilter, selectionStore, sortBy, sortDir, stateFilter, typeFilter]);
+  }, [filters, page, pageSize, selectionStore]);
 
   const accountListQueryKey = useMemo(
-    () => queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter, sortBy, sortDir),
-    [debouncedKeyword, groupFilter, page, pageSize, platformFilter, proxyFilter, sortBy, sortDir, stateFilter, typeFilter],
+    () => queryKeys.accounts({ page, page_size: pageSize, keyword: debouncedKeyword, ...filterQuery }),
+    [debouncedKeyword, filterQuery, page, pageSize],
   );
 
   // 查询账号列表
@@ -447,14 +412,7 @@ export default function AccountsPageContent() {
         page,
         page_size: pageSize,
         keyword: debouncedKeyword || undefined,
-        platform: platformFilter || undefined,
-        state: stateFilter || undefined,
-        account_type: typeFilter || undefined,
-        group_id: groupIdFilter || undefined,
-        ungrouped: ungroupedFilter || undefined,
-        proxy_id: proxyFilter || undefined,
-        sort_by: sortBy ? ACCOUNT_PRIORITY_SORT_KEY : undefined,
-        sort_dir: sortBy ? sortDir : undefined,
+        ...filterQuery,
       }),
     meta: { globalLoading: false },
     placeholderData: keepPreviousData,
@@ -844,12 +802,7 @@ export default function AccountsPageContent() {
       }
       return accountsApi.export({
         keyword: debouncedKeyword || undefined,
-        platform: platformFilter || undefined,
-        state: stateFilter || undefined,
-        account_type: typeFilter || undefined,
-        group_id: groupIdFilter || undefined,
-        ungrouped: ungroupedFilter || undefined,
-        proxy_id: proxyFilter || undefined,
+        ...filterQuery,
       });
     },
     onSuccess: (file: AccountExportFile) => {
@@ -1180,13 +1133,9 @@ export default function AccountsPageContent() {
   }, [clearRateLimitMarkersMutateRef]);
   const handleSortChange = useCallback((nextSortBy: string) => {
     if (nextSortBy !== ACCOUNT_PRIORITY_SORT_KEY) return;
-    setPrioritySortDir((prev) => {
-      if (prev === '') return 'desc';
-      if (prev === 'desc') return 'asc';
-      return '';
-    });
+    updateFilters((current) => ({ prioritySort: current.prioritySort === '' ? 'desc' : current.prioritySort === 'desc' ? 'asc' : '' }));
     setPage(1);
-  }, [setPage]);
+  }, [setPage, updateFilters]);
 
   // 批量操作通用的结果处理：全部成功 → success toast；部分成功 → warning；全部失败 → error。
   const handleBulkResult = (res: BulkOpResp, okKey: string) => {
@@ -1373,138 +1322,91 @@ export default function AccountsPageContent() {
       selectionStore.setRow(id, isSelected)
     ));
   }, [runSelectionPerf, selectionStore, visibleRowIds]);
-  const typeOptions = useMemo<AccountTypeFilterOption[]>(() => [
-    { id: 'oauth', label: 'OAuth' },
-    { id: 'apikey', label: 'API Key' },
-  ], []);
+  const platformIconVersion = useSyncExternalStore(onPlatformIconChange, getPlatformIconVersion, getPlatformIconVersion);
   const oauthPlanOptions = useMemo<AccountTypeFilterOption[]>(() => {
     const selectedPlatforms = new Set(selectedPlatformFilters);
     const singlePlatform = selectedPlatformFilters.length === 1 ? selectedPlatformFilters[0] : '';
-    return oauthPlanFilters
-      .filter((item) => selectedPlatforms.size === 0 || selectedPlatforms.has(item.platform))
+    const knownPlans = new Set(oauthPlanFilters.map((item) => item.id));
+    const savedPlans = filters.plans.filter((plan) => !knownPlans.has(accountPlanFilterId(plan))).map((plan) => ({
+      id: accountPlanFilterId(plan), platform: plan.platform, platformLabel: platformName(plan.platform), planLabel: plan.key,
+    }));
+    return [...oauthPlanFilters, ...savedPlans]
+      .filter((item) => selectedPlatforms.size === 0 || selectedPlatforms.has(item.platform) || selectedPlanFilters.includes(item.id))
       .sort((a, b) => {
-        const platformRank = (platform: string) => {
-          const normalized = platform.toLowerCase();
-          if (normalized === 'openai') return 0;
-          if (normalized === 'claude') return 1;
-          return 2;
-        };
-        const rankCompare = platformRank(a.platform) - platformRank(b.platform);
-        if (rankCompare !== 0) return rankCompare;
-        const platformCompare = a.platformLabel.localeCompare(b.platformLabel, undefined, { sensitivity: 'base' });
+        const platformCompare = compareAccountFilterPlatforms(a.platform, b.platform);
         if (platformCompare !== 0) return platformCompare;
-        return a.planLabel.localeCompare(b.planLabel, undefined, { sensitivity: 'base' });
+        return a.planLabel.localeCompare(b.planLabel, 'en', { sensitivity: 'base' }) || a.id.localeCompare(b.id, 'en');
       })
       .map((item) => ({
         id: item.id,
-        label: singlePlatform ? `OAuth ${item.planLabel}` : `${item.platformLabel} OAuth ${item.planLabel}`,
-        platformLabel: singlePlatform ? undefined : item.platformLabel,
+        label: singlePlatform === item.platform ? item.planLabel : `${item.platformLabel} ${item.planLabel}`,
+        platform: item.platform,
+        platformLabel: item.platformLabel,
         planLabel: item.planLabel,
       }));
-  }, [oauthPlanFilters, selectedPlatformFilters]);
+  }, [filters.plans, oauthPlanFilters, platformName, selectedPlatformFilters, selectedPlanFilters]);
   const groupOptions = useMemo(() => [
     { id: UNGROUPED_GROUP_FILTER, label: t('accounts.ungrouped') },
-    ...(allGroupsData?.list ?? []).map((g) => ({ id: String(g.id), label: g.name })),
+    ...(allGroupsData?.list ?? [])
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.id - b.id)
+      .map((g) => ({ id: String(g.id), label: g.name })),
   ], [allGroupsData?.list, t]);
   const proxyOptions = useMemo(() => [
     ...(allProxiesData?.list ?? []).map((p) => ({ id: String(p.id), label: p.name })),
   ], [allProxiesData?.list]);
   const typeLabelByKey = useMemo(() => new Map([
-    ...typeOptions.map((option) => [option.id, option.label] as const),
     ...oauthPlanOptions.map((option) => [option.id, option.label] as const),
-  ]), [oauthPlanOptions, typeOptions]);
-  const proxyLabelByKey = useMemo(
-    () => new Map(proxyOptions.map((option) => [option.id, option.label])),
-    [proxyOptions],
-  );
-  const selectedStateLabel = selectedStateFilters.length > 0
-    ? selectedStateFilters
-      .map((state) => STATE_OPTIONS.find((item) => item.id === state)?.label ?? state)
-      .join(', ')
-    : t('users.all_status');
-  const selectedTypeLabel = joinAccountFilterLabels(selectedTypeFilters, typeLabelByKey, t('accounts.all_types', '全部类型'));
-  const selectedProxyLabel = joinAccountFilterLabels(selectedProxyFilters, proxyLabelByKey, t('accounts.all_proxies'), (key) => `#${key}`);
-  const updateStateFilters = useCallback((nextStates: string[]) => {
-    const selected = new Set(nextStates);
-    setStateFilter(ACCOUNT_STATE_FILTER_ORDER.filter((state) => selected.has(state)).join(','));
+  ]), [oauthPlanOptions]);
+  const selectedPlanLabel = joinAccountFilterLabels(selectedPlanFilters, typeLabelByKey, t('accounts.plan_filter', '账号计划'));
+  const updateStateFilters = useCallback((states: string[]) => {
+    updateFilters({ states });
     setPage(1);
-  }, [setPage, setStateFilter]);
-  const updatePlatformFilters = useCallback((nextKeys: string[]) => {
-    setPlatformFilter(nextKeys.join(','));
+  }, [setPage, updateFilters]);
+  const updatePlatformFilters = useCallback((platforms: string[]) => {
+    updateFilters({ platforms });
     setPage(1);
-  }, [setPage, setPlatformFilter]);
-  const updateTypeFilters = useCallback((nextKeys: string[]) => {
-    setTypeFilter(nextKeys.join(','));
+  }, [setPage, updateFilters]);
+  const updateGroupFilters = useCallback((keys: string[]) => {
+    updateFilters({ groupIds: keys.filter((key) => key !== UNGROUPED_GROUP_FILTER).map(Number), ungrouped: keys.includes(UNGROUPED_GROUP_FILTER) });
     setPage(1);
-  }, [setPage, setTypeFilter]);
-  const updateGroupFilters = useCallback((nextKeys: string[]) => {
-    setGroupFilter(nextKeys.join(','));
+  }, [setPage, updateFilters]);
+  const updateProxyFilters = useCallback((keys: string[]) => {
+    updateFilters({ proxyIds: keys.map(Number) });
     setPage(1);
-  }, [setGroupFilter, setPage]);
-  const updateProxyFilters = useCallback((nextKeys: string[]) => {
-    setProxyFilter(nextKeys.join(','));
+  }, [setPage, updateFilters]);
+  const combinedFilterGroups = useMemo(() => [
+    { id: 'group', label: t('accounts.group'), options: groupOptions, selectedValues: selectedGroupFilters },
+    { id: 'state', label: t('common.status'), options: STATE_OPTIONS, selectedValues: selectedStateFilters },
+    { id: 'proxy', label: t('accounts.proxy'), options: proxyOptions, selectedValues: selectedProxyFilters },
+  ], [groupOptions, proxyOptions, selectedGroupFilters, selectedProxyFilters, selectedStateFilters, STATE_OPTIONS, t]);
+  const clearCombinedFilters = useCallback(() => {
+    updateFilters({ groupIds: [], ungrouped: false, states: [], proxyIds: [] });
     setPage(1);
-  }, [setPage, setProxyFilter]);
-  const platformGroupFilterOptions = useMemo(() => ({
-    platform: PLATFORM_ITEMS.map((item) => ({ id: item.key, label: item.textValue ?? item.key })),
-    group: groupOptions,
-  }), [PLATFORM_ITEMS, groupOptions]);
-  const clearPlatformGroupFilters = useCallback(() => {
-    setPlatformFilter('');
-    setGroupFilter('');
-    setPage(1);
-  }, [setGroupFilter, setPage, setPlatformFilter]);
-  const togglePlatformGroupFilter = useCallback((groupID: string, value: string) => {
-    const current = groupID === 'platform' ? selectedPlatformFilters : selectedGroupFilters;
+  }, [setPage, updateFilters]);
+  const toggleCombinedFilter = useCallback((groupID: string, value: string) => {
+    const current = groupID === 'group' ? selectedGroupFilters : groupID === 'state' ? selectedStateFilters : selectedProxyFilters;
     const next = current.includes(value)
       ? current.filter((item) => item !== value)
       : [...current, value];
-    if (groupID === 'platform') {
-      updatePlatformFilters(next);
-    } else {
-      updateGroupFilters(next);
-    }
-  }, [selectedGroupFilters, selectedPlatformFilters, updateGroupFilters, updatePlatformFilters]);
-  // 多选类型筛选的失效选项清理：未解析的 oauth_plan 降级为 oauth，其余直接移除；
-  // 全部取消选择时自然回退为不筛选（全部类型）。
-  useEffect(() => {
-    if (!typeFilter) return;
-    const validKeys = new Set([
-      ...typeOptions.map((option) => option.id),
-      ...oauthPlanOptions.map((option) => option.id),
-    ]);
-    const kept: string[] = [];
-    let changed = false;
-    for (const token of parseAccountFilterValues(typeFilter)) {
-      if (validKeys.has(token)) {
-        kept.push(token);
-        continue;
-      }
-      if (token.startsWith('oauth_plan:')) {
-        if (platformsLoading) {
-          kept.push(token);
-          continue;
-        }
-        if (!kept.includes('oauth')) kept.push('oauth');
-        changed = true;
-        continue;
-      }
-      changed = true;
-    }
-    if (!changed) return;
-    setTypeFilter(kept.join(','));
+    if (groupID === 'group') updateGroupFilters(next);
+    else if (groupID === 'state') updateStateFilters(next);
+    else updateProxyFilters(next);
+  }, [selectedGroupFilters, selectedStateFilters, selectedProxyFilters, updateGroupFilters, updateStateFilters, updateProxyFilters]);
+  const updatePlanFilters = useCallback((keys: string[]) => {
+    updateFilters({ plans: parseAccountPlanFilterIds(keys) });
     setPage(1);
-  }, [oauthPlanOptions, platformsLoading, setPage, setTypeFilter, typeFilter, typeOptions]);
+  }, [setPage, updateFilters]);
+  const updateAuthFilters = useCallback((accountTypes: string[]) => {
+    updateFilters({ accountTypes });
+    setPage(1);
+  }, [setPage, updateFilters]);
+  const platformIconOptions = useMemo(() => PLATFORM_ITEMS.map((item) => ({ key: item.key, label: item.textValue ?? item.key })), [PLATFORM_ITEMS]);
   const typeFilterItems = useMemo<SimpleSelectOption[]>(() => {
     const items: SimpleSelectOption[] = [
       ...oauthPlanOptions.map((option) => ({
         key: option.id,
-        label: renderAccountTypeFilterOption(option, true),
-        textValue: option.label,
-      })),
-      ...typeOptions.map((option) => ({
-        key: option.id,
-        label: option.label,
+        label: renderAccountTypeFilterOption(option, getPluginPlatformIcon(option.platform ?? '') ?? Server),
         textValue: option.label,
       })),
     ];
@@ -1512,56 +1414,7 @@ export default function AccountsPageContent() {
       items.push({ key: '__loading__', label: t('common.loading'), isDisabled: true });
     }
     return items;
-  }, [oauthPlanOptions, platformsLoading, t, typeOptions]);
-  const toolbarFilters = useMemo(() => [
-    {
-      key: 'state',
-      perfTarget: 'state' as const,
-      label: t('common.status'),
-      allLabel: t('users.all_status'),
-      selectedLabel: selectedStateLabel,
-      items: STATE_OPTIONS.map((item) => ({ key: item.id, label: item.label, textValue: item.label })),
-      selectedKeys: selectedStateFilters,
-      onSelectionChange: updateStateFilters,
-      widthClass: 'w-full sm:w-48',
-    },
-    {
-      key: 'type',
-      perfTarget: 'type' as const,
-      label: t('common.type'),
-      allLabel: t('accounts.all_types', '全部类型'),
-      selectedLabel: selectedTypeLabel,
-      items: typeFilterItems,
-      selectedKeys: selectedTypeFilters,
-      onSelectionChange: updateTypeFilters,
-      widthClass: 'w-full sm:w-48',
-    },
-    {
-      key: 'proxy',
-      perfTarget: 'proxy' as const,
-      label: t('accounts.proxy'),
-      allLabel: t('accounts.all_proxies'),
-      selectedLabel: selectedProxyLabel,
-      items: proxyOptions.map((item) => ({ key: item.id, label: item.label, textValue: item.label })),
-      selectedKeys: selectedProxyFilters,
-      onSelectionChange: updateProxyFilters,
-      widthClass: 'w-full sm:w-48',
-    },
-  ], [
-    STATE_OPTIONS,
-    proxyOptions,
-    selectedProxyFilters,
-    selectedProxyLabel,
-    selectedStateFilters,
-    selectedStateLabel,
-    selectedTypeFilters,
-    selectedTypeLabel,
-    t,
-    typeFilterItems,
-    updateProxyFilters,
-    updateStateFilters,
-    updateTypeFilters,
-  ]);
+  }, [oauthPlanOptions, platformIconVersion, platformsLoading, t]);
   // toolbar/actions/footer 整体记忆化：用量轮询（refreshing 时 1s 一次）和 fetch 状态
   // 切换会频繁重渲染页面，保持这些子树的元素身份稳定可让 memoized SimpleSelect 等整体跳过。
   // useMutation 每次渲染都返回新展开的结果对象，只解构稳定的 mutate/isPending 作为依赖。
@@ -1570,7 +1423,7 @@ export default function AccountsPageContent() {
   const isAnyImportPending = isImportPending || isCompatImportPending;
   const toolbarNode = useMemo(() => (
     <div className="ag-page-toolbar-filter-row">
-      <div className="w-full sm:w-48">
+      <div className="ag-toolbar-control">
         <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
@@ -1585,59 +1438,42 @@ export default function AccountsPageContent() {
       </div>
 
       <MultiFilterSelect
-        allLabel={t('accounts.all_groups')}
-        ariaLabel={`${t('groups.platform')} / ${t('accounts.group')}`}
-        className="w-full sm:w-56"
+        allLabel={t('accounts.combined_filters', '分组 / 状态 / 代理')}
+        ariaLabel={t('accounts.combined_filters', '分组 / 状态 / 代理')}
+        className="ag-toolbar-control"
         collapsePlaceholder
-        label={`${t('groups.platform')} / ${t('accounts.group')}`}
-        groups={[
-          {
-            id: 'platform',
-            label: t('groups.platform'),
-            options: platformGroupFilterOptions.platform,
-            selectedValues: selectedPlatformFilters,
-          },
-          {
-            id: 'group',
-            label: t('accounts.group'),
-            options: platformGroupFilterOptions.group,
-            selectedValues: selectedGroupFilters,
-          },
-        ]}
-        onClear={clearPlatformGroupFilters}
-        onToggle={togglePlatformGroupFilter}
+        label={t('accounts.combined_filters', '分组 / 状态 / 代理')}
+        groups={combinedFilterGroups}
+        onClear={clearCombinedFilters}
+        onToggle={toggleCombinedFilter}
       />
-
-      {toolbarFilters.map((filter) => (
-        <div
-          key={filter.key}
-          className={filter.widthClass}
-        >
-          <SimpleMultiSelect
-            allLabel={filter.allLabel}
-            ariaLabel={filter.label}
-            fullWidth
-            items={filter.items}
-            selectedKeys={filter.selectedKeys}
-            selectedLabel={filter.selectedLabel}
-            onOpenChange={(isOpen) => handleToolbarMenuOpenChange(filter.perfTarget, isOpen)}
-            onSelectionChange={filter.onSelectionChange}
-          />
-        </div>
-      ))}
+      <div className="ag-toolbar-control">
+        <SimpleMultiSelect
+          allLabel={t('accounts.plan_filter', '账号计划')}
+          ariaLabel={t('accounts.plan_filter', '账号计划')}
+          fullWidth
+          items={typeFilterItems}
+          selectedKeys={selectedPlanFilters}
+          selectedLabel={selectedPlanLabel}
+          onOpenChange={(isOpen) => handleToolbarMenuOpenChange('type', isOpen)}
+          onSelectionChange={updatePlanFilters}
+        />
+      </div>
+      <AccountFilterIcons
+        platforms={platformIconOptions}
+        selectedPlatforms={selectedPlatformFilters}
+        selectedTypes={selectedAuthFilters}
+        platformLabel={t('accounts.platform')}
+        typeLabel={t('common.type')}
+        onPlatformsChange={updatePlatformFilters}
+        onTypesChange={updateAuthFilters}
+      />
     </div>
   ), [
-    clearPlatformGroupFilters,
-    handleToolbarMenuOpenChange,
-    keyword,
-    platformGroupFilterOptions,
-    selectedGroupFilters,
-    selectedPlatformFilters,
-    setKeyword,
-    setPage,
-    t,
-    togglePlatformGroupFilter,
-    toolbarFilters,
+    clearCombinedFilters, combinedFilterGroups, handleToolbarMenuOpenChange, keyword,
+    platformIconOptions, selectedAuthFilters, selectedPlanFilters, selectedPlanLabel,
+    selectedPlatformFilters, setKeyword, setPage, t, toggleCombinedFilter,
+    typeFilterItems, updateAuthFilters, updatePlanFilters, updatePlatformFilters,
   ]);
 
   const actionsNode = useMemo(() => (

@@ -47,6 +47,7 @@ export const PRESERVED_LOCAL_STORAGE_KEYS = new Set<string>([
   STORAGE_KEYS.i18n.language,
   STORAGE_KEYS.setup.complete,
   STORAGE_KEYS.settings.publicSite,
+  STORAGE_KEYS.ui.adminAccountsFilters,
 ]);
 
 export function storagePageSizeKey(scope: string) {

@@ -14,6 +14,8 @@ export type AccountListFilter = {
   state?: string;
   /** Comma-separated union of account types and oauth_plan virtual filters. */
   account_type?: string;
+  /** Authentication types, intersected with plan and other filters. */
+  auth_type?: string;
   /** Comma-separated union of group ids. */
   group_id?: number | string;
   ungrouped?: boolean;

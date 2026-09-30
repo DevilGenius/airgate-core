@@ -519,7 +519,7 @@ export default function UserUsageContent() {
       <PageToolbarFrame>
         <div className="ag-page-toolbar-filters">
           <div className="ag-page-toolbar-filter-row">
-            <div className="w-full sm:w-72">
+            <div className="ag-toolbar-calendar w-full sm:w-72">
               <UsageDateRangeFilter
                 clearLabel={t('common.clear')}
                 endDate={filters.end_date}
@@ -531,7 +531,7 @@ export default function UserUsageContent() {
                 }}
               />
             </div>
-            <div className="w-full sm:w-48">
+            <div className="ag-toolbar-control">
               <SimpleSelect
                 ariaLabel={t('usage.platform')}
                 fullWidth
@@ -544,7 +544,7 @@ export default function UserUsageContent() {
               />
             </div>
             {!customerScope && (
-              <div className="w-full sm:w-48">
+              <div className="ag-toolbar-control">
                 <APIKeySearchFilterComboBox
                   ariaLabel="API Key"
                   emptyPrompt="API Key"
@@ -561,7 +561,7 @@ export default function UserUsageContent() {
                 />
               </div>
             )}
-            <div className="w-full sm:w-48">
+            <div className="ag-toolbar-control">
               <UsageModelFilterInput
                 ariaLabel={t('usage.model', 'Model')}
                 placeholder={t('usage.model_placeholder')}
@@ -578,6 +578,7 @@ export default function UserUsageContent() {
             label={autoRefreshLabel}
             offLabel={autoRefreshOffLabel}
             refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
+            showRefreshButton={false}
             triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
             ariaLabel={t('usage.auto_update')}
             refreshAriaLabel={t('common.refresh', 'Refresh')}
