@@ -58,7 +58,9 @@
   padding: 0 !important;
 }
 
-.ag-auto-refresh-refresh--dashboard-compact.button {
+.ag-auto-refresh-refresh--dashboard-compact.button,
+button.ag-auto-refresh-refresh--dashboard-compact,
+.ag-auto-refresh-refresh--dashboard-compact {
   width: var(--ag-dropdown-control-height, 2.5rem);
   min-width: var(--ag-dropdown-control-height, 2.5rem);
   height: var(--ag-dropdown-control-height, 2.5rem);

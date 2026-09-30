@@ -1,4 +1,3 @@
-import { PageToolbarFrame } from '../shared/components/PageToolbar';
 import { Panel } from '../shared/components/Panel';
 import { TokenTrendChart } from '../shared/charts/TokenTrendChart';
 import { TimeSeriesChart } from '../shared/charts/TimeSeriesChart';
@@ -7,7 +6,7 @@ import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../shared/components/Card';
-import { Alert, Skeleton, Tabs } from '@heroui/react';
+import { Alert, Button, Skeleton, Tabs } from '@heroui/react';
 import {
   Activity,
   Astroid,
@@ -19,6 +18,7 @@ import {
   MoveDown,
   MoveRight,
   MoveUp,
+  RefreshCw,
   ToggleRight,
   Zap,
 } from 'lucide-react';
@@ -653,13 +653,16 @@ export default function DashboardPage() {
 
       {statsQuery.isLoading ? <StatsSkeleton /> : statsQuery.data ? <StatsCards stats={statsQuery.data} /> : null}
 
-      <PageToolbarFrame className="ag-dashboard-toolbar" flow="stack">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.time_range')}</span>
-          <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={range} onSelectionChange={(key) => setRange(key as RangePreset)}>
-            <Tabs.List>
+      <div className="ag-dashboard-toolbar py-1">
+        <div className="ag-dashboard-toolbar-col-1">
+          <Tabs
+            className="ag-segmented-tabs ag-segmented-tabs-dashboard w-full"
+            selectedKey={range}
+            onSelectionChange={(key) => setRange(key as RangePreset)}
+          >
+            <Tabs.List className="w-full">
               {RANGE_PRESETS.map((item, index) => (
-                <Tabs.Tab id={item} key={item}>
+                <Tabs.Tab id={item} key={item} className="flex-1 min-w-0">
                   {index > 0 ? <Tabs.Separator /> : null}
                   <Tabs.Indicator />
                   <span>{t(`dashboard.range_${item}`)}</span>
@@ -667,70 +670,80 @@ export default function DashboardPage() {
               ))}
             </Tabs.List>
           </Tabs>
-          <AutoRefreshControl
-            value={autoRefresh}
-            options={DASHBOARD_AUTO_REFRESH_OPTIONS}
-            label={t('dashboard.auto_refresh')}
-            offLabel={t('dashboard.auto_refresh_off')}
-            refreshButtonClassName="ag-auto-refresh-refresh--dashboard-compact"
-            triggerClassName="ag-auto-refresh-trigger--dashboard-compact"
-            ariaLabel={t('dashboard.auto_refresh')}
-            refreshAriaLabel={t('common.refresh', 'Refresh')}
-            onChange={setAutoRefresh}
-            onAutoRefresh={refresh}
-            onRefresh={refresh}
-            isRefreshing={isDashboardRefreshing}
-            isAutoRefreshing={isDashboardRefreshing}
-            isAutoRefreshDisabled={!isTodayRange}
-          />
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.filter_user')}</span>
-            <div className="w-full sm:w-48">
-              <UserSearchFilterComboBox
-                ariaLabel={t('dashboard.filter_user')}
-                emptyPrompt={t('dashboard.filter_user')}
-                loadingLabel={t('common.loading')}
-                noDataLabel={t('common.no_data')}
-                placeholder={t('dashboard.all_users')}
-                selectedKey={selectedUserId ? String(selectedUserId) : null}
-                selectedLabel={selectedUserLabel}
-                onSelectionChange={(value, label) => {
-                  if (!value) {
-                    setSelectedUserId(undefined);
-                    setSelectedUserLabel('');
-                    return;
-                  }
-                  setSelectedUserId(Number(value));
-                  setSelectedUserLabel(label);
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.granularity')}</span>
-            <div className="w-full sm:w-48">
-              <SimpleSelect
-                ariaLabel={t('dashboard.granularity')}
-                fullWidth
-                isDisabled={isTodayRange}
-                items={granularityOptions.map((item) => ({ key: item.id, label: item.label }))}
-                selectedKey={selectedGranularity}
-                selectedLabel={(
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <CalendarDays className="h-4 w-4 shrink-0 text-text" />
-                    <span className="min-w-0 truncate">{selectedGranularityLabel}</span>
-                  </span>
-                )}
-                onSelectionChange={(key) => setGranularity(key as Granularity)}
-              />
-            </div>
+        <div className="ag-dashboard-toolbar-col-3">
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh', 'Refresh')}
+            isDisabled={isDashboardRefreshing}
+            size="sm"
+            variant="ghost"
+            className="ag-auto-refresh-refresh--dashboard-compact shrink-0"
+            onPress={refresh}
+          >
+            <RefreshCw className={`h-4 w-4 ${isDashboardRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+          <div className="ag-dashboard-toolbar-auto-refresh">
+            <AutoRefreshControl
+              value={autoRefresh}
+              options={DASHBOARD_AUTO_REFRESH_OPTIONS}
+              label={t('dashboard.auto_refresh')}
+              offLabel={t('dashboard.auto_refresh_off')}
+              showRefreshButton={false}
+              triggerClassName="ag-auto-refresh-trigger--dashboard-compact w-full"
+              ariaLabel={t('dashboard.auto_refresh')}
+              refreshAriaLabel={t('common.refresh', 'Refresh')}
+              onChange={setAutoRefresh}
+              onAutoRefresh={refresh}
+              onRefresh={refresh}
+              isRefreshing={isDashboardRefreshing}
+              isAutoRefreshing={isDashboardRefreshing}
+              isAutoRefreshDisabled={!isTodayRange}
+            />
           </div>
         </div>
-      </PageToolbarFrame>
+
+        <div className="ag-dashboard-toolbar-col-4">
+          <div className="ag-dashboard-toolbar-control">
+            <UserSearchFilterComboBox
+              ariaLabel={t('dashboard.all_users')}
+              emptyPrompt={t('dashboard.all_users')}
+              loadingLabel={t('common.loading')}
+              noDataLabel={t('common.no_data')}
+              placeholder={t('dashboard.all_users')}
+              selectedKey={selectedUserId ? String(selectedUserId) : null}
+              selectedLabel={selectedUserLabel}
+              onSelectionChange={(value, label) => {
+                if (!value) {
+                  setSelectedUserId(undefined);
+                  setSelectedUserLabel('');
+                  return;
+                }
+                setSelectedUserId(Number(value));
+                setSelectedUserLabel(label);
+              }}
+            />
+          </div>
+
+          <div className="ag-dashboard-toolbar-control">
+            <SimpleSelect
+              ariaLabel={t('dashboard.granularity')}
+              fullWidth
+              isDisabled={isTodayRange}
+              items={granularityOptions.map((item) => ({ key: item.id, label: item.label }))}
+              selectedKey={selectedGranularity}
+              selectedLabel={(
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
+                  <span className="min-w-0 truncate">{selectedGranularityLabel}</span>
+                </span>
+              )}
+              onSelectionChange={(key) => setGranularity(key as Granularity)}
+            />
+          </div>
+        </div>
+      </div>
 
       {trendQuery.isLoading && !trendQuery.data ? (
         <div className="ag-dashboard-trends">

@@ -756,8 +756,7 @@
    ========================================================================== */
 
 .ag-dashboard-panel,
-.ag-dashboard-metric,
-.ag-dashboard-toolbar {
+.ag-dashboard-metric {
   border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
   border-radius: var(--ag-panel-radius);
   background: var(--surface);
@@ -779,17 +778,155 @@
 }
 
 .ag-dashboard-toolbar {
+  --ag-dropdown-control-height: 2.125rem;
+  --ag-dashboard-control-paired-width: 9.5rem;
   position: relative;
   z-index: 10;
   overflow: visible;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ag-dashboard-toolbar-col-1 {
+  width: 100%;
+  min-width: 0;
+}
+
+.ag-dashboard-toolbar-col-3 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.ag-dashboard-toolbar-auto-refresh {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .ag-dashboard-toolbar-auto-refresh {
+    width: var(--ag-dashboard-control-paired-width, 9.5rem);
+    flex-shrink: 0;
+  }
+}
+
+.ag-dashboard-toolbar-col-4 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.ag-dashboard-toolbar-control {
+  width: 100%;
+  min-width: 0;
 }
 
 .ag-dashboard-toolbar :where(.ag-auto-refresh-trigger,
   .ag-toolbar-menu-trigger-label,
   .ag-toolbar-menu-item,
-  .ag-toolbar-menu-item-label) {
-  font-size: 0.875rem;
+  .ag-toolbar-menu-item-label,
+  .ag-search-combobox-input,
+  .ag-simple-select-trigger,
+  .select__trigger) {
+  font-size: 0.8125rem;
   line-height: 1.25rem;
+}
+
+.ag-dashboard-toolbar :where(button, .button, [data-slot="button"]).ag-auto-refresh-refresh--dashboard-compact,
+.ag-dashboard-toolbar .ag-auto-refresh-refresh--dashboard-compact {
+  height: var(--ag-dropdown-control-height, 2.125rem);
+  min-height: var(--ag-dropdown-control-height, 2.125rem);
+  width: var(--ag-dropdown-control-height, 2.125rem);
+  min-width: var(--ag-dropdown-control-height, 2.125rem);
+  border-radius: var(--ag-control-radius);
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-tertiary);
+  padding: 0;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.ag-dashboard-toolbar :where(button, .button, [data-slot="button"]).ag-auto-refresh-refresh--dashboard-compact:hover,
+.ag-dashboard-toolbar .ag-auto-refresh-refresh--dashboard-compact:hover {
+  background: color-mix(in oklab, var(--foreground) 6%, transparent) !important;
+  color: var(--foreground);
+}
+
+.ag-dashboard-toolbar-auto-refresh .ag-toolbar-menu {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.ag-dashboard-toolbar .ag-auto-refresh-trigger--dashboard-compact {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  height: var(--ag-dropdown-control-height, 2.125rem);
+  min-height: var(--ag-dropdown-control-height, 2.125rem);
+  padding-inline-start: 0.625rem !important;
+  padding-inline-end: 1.75rem !important;
+  border-radius: var(--ag-control-radius);
+  font-size: 0.8125rem;
+  overflow: hidden;
+}
+
+.ag-dashboard-toolbar-auto-refresh .ag-toolbar-menu-trigger-label {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  overflow: hidden;
+}
+
+.ag-dashboard-toolbar-auto-refresh .ag-auto-refresh-label {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  gap: 0.25rem !important;
+}
+
+.ag-dashboard-toolbar-auto-refresh .ag-auto-refresh-label-title {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  flex: 1 1 auto !important;
+}
+
+.ag-dashboard-toolbar-auto-refresh .ag-auto-refresh-label-value {
+  flex-shrink: 0 !important;
+  min-width: auto !important;
+  white-space: nowrap !important;
+}
+
+.ag-dashboard-toolbar :where(.ag-search-combobox-input,
+  .ag-search-combobox [data-slot="input-wrapper"],
+  .ag-search-combobox .input,
+  .ag-simple-select-trigger) {
+  height: var(--ag-dropdown-control-height, 2.125rem) !important;
+  min-height: var(--ag-dropdown-control-height, 2.125rem) !important;
+}
+
+.ag-dashboard-toolbar .ag-simple-select > .ag-simple-select-trigger {
+  padding-inline-start: 0.625rem !important;
+  padding-inline-end: 1.75rem !important;
 }
 
 .ag-dashboard-metric {
@@ -866,12 +1003,35 @@
 @container ag-dashboard-shell (min-width: 64rem) {
   .ag-dashboard-page .ag-dashboard-toolbar {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
   }
 
   .ag-dashboard-trend-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-1 {
+    width: auto;
+    flex: 0 1 auto;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-3 {
+    width: auto;
+    margin-left: auto;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-4 {
+    width: auto;
+    display: flex;
+    align-items: center;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-control {
+    width: 9.5rem;
+    min-width: 8rem;
+    flex-shrink: 0;
   }
 }
 
@@ -885,6 +1045,47 @@
 @container ag-dashboard-shell (min-width: 91rem) {
   .ag-dashboard-metrics-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-1 {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-3 {
+    grid-column: 3;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.375rem;
+    margin-left: 0;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-auto-refresh {
+    width: calc((100% - 0.75rem) / 2);
+    flex-shrink: 0;
+    min-width: 0;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-4 {
+    grid-column: 4;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-control {
+    width: 100%;
+    min-width: 0;
   }
 
   .ag-dashboard-page .ag-dashboard-metric {

@@ -73,6 +73,47 @@
   padding: 0.125rem;
 }
 
+.ag-segmented-tabs-dashboard {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ag-segmented-tabs-dashboard :where(.tabs__list-container) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.ag-segmented-tabs-dashboard :where(.tabs__list, [data-slot="tabs-list"]) {
+  display: flex;
+  width: 100%;
+  height: var(--ag-dropdown-control-height, 2.5rem);
+  box-sizing: border-box;
+  padding: 0.1875rem;
+  border-radius: var(--ag-control-radius);
+  background: color-mix(in oklab, var(--surface-secondary) 85%, var(--background) 15%);
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+}
+
+.ag-segmented-tabs-dashboard :where(.tabs__tab, [data-slot="tabs-tab"]) {
+  flex: 1 1 0;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  padding-inline: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: calc(var(--ag-control-radius) - 0.1875rem);
+  transition: color 120ms ease;
+  justify-content: center;
+}
+
+.ag-segmented-tabs-dashboard :where(.tabs__indicator, [data-slot="tabs-indicator"]) {
+  border-radius: calc(var(--ag-control-radius) - 0.1875rem);
+}
+
 .ag-page-tabs-auto :where(.tabs__tab, [data-slot="tabs-tab"]),
 .ag-segmented-tabs-auto :where(.tabs__tab, [data-slot="tabs-tab"]) {
   width: max-content;
