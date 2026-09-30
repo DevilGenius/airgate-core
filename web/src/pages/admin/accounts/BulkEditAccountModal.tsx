@@ -16,15 +16,8 @@ import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
+import { AccountPlanTypeInput } from './AccountPlanTypeInput';
 import { ProxyBindingFields, resolveProxyBinding } from './ProxyBindingFields';
-import {
-  MAX_RATE_MULTIPLIER,
-  MIN_POSITIVE_RATE_MULTIPLIER,
-  RATE_MULTIPLIER_STEP,
-  isEmptyRateMultiplierInput,
-  isValidRateMultiplierValue,
-  parseRateMultiplier,
-} from '../../../shared/utils/rateMultiplier';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
 import {
   ACCOUNT_PRIORITY_MAX,
@@ -60,7 +53,11 @@ export function BulkEditAccountModal({
   initialPriority,
   initialPriorityMax,
   initialPriorityMin,
-  initialRateMultiplier,
+  initialPlanType,
+  initialPlanTypeLocked,
+  initialPoolMode,
+  initialMessageLockEnabled,
+  initialDispatchEnabled,
   initialModelDowngradeThreshold,
   onClose,
   onSubmit,
@@ -73,7 +70,11 @@ export function BulkEditAccountModal({
   initialPriority?: number;
   initialPriorityMax?: number;
   initialPriorityMin?: number;
-  initialRateMultiplier?: number;
+  initialPlanType?: string;
+  initialPlanTypeLocked?: boolean;
+  initialPoolMode?: boolean;
+  initialMessageLockEnabled?: boolean;
+  initialDispatchEnabled?: boolean;
   initialModelDowngradeThreshold?: number;
   onClose: () => void;
   onSubmit: (data: Omit<BulkUpdateAccountsReq, 'account_ids'>) => void;
@@ -87,14 +88,18 @@ export function BulkEditAccountModal({
   const [enablePrioritySequence, setEnablePrioritySequence] = useState(false);
   const [enablePriorityOffset, setEnablePriorityOffset] = useState(false);
   const [enableConcurrency, setEnableConcurrency] = useState(false);
-  const [enableRateMultiplier, setEnableRateMultiplier] = useState(false);
+  const [enablePlanType, setEnablePlanType] = useState(false);
+  const [enablePlanTypeLock, setEnablePlanTypeLock] = useState(false);
+  const [enablePoolMode, setEnablePoolMode] = useState(false);
+  const [planTypeLocked, setPlanTypeLocked] = useState(initialPlanTypeLocked ?? false);
+  const [poolMode, setPoolMode] = useState(initialPoolMode ?? false);
   const [enableModelDowngradeThreshold, setEnableModelDowngradeThreshold] = useState(false);
   const [enableGroups, setEnableGroups] = useState(false);
   const [enableProxy, setEnableProxy] = useState(false);
   const [enableMessageLock, setEnableMessageLock] = useState(false);
 
   // 字段值
-  const [status, setStatus] = useState<'active' | 'disabled'>('active');
+  const [status, setStatus] = useState<'active' | 'disabled'>(initialDispatchEnabled === false ? 'disabled' : 'active');
   const [priority, setPriority] = useState(() => initialPriority ?? DEFAULT_ACCOUNT_PRIORITY);
   const [priorityInput, setPriorityInput] = useState(() => String(initialPriority ?? DEFAULT_ACCOUNT_PRIORITY));
   const [prioritySequenceInitialInput, setPrioritySequenceInitialInput] = useState(
@@ -108,14 +113,14 @@ export function BulkEditAccountModal({
   );
   const [priorityOffsetInput, setPriorityOffsetInput] = useState('');
   const [maxConcurrency, setMaxConcurrency] = useState(() => initialMaxConcurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY);
-  const [rateMultiplier, setRateMultiplier] = useState(() => String(initialRateMultiplier ?? 1));
+  const [planType, setPlanType] = useState(initialPlanType ?? '');
   const [modelDowngradeThreshold, setModelDowngradeThreshold] = useState(
     () => String(initialModelDowngradeThreshold ?? DEFAULT_MODEL_DOWNGRADE_THRESHOLD),
   );
   const [groupIds, setGroupIds] = useState<number[]>(() => [...(initialGroupIds ?? [])]);
   const [proxyId, setProxyId] = useState<number | null>(null);
   const [proxySlotInput, setProxySlotInput] = useState('random');
-  const [messageLockEnabled, setMessageLockEnabled] = useState(false);
+  const [messageLockEnabled, setMessageLockEnabled] = useState(initialMessageLockEnabled ?? false);
 
   const { data: groupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -133,15 +138,13 @@ export function BulkEditAccountModal({
     enablePrioritySequence ||
     enablePriorityOffset ||
     enableConcurrency ||
-    enableRateMultiplier ||
+    enablePlanType ||
+    enablePlanTypeLock ||
+    enablePoolMode ||
     enableModelDowngradeThreshold ||
     enableGroups ||
     enableProxy ||
     enableMessageLock;
-  const parsedRateMultiplier = parseRateMultiplier(rateMultiplier);
-  const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplier);
-  const rateMultiplierValid =
-    !enableRateMultiplier || rateMultiplierEmpty || isValidRateMultiplierValue(parsedRateMultiplier);
   const modelDowngradeThresholdValue = parseModelDowngradeThresholdInput(modelDowngradeThreshold);
   const modelDowngradeThresholdEmpty = isEmptyModelDowngradeThresholdInput(modelDowngradeThreshold);
   const modelDowngradeThresholdValid = !enableModelDowngradeThreshold || isValidModelDowngradeThresholdInput(modelDowngradeThreshold);
@@ -165,7 +168,6 @@ export function BulkEditAccountModal({
   const canSubmit = hasAnyField
     && priorityOffsetValid
     && prioritySequenceValid
-    && rateMultiplierValid
     && modelDowngradeThresholdValid
     && (!enableProxy || proxyBinding.valid);
 
@@ -184,13 +186,8 @@ export function BulkEditAccountModal({
     }
     if (enablePriorityOffset && parsedPriorityOffset != null) patch.priority_offset = parsedPriorityOffset;
     if (enableConcurrency) patch.max_concurrency = maxConcurrency;
-    if (enableRateMultiplier) {
-      if (rateMultiplierEmpty) {
-        patch.rate_multiplier = null;
-      } else if (isValidRateMultiplierValue(parsedRateMultiplier)) {
-        patch.rate_multiplier = parsedRateMultiplier;
-      }
-    }
+    if (enablePlanType) patch.plan_type = planType.trim();
+    if (enablePoolMode) patch.upstream_is_pool = poolMode;
     if (enableModelDowngradeThreshold) {
       patch.model_downgrade_threshold = modelDowngradeThresholdEmpty ? null : modelDowngradeThresholdValue;
     }
@@ -203,6 +200,7 @@ export function BulkEditAccountModal({
       }
     }
     let extraPatch: Record<string, unknown> | undefined;
+    if (enablePlanTypeLock) extraPatch = { plan_type_locked: planTypeLocked };
     if (enableMessageLock) {
       extraPatch = setAccountMessageLockEnabled(extraPatch, messageLockEnabled);
     }
@@ -295,7 +293,7 @@ export function BulkEditAccountModal({
           {t('accounts.bulk_update_hint')}
         </p>
 
-        {/* 调度开关 + 消息锁同行；消息锁不显示多选框，拨动即纳入本次批量修改 */}
+        {/* 调度复选框控制状态字段；其余开关拨动后独立纳入本次修改。 */}
         <div className="grid items-center gap-3 border-t border-border-subtle pt-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
           <NativeCheckbox
             className="self-center"
@@ -306,16 +304,26 @@ export function BulkEditAccountModal({
               {t('accounts.dispatch_toggle')}
             </span>
           </NativeCheckbox>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
             <NativeSwitch
               isDisabled={!enableStatus}
               isSelected={status === 'active'}
               label={(
                 <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
-                  {status === 'active' ? t('common.enabled', '已启用') : t('common.disabled', '已禁用')}
+                  {t('accounts.dispatch_enabled')}
                 </span>
               )}
               onChange={(on) => setStatus(on ? 'active' : 'disabled')}
+            />
+            <NativeSwitch
+              isSelected={planTypeLocked}
+              label={<span className={enablePlanTypeLock ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>{t('accounts.plan_type_locked')}</span>}
+              onChange={(on) => { setEnablePlanTypeLock(true); setPlanTypeLocked(on); }}
+            />
+            <NativeSwitch
+              isSelected={poolMode}
+              label={<span className={enablePoolMode ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>{t('accounts.upstream_is_pool')}</span>}
+              onChange={(on) => { setEnablePoolMode(true); setPoolMode(on); }}
             />
             <NativeSwitch
               isSelected={messageLockEnabled}
@@ -491,21 +499,18 @@ export function BulkEditAccountModal({
           </HeroTextField>
         </FieldRow>
 
-        {/* 费率倍率 */}
+        {/* 账号套餐类型：空字符串可清除已有类型。 */}
         <FieldRow
-          enabled={enableRateMultiplier}
-          onToggle={setEnableRateMultiplier}
-          label={t('accounts.rate_multiplier')}
+          enabled={enablePlanType}
+          onToggle={setEnablePlanType}
+          label={t('accounts.plan_type_label')}
         >
-          <HeroTextField fullWidth isDisabled={!enableRateMultiplier}>
-            <Input
-              type="number"
-              min={MIN_POSITIVE_RATE_MULTIPLIER}
-              max={MAX_RATE_MULTIPLIER}
-              step={RATE_MULTIPLIER_STEP}
-              value={rateMultiplier}
-              disabled={!enableRateMultiplier}
-              onChange={(e) => setRateMultiplier(e.target.value)}
+          <HeroTextField fullWidth isDisabled={!enablePlanType}>
+            <AccountPlanTypeInput
+              label={t('accounts.plan_type_label')}
+              value={planType}
+              disabled={!enablePlanType}
+              onChange={setPlanType}
             />
           </HeroTextField>
         </FieldRow>

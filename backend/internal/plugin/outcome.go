@@ -12,8 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DevilGenius/airgate-core/internal/accountidentity"
-	"github.com/DevilGenius/airgate-core/internal/accountscope"
+	"github.com/DevilGenius/airgate-core/internal/accountcredentials"
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/safego"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
@@ -515,71 +514,9 @@ func (f *Forwarder) updateAccountCredentials(accountID int, updated map[string]s
 	lock.Lock()
 	defer lock.Unlock()
 
-	acc, err := accountscope.QueryByID(f.db, accountID).Only(ctx)
-	if err != nil {
-		slog.Error("更新凭证失败：查询账号", "account_id", accountID, "error", err)
-		return
-	}
-
-	email, currentCredentials, identityErr := accountidentity.Resolve(acc.Email, acc.Credentials)
-	if identityErr != nil {
-		slog.Error("更新凭证失败：账号邮箱状态不一致", "account_id", accountID, "error", identityErr)
-		return
-	}
-	if rawEmail, ok := updated["email"]; ok {
-		normalized, normalizeErr := accountidentity.NormalizeOptional(&rawEmail)
-		if normalizeErr != nil {
-			slog.Error("更新凭证失败：插件返回的账号邮箱无效", "account_id", accountID, "error", normalizeErr)
-		} else {
-			email = normalized
-		}
-	}
-
-	merged := make(map[string]string, len(currentCredentials)+len(updated))
-	for k, v := range currentCredentials {
-		if k == "email" {
-			continue
-		}
-		merged[k] = v
-	}
-	for k, v := range updated {
-		if k == "email" {
-			continue
-		}
-		merged[k] = v
-	}
-	merged = accountidentity.SyncCredentials(merged, email)
-	credentialsChanged := len(merged) != len(acc.Credentials)
-	if !credentialsChanged {
-		for key, value := range merged {
-			if acc.Credentials[key] != value {
-				credentialsChanged = true
-				break
-			}
-		}
-	}
-	emailChanged := (acc.Email == nil) != (email == nil)
-	if !emailChanged && acc.Email != nil && email != nil {
-		emailChanged = *acc.Email != *email
-	}
-	if !credentialsChanged && !emailChanged {
-		// 多个请求可能同时携带同一个已回写的 task/token；避免无变化的
-		// UPDATE 和后台持久化工作反复排队。
-		slog.Debug("插件回传凭证无变化，跳过持久化", "account_id", accountID)
-		return
-	}
-
-	builder := accountscope.UpdateOneID(f.db, accountID).SetCredentials(merged)
-	if email == nil {
-		builder = builder.ClearEmail()
-	} else {
-		builder = builder.SetEmail(*email)
-	}
-	if err := builder.Exec(ctx); err != nil {
+	if _, err := accountcredentials.UpdateAutomatic(ctx, f.db, accountID, updated); err != nil {
 		slog.Error("更新凭证失败：写入数据库", "account_id", accountID, "error", err)
-		return
 	}
-	slog.Info("插件回传凭证已持久化", "account_id", accountID)
 }
 
 func (f *Forwarder) credentialLock(accountID int) *sync.Mutex {

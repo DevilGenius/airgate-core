@@ -22,6 +22,31 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
+func TestAccountPlanTypeUpdateRoutes(t *testing.T) {
+	db := testdb.OpenMemoryEnt(t, t.Name(), schema.WithGlobalUniqueID(false))
+	defer db.Close()
+	item := db.Account.Create().SetName("locked").SetPlatform("openai").SetType("oauth").
+		SetCredentials(map[string]string{"plan_type": "plus", "access_token": "secret"}).
+		SetExtra(map[string]any{"plan_type_locked": true, "keep": "value"}).SaveX(t.Context())
+	service := appaccount.NewService(store.NewAccountStore(db), nil, scheduler.NewConcurrencyManager(nil), nil)
+	h := NewAccountHandler(service, nil)
+	w := invokeHandlerForValidation(http.MethodPatch, "/accounts/1", `{"plan_type":" team "}`, gin.Params{{Key: "id", Value: fmt.Sprint(item.ID)}}, nil, h.UpdateAccount)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	updated := db.Account.GetX(t.Context(), item.ID)
+	if updated.Credentials["plan_type"] != "team" || updated.Credentials["access_token"] != "secret" || updated.Extra["plan_type_locked"] != true {
+		t.Fatalf("single update: %+v", updated)
+	}
+	w = invokeHandlerForValidation(http.MethodPatch, "/accounts/bulk", fmt.Sprintf(`{"account_ids":[%d],"plan_type":"","upstream_is_pool":true,"extra":{"plan_type_locked":false}}`, item.ID), nil, nil, h.BulkUpdateAccounts)
+	requireOKResponse(t, asResponseView(w.Code, w.Body.String()))
+	if !strings.Contains(w.Body.String(), `"success":1`) {
+		t.Fatal(w.Body.String())
+	}
+	updated = db.Account.GetX(t.Context(), item.ID)
+	if updated.Credentials["plan_type"] != "" || updated.Credentials["access_token"] != "secret" || updated.Extra["keep"] != "value" || updated.Extra["plan_type_locked"] != false || !updated.UpstreamIsPool {
+		t.Fatalf("bulk update: %+v", updated)
+	}
+}
+
 func TestImportAccountsAppliesConfiguredDSL(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.OpenMemoryEnt(t, "handler_account_import_dsl", schema.WithGlobalUniqueID(false))

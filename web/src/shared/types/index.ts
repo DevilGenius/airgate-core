@@ -233,6 +233,7 @@ export interface CreateAccountReq {
 }
 
 export interface UpdateAccountReq {
+  plan_type?: string;
   name?: string;
   email?: string | null;
   type?: string;
@@ -254,6 +255,8 @@ export interface UpdateAccountReq {
 
 // 批量更新账号请求（只传需要修改的字段，缺失 = 不改）
 export interface BulkUpdateAccountsReq {
+  plan_type?: string;
+  upstream_is_pool?: boolean;
   account_ids: number[];
   state?: 'active' | 'disabled';
   priority?: number;

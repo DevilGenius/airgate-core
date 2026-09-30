@@ -1,4 +1,5 @@
 import type { AccountResp } from '../../../shared/types';
+import { getAccountMessageLockEnabled } from './accountDefaults';
 
 export type BulkEditInitialValues = {
   groupIds: number[];
@@ -6,7 +7,11 @@ export type BulkEditInitialValues = {
   priority?: number;
   priorityMax?: number;
   priorityMin?: number;
-  rateMultiplier?: number;
+  planType?: string;
+  planTypeLocked?: boolean;
+  poolMode?: boolean;
+  messageLockEnabled?: boolean;
+  dispatchEnabled?: boolean;
   modelDowngradeThreshold?: number;
 };
 
@@ -66,6 +71,11 @@ export function getBulkEditInitialValues(rows: AccountResp[], selectedIds: numbe
   };
 
   const groupIds = firstGroupIds.filter((groupId) => commonGroupIds.has(groupId));
+  const getCommonValue = <T,>(selectValue: (account: AccountResp) => T): T | undefined => {
+    const value = selectValue(firstSelectedRow);
+    return selectedRows.length === selectedIds.length && selectedRows.every((row) => selectValue(row) === value)
+      ? value : undefined;
+  };
   const priorities = selectedRows
     .map((account) => account.priority)
     .filter((priority) => typeof priority === 'number' && Number.isFinite(priority));
@@ -76,7 +86,11 @@ export function getBulkEditInitialValues(rows: AccountResp[], selectedIds: numbe
     priority: getCommonNumber((account) => account.priority),
     priorityMax: hasCompletePriorityRange ? Math.max(...priorities) : undefined,
     priorityMin: hasCompletePriorityRange ? Math.min(...priorities) : undefined,
-    rateMultiplier: getCommonNumber((account) => account.rate_multiplier),
+    planType: getCommonValue((account) => account.credentials.plan_type ?? ''),
+    planTypeLocked: getCommonValue((account) => account.extra?.plan_type_locked === true),
+    poolMode: getCommonValue((account) => account.upstream_is_pool),
+    messageLockEnabled: getCommonValue((account) => getAccountMessageLockEnabled(account.extra)),
+    dispatchEnabled: getCommonValue((account) => account.state !== 'disabled'),
     modelDowngradeThreshold: getCommonNumber((account) => account.model_downgrade_threshold),
   };
 }

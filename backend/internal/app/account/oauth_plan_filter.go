@@ -28,6 +28,7 @@ type oauthPlanFilter struct {
 	CredentialKey string
 	MatchMode     string
 	Matches       []string
+	KnownPlans    []CredentialStringFilter
 }
 
 func oauthPlanFilterID(platform, key string) string {
@@ -70,16 +71,23 @@ func pluginOAuthPlanFilters(meta plugin.PluginMeta) []oauthPlanFilter {
 			credentialKey = defaultOAuthPlanCredential
 		}
 		matchMode := strings.ToLower(strings.TrimSpace(item.MatchMode))
-		if matchMode != "contains" && matchMode != "normalized_contains" && matchMode != "empty" {
+		// Installed plugins may still declare the former empty-only None entry.
+		if key == "none" && credentialKey == defaultOAuthPlanCredential && matchMode == "empty" {
+			key, matchMode = "unknown", "unknown"
+		}
+		if matchMode != "contains" && matchMode != "normalized_contains" && matchMode != "empty" && matchMode != "unknown" {
 			matchMode = "exact"
 		}
 		matches := normalizedPlanMatches(item.Matches, key)
-		if matchMode == "empty" {
+		if matchMode == "empty" || matchMode == "unknown" {
 			matches = nil
 		} else if len(matches) == 0 {
 			continue
 		}
 		label := strings.TrimSpace(item.Label)
+		if matchMode == "unknown" {
+			label = "Unknown"
+		}
 		if label == "" {
 			label = key
 		}
@@ -91,6 +99,19 @@ func pluginOAuthPlanFilters(meta plugin.PluginMeta) []oauthPlanFilter {
 			MatchMode:     matchMode,
 			Matches:       matches,
 		})
+	}
+	for index := range result {
+		if result[index].MatchMode != "unknown" {
+			continue
+		}
+		for _, known := range result {
+			if known.CredentialKey != result[index].CredentialKey || known.MatchMode == "unknown" || known.MatchMode == "empty" {
+				continue
+			}
+			result[index].KnownPlans = append(result[index].KnownPlans, CredentialStringFilter{
+				Key: known.CredentialKey, Values: known.Matches, MatchMode: known.MatchMode,
+			})
+		}
 	}
 	return result
 }
@@ -152,6 +173,7 @@ func (s *Service) normalizeListFilter(filter ListFilter) ListFilter {
 			Key:         plan.CredentialKey,
 			Values:      plan.Matches,
 			MatchMode:   plan.MatchMode,
+			KnownPlans:  plan.KnownPlans,
 		})
 	}
 	filter.AccountType = strings.Join(types, ",")

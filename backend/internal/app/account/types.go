@@ -126,7 +126,8 @@ type CredentialStringFilter struct {
 	AccountType string
 	Key         string
 	Values      []string
-	MatchMode   string // exact / contains / normalized_contains / empty（匹配字段缺失或为空）
+	MatchMode   string                   // exact / contains / normalized_contains / empty / unknown
+	KnownPlans  []CredentialStringFilter // unknown matches the complement of these rules, including missing values.
 }
 
 // ListResult 账号列表结果。
@@ -162,6 +163,8 @@ type CreateInput struct {
 // State 传 "active" / "disabled" 表示运维手动恢复 / 禁用；
 // 其它 state 值（rate_limited / degraded）由调度状态机自行维护，不由 API 写入。
 type UpdateInput struct {
+	PlanType                *string
+	AutomaticCredentials    bool
 	Name                    *string
 	Email                   *string
 	HasEmail                bool
@@ -195,6 +198,8 @@ type ToggleResult struct {
 // 所有可选字段使用指针/HasXxx 标记：未设置表示「不修改」。
 // GroupIDs 采用整体替换语义：HasGroupIDs=true 时会用新列表覆盖账号原有分组。
 type BulkUpdateInput struct {
+	PlanType                *string
+	UpstreamIsPool          *bool
 	IDs                     []int
 	State                   *string
 	Priority                *int

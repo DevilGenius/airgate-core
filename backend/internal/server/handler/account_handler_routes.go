@@ -219,6 +219,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 	}
 
 	input := appaccount.UpdateInput{
+		PlanType:                req.PlanType,
 		Name:                    req.Name,
 		Email:                   req.Email,
 		Type:                    req.Type,
@@ -315,6 +316,8 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 
 	_, hasProxyID := rawPayload["proxy_id"]
 	result := h.service.BulkUpdate(c.Request.Context(), appaccount.BulkUpdateInput{
+		PlanType:                req.PlanType,
+		UpstreamIsPool:          req.UpstreamIsPool,
 		IDs:                     req.AccountIDs,
 		State:                   req.State,
 		Priority:                req.Priority,

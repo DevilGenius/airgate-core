@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditAccountModal } from './EditAccountModal';
+import { BulkEditAccountModal } from './BulkEditAccountModal';
 import type { AccountResp, CredentialSchemaResp } from '../../../shared/types';
 
 vi.mock('@heroui/react', async () => import('../../../test/herouiMock'));
@@ -11,7 +12,7 @@ vi.mock('react-i18next', () => ({
     type: '3rdParty',
   },
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => fallback ?? key,
+    t: (key: string, fallback?: unknown) => typeof fallback === 'string' ? fallback : key,
   }),
 }));
 
@@ -37,10 +38,12 @@ vi.mock('../../../shared/components/CommonModal', () => ({
 
 vi.mock('../../../shared/components/NativeSwitch', () => ({
   NativeSwitch: ({
+    isDisabled,
     isSelected,
     label,
     onChange,
   }: {
+    isDisabled?: boolean;
     isSelected: boolean;
     label?: React.ReactNode;
     onChange: (checked: boolean) => void;
@@ -48,6 +51,8 @@ vi.mock('../../../shared/components/NativeSwitch', () => ({
     <label>
       {label}
       <input
+        role="switch"
+        disabled={isDisabled}
         checked={isSelected}
         type="checkbox"
         onChange={(event) => onChange(event.currentTarget.checked)}
@@ -171,6 +176,30 @@ describe('EditAccountModal model policy', () => {
     vi.clearAllMocks();
   });
 
+  it('edits a locked plan manually without a dispatch control or state patch', () => {
+    const onSubmit = renderModal(account({
+      credentials: { api_key: 'secret', plan_type: 'plus' },
+      extra: { plan_type_locked: true, keep: 'value' },
+      state: 'disabled',
+    }));
+    expect(screen.queryByText('accounts.enable_dispatch')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'accounts.plan_type_locked' })).toBeChecked();
+    fireEvent.change(screen.getByRole('combobox', { name: 'accounts.plan_type' }), { target: { value: ' team ' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: '池模式' }));
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      plan_type: 'team', upstream_is_pool: true, extra: { plan_type_locked: true, keep: 'value' },
+    }));
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty('state');
+  });
+
+  it('can clear plan_type explicitly', () => {
+    const onSubmit = renderModal(account({ credentials: { api_key: 'secret', plan_type: 'plus' } }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'accounts.plan_type' }), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ plan_type: '' }));
+  });
+
   it('shows the existing account model policy', () => {
     renderModal(account({
       model_policy: {
@@ -181,6 +210,18 @@ describe('EditAccountModal model policy', () => {
 
     expect(screen.getByLabelText('accounts.model_allowlist')).toHaveValue('gpt-5.4\ngpt-5.4-*');
     expect(screen.getByLabelText('accounts.model_denylist')).toHaveValue('gpt-5.4-nano');
+  });
+
+  it('offers backend plan presets and allows editing a selected preset', () => {
+    const onSubmit = renderModal(account());
+    const input = screen.getByRole('combobox', { name: 'accounts.plan_type' });
+    const options = document.getElementById(input.getAttribute('list')!);
+    expect(Array.from(options!.querySelectorAll('option'), (option) => option.value))
+      .toEqual(['free', 'plus', 'team', 'prolite', 'pro', 'k12', 'enterprise']);
+    fireEvent.change(input, { target: { value: 'team' } });
+    fireEvent.change(input, { target: { value: 'custom-team-plan' } });
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ plan_type: 'custom-team-plan' }));
   });
 
   it('submits an OAuth account model policy', () => {
@@ -245,5 +286,31 @@ describe('EditAccountModal model policy', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       model_policy: {},
     }));
+  });
+});
+
+describe('BulkEditAccountModal plan controls', () => {
+  it('uses four switches and patches only explicitly edited fields', () => {
+    const onSubmit = vi.fn();
+    render(<BulkEditAccountModal open count={2} loading={false} initialPlanType="plus" initialPlanTypeLocked initialPoolMode onClose={() => {}} onSubmit={onSubmit} />);
+    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    expect(screen.queryByText('accounts.rate_multiplier')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.plan_type_label' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'accounts.plan_type_label' }), { target: { value: ' pro ' } });
+    fireEvent.click(screen.getByRole('switch', { name: 'accounts.plan_type_locked' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'accounts.upstream_is_pool' }));
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledWith({ plan_type: 'pro', upstream_is_pool: false, extra: { plan_type_locked: false } });
+  });
+
+  it('keeps dispatch opt-in separate from the other switches', () => {
+    const onSubmit = vi.fn();
+    render(<BulkEditAccountModal open count={2} loading={false} onClose={() => {}} onSubmit={onSubmit} />);
+    expect(screen.getByRole('switch', { name: 'accounts.dispatch_enabled' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.dispatch_toggle' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'accounts.dispatch_enabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledWith({ state: 'disabled' });
   });
 });

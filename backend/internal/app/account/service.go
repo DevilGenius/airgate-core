@@ -18,6 +18,7 @@ import (
 
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 
+	"github.com/DevilGenius/airgate-core/internal/accountcredentials"
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
@@ -611,10 +612,21 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 	if err := validateProxySlotAssignment(input.HasProxyID, input.ProxyID, input.ProxyAssignment, input.ProxySlot); err != nil {
 		return Account{}, err
 	}
-	if input.HasEmail || input.Credentials != nil {
+	if input.HasEmail || input.Credentials != nil || input.PlanType != nil {
 		current, err := s.repo.FindByID(ctx, id, LoadOptions{})
 		if err != nil {
 			return Account{}, err
+		}
+		if input.PlanType != nil {
+			if input.Credentials == nil {
+				input.Credentials = cloneStringMap(current.Credentials)
+			} else {
+				input.Credentials = cloneStringMap(input.Credentials)
+			}
+			if input.Credentials == nil {
+				input.Credentials = map[string]string{}
+			}
+			input.Credentials["plan_type"] = strings.TrimSpace(*input.PlanType)
 		}
 		input, err = normalizeAccountIdentityUpdate(current, input)
 		if err != nil {
@@ -835,6 +847,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			priority = &sequencePriorities[index]
 		}
 		patch := UpdateInput{
+			UpstreamIsPool:          input.UpstreamIsPool,
 			State:                   input.State,
 			Priority:                priority,
 			MaxConcurrency:          input.MaxConcurrency,
@@ -845,7 +858,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			ProxySlot:               input.ProxySlot,
 		}
 		var existing *Account
-		needsExisting := input.HasExtra || (input.PriorityOffset != nil && *input.PriorityOffset != 0)
+		needsExisting := input.HasExtra || input.PlanType != nil || (input.PriorityOffset != nil && *input.PriorityOffset != 0)
 		if needsExisting {
 			account, err := s.repo.FindByID(ctx, id, LoadOptions{})
 			if err != nil {
@@ -853,6 +866,13 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 				continue
 			}
 			existing = &account
+		}
+		if input.PlanType != nil {
+			patch.Credentials = cloneStringMap(existing.Credentials)
+			if patch.Credentials == nil {
+				patch.Credentials = map[string]string{}
+			}
+			patch.Credentials["plan_type"] = strings.TrimSpace(*input.PlanType)
 		}
 		if input.PriorityOffset != nil && *input.PriorityOffset != 0 {
 			nextPriority, ok := accountpriority.AddOffset(existing.Priority, *input.PriorityOffset)
@@ -915,7 +935,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			s.usage.cacheAccountProfiles(ctx, accounts)
 		}
 	}
-	if result.Success > 0 && input.State != nil {
+	if result.Success > 0 && (input.State != nil || input.PlanType != nil || input.UpstreamIsPool != nil) {
 		s.InvalidateUsageCache("")
 	}
 	return result
@@ -1665,6 +1685,9 @@ func (s *Service) refreshToken(ctx context.Context, item Account, probeUsage boo
 		credentials = map[string]string{}
 	}
 	for key, value := range result.Extra {
+		if key == "plan_type" && accountcredentials.PlanTypeLocked(item.Extra) {
+			continue
+		}
 		if shouldPersistTokenRefreshExtra(key, value) {
 			credentials[key] = value
 		}
@@ -1673,20 +1696,15 @@ func (s *Service) refreshToken(ctx context.Context, item Account, probeUsage boo
 		credentials["subscription_active_until"] = result.ExpiresAt
 	}
 	credentials = syncAccountCredentials(credentials, refreshedEmail)
-	var usageProbeCredentials map[string]string
-	if probeUsage {
-		usageProbeCredentials = accountMaintenanceCredentials(Account{
-			Credentials: credentials,
-			Proxy:       item.Proxy,
-		})
-	}
+	probeProxy := item.Proxy
 	credentialsChanged := !maps.Equal(item.Credentials, credentials)
 	emailChanged := !accountEmailsEqual(item.Email, refreshedEmail)
 	if credentialsChanged || emailChanged {
 		patch := UpdateInput{
-			Credentials: credentials,
-			Email:       refreshedEmail,
-			HasEmail:    true,
+			AutomaticCredentials: true,
+			Credentials:          credentials,
+			Email:                refreshedEmail,
+			HasEmail:             true,
 		}
 		persisted, persistErr := s.repo.Update(ctx, item.ID, patch)
 		if persistErr != nil {
@@ -1697,6 +1715,7 @@ func (s *Service) refreshToken(ctx context.Context, item Account, probeUsage boo
 			return TokenRefreshResult{}, persistErr
 		}
 		item = persisted
+		credentials = persisted.Credentials
 		if s.stateWriter != nil {
 			s.stateWriter.RefreshRouteGraphAccount(ctx, item.ID)
 		}
@@ -1706,7 +1725,10 @@ func (s *Service) refreshToken(ctx context.Context, item Account, probeUsage boo
 		// 顺手触发一次用量强制重探测：账号令牌刷新只负责刷订阅信息（plan_type / 过期时间），
 		// 不动用量窗口缓存。用户点"刷新"时如果账号从没探测过，还是看不到 5h/7d 进度条。
 		// 主动调一次 usage/probe 并写入该账号缓存；失败不阻断主流程。
-		s.triggerUsageProbe(ctx, inst, item.Platform, item.ID, usageProbeCredentials)
+		s.triggerUsageProbe(ctx, inst, item.Platform, item.ID, accountMaintenanceCredentials(Account{
+			Credentials: credentials,
+			Proxy:       probeProxy,
+		}))
 	}
 	s.resolveAccountMonitorEvents(ctx, item.ID)
 	email := ""

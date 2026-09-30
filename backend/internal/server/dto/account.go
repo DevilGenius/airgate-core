@@ -96,6 +96,7 @@ type CreateAccountReq struct {
 // State 只允许 "active" / "disabled"（运维手动恢复 / 禁用）；
 // rate_limited / degraded 由状态机自动写入，不接受 API 显式赋值。
 type UpdateAccountReq struct {
+	PlanType                *string             `json:"plan_type"`
 	Name                    *string             `json:"name"`
 	Email                   *string             `json:"email"`
 	Type                    *string             `json:"type"`
@@ -188,6 +189,8 @@ type UpdateAccountImportConfigReq struct {
 
 // BulkUpdateAccountsReq 批量更新账号请求。
 type BulkUpdateAccountsReq struct {
+	PlanType                *string                  `json:"plan_type"`
+	UpstreamIsPool          *bool                    `json:"upstream_is_pool"`
 	AccountIDs              []int                    `json:"account_ids" binding:"required,min=1"`
 	State                   *string                  `json:"state" binding:"omitempty,oneof=active disabled"`
 	Priority                *int                     `json:"priority"`

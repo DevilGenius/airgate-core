@@ -18,6 +18,7 @@ import (
 	"github.com/DevilGenius/airgate-core/ent/predicate"
 	entproxy "github.com/DevilGenius/airgate-core/ent/proxy"
 	entusagelog "github.com/DevilGenius/airgate-core/ent/usagelog"
+	"github.com/DevilGenius/airgate-core/internal/accountcredentials"
 	"github.com/DevilGenius/airgate-core/internal/accountidentity"
 	"github.com/DevilGenius/airgate-core/internal/accountscope"
 	"github.com/DevilGenius/airgate-core/internal/accountusage"
@@ -129,6 +130,18 @@ func accountCredentialStringMatches(filter appaccount.CredentialStringFilter) pr
 	}
 	if filter.AccountType != "" {
 		predicates = append(predicates, entaccount.TypeEQ(filter.AccountType))
+	}
+	if filter.MatchMode == "unknown" {
+		known := make([]predicate.Account, 0, len(filter.KnownPlans))
+		for _, plan := range filter.KnownPlans {
+			known = append(known, accountCredentialStringMatches(plan))
+		}
+		if len(known) > 0 {
+			// SQL NOT alone cannot match missing/null JSON values.
+			empty := accountCredentialStringMatches(appaccount.CredentialStringFilter{Key: filter.Key, MatchMode: "empty"})
+			predicates = append(predicates, entaccount.Or(empty, entaccount.Not(entaccount.Or(known...))))
+		}
+		return entaccount.And(predicates...)
 	}
 	if filter.MatchMode == "empty" {
 		predicates = append(predicates, func(s *sql.Selector) {
@@ -609,6 +622,13 @@ func sameOAuthAccount(existing *ent.Account, input appaccount.CreateInput) bool 
 
 // Update 更新账号。
 func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.UpdateInput) (appaccount.Account, error) {
+	if input.AutomaticCredentials {
+		updated, err := accountcredentials.UpdateAutomatic(ctx, s.db, id, input.Credentials)
+		if err != nil {
+			return appaccount.Account{}, err
+		}
+		return mapAccount(updated), nil
+	}
 	if input.HasEmail || input.Credentials != nil {
 		var (
 			resolvedEmail       *string

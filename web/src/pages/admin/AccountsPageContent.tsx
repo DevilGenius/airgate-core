@@ -1896,7 +1896,11 @@ export default function AccountsPageContent() {
           initialPriority={bulkEditSelection.initialValues.priority}
           initialPriorityMax={bulkEditSelection.initialValues.priorityMax}
           initialPriorityMin={bulkEditSelection.initialValues.priorityMin}
-          initialRateMultiplier={bulkEditSelection.initialValues.rateMultiplier}
+          initialPlanType={bulkEditSelection.initialValues.planType}
+          initialPlanTypeLocked={bulkEditSelection.initialValues.planTypeLocked}
+          initialPoolMode={bulkEditSelection.initialValues.poolMode}
+          initialMessageLockEnabled={bulkEditSelection.initialValues.messageLockEnabled}
+          initialDispatchEnabled={bulkEditSelection.initialValues.dispatchEnabled}
           initialModelDowngradeThreshold={bulkEditSelection.initialValues.modelDowngradeThreshold}
           onClose={() => setBulkEditSelection(null)}
           onSubmit={(patch) =>

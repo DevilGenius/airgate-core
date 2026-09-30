@@ -24,6 +24,8 @@ const OAUTH_PLANS_METADATA_KEY = 'account.oauth_plans';
 type PluginOAuthPlanMeta = {
   key?: string;
   label?: string;
+  match?: string;
+  credential_key?: string;
 };
 
 export type OAuthPlanFilterOption = {
@@ -35,16 +37,18 @@ export type OAuthPlanFilterOption = {
 
 const EMPTY_OAUTH_PLAN_FILTERS: OAuthPlanFilterOption[] = [];
 
-function parseOAuthPlanFilters(platform: string, platformLabel: string, raw?: string): OAuthPlanFilterOption[] {
+export function parseOAuthPlanFilters(platform: string, platformLabel: string, raw?: string): OAuthPlanFilterOption[] {
   if (!raw) return [];
   try {
     const items = JSON.parse(raw) as PluginOAuthPlanMeta[];
     if (!Array.isArray(items)) return [];
     return items
       .map((item) => {
-        const key = item.key?.trim();
+        let key = item.key?.trim();
         if (!key) return null;
-        const planLabel = item.label?.trim() || key;
+        if (key === 'none' && item.match?.trim().toLowerCase() === 'empty'
+          && (!item.credential_key?.trim() || item.credential_key.trim() === 'plan_type')) key = 'unknown';
+        const planLabel = key === 'unknown' ? 'Unknown' : item.label?.trim() || key;
         return {
           id: `oauth_plan:${platform}:${key}`,
           platform,

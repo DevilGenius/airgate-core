@@ -29,7 +29,7 @@ import {
 import { SchemaCredentialsForm } from './CredentialForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
-import { NativeSwitch } from '../../../shared/components/NativeSwitch';
+import { AccountPlanTypeInput } from './AccountPlanTypeInput';
 import { ProxyBindingFields, resolveProxyBinding } from './ProxyBindingFields';
 import {
   MAX_RATE_MULTIPLIER,
@@ -71,7 +71,7 @@ export function EditAccountModal({
   const { t } = useTranslation();
   const { platformName: pName } = usePlatforms();
   const initialAccountType = account.type || detectCredentialAccountType(account.credentials);
-  const initialDispatchEnabled = account.state !== 'disabled';
+  const [planType, setPlanType] = useState(account.credentials.plan_type ?? '');
   const [accountType, setAccountType] = useState(initialAccountType);
   const [form, setForm] = useState<UpdateAccountReq>({
     name: account.name,
@@ -88,7 +88,6 @@ export function EditAccountModal({
   const origCredentials = useRef(account.credentials);
   const [credentials, setCredentials] = useState<Record<string, string>>(account.credentials);
   const [groupIds, setGroupIds] = useState<number[]>(account.group_ids ?? []);
-  const [dispatchEnabled, setDispatchEnabled] = useState(initialDispatchEnabled);
   const [proxySlotInput, setProxySlotInput] = useState(
     account.proxy_slot == null ? '' : String(account.proxy_slot),
   );
@@ -185,10 +184,6 @@ export function EditAccountModal({
       if (passwordKeys.has(key) && merged[key] === '' && value) merged[key] = value;
     }
 
-    const nextState = dispatchEnabled === initialDispatchEnabled
-      ? undefined
-      : dispatchEnabled ? 'active' : 'disabled';
-
     const identity = syncAccountIdentity(merged, form.email);
 
     const proxyAssignmentPatch: Pick<UpdateAccountReq, 'proxy_assignment' | 'proxy_slot'> = {};
@@ -201,7 +196,7 @@ export function EditAccountModal({
       ...form,
       ...proxyAssignmentPatch,
       email: identity.email,
-      ...(nextState ? { state: nextState } : {}),
+      ...(planType !== (account.credentials.plan_type ?? '') ? { plan_type: planType.trim() } : {}),
       priority,
       rate_multiplier: rateMultiplier,
       model_downgrade_threshold: modelDowngradeThresholdValue,
@@ -413,29 +408,38 @@ export function EditAccountModal({
                       slotInput={proxySlotInput}
                     />
 
-                    <div className="ag-account-switch-row">
-                      <NativeSwitch
-                        className="ag-account-option-switch"
-                        isSelected={dispatchEnabled}
-                        label={<span className="text-sm text-text">{t('accounts.enable_dispatch')}</span>}
-                        onChange={setDispatchEnabled}
-                      />
+                  </div>
 
-                      <NativeSwitch
-                        className="ag-account-option-switch"
+                  <div className="grid items-end gap-4 md:grid-cols-2">
+                    <HeroTextField fullWidth className="min-w-0">
+                      <Label>{t('accounts.plan_type')}</Label>
+                      <AccountPlanTypeInput
+                        label={t('accounts.plan_type')}
+                        value={planType}
+                        onChange={setPlanType}
+                      />
+                    </HeroTextField>
+                    <div className="flex flex-wrap items-center gap-4 pb-2">
+                      <NativeCheckbox
+                        isSelected={form.extra?.plan_type_locked === true}
+                        onChange={(checked) => setForm({ ...form, extra: { ...form.extra, plan_type_locked: checked } })}
+                      >
+                        {t('accounts.plan_type_locked')}
+                      </NativeCheckbox>
+                      <NativeCheckbox
                         isSelected={form.upstream_is_pool ?? false}
-                        label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
                         onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
-                      />
-
-                      <NativeSwitch
-                        className="ag-account-option-switch"
+                      >
+                        {t('accounts.upstream_is_pool', '池模式')}
+                      </NativeCheckbox>
+                      <NativeCheckbox
                         isSelected={getAccountMessageLockEnabled(form.extra)}
-                        label={<span className="text-sm text-text">{t('accounts.message_lock')}</span>}
                         onChange={(checked) =>
                           setForm({ ...form, extra: setAccountMessageLockEnabled(form.extra, checked) })
                         }
-                      />
+                      >
+                        {t('accounts.message_lock')}
+                      </NativeCheckbox>
                     </div>
                   </div>
 

@@ -120,6 +120,31 @@ func (c accountGatewayCatalog) GetPluginByPlatform(platform string) *plugin.Plug
 	return c.instances[platform]
 }
 
+func TestTokenRefreshPreservesLockedPlan(t *testing.T) {
+	runtime := newAccountGatewayRuntime(t, &accountFakeGatewayPlugin{
+		platform: "openai",
+		handle: func(context.Context, string, string, string, http.Header, []byte) (int, http.Header, []byte, error) {
+			body, _ := json.Marshal(map[string]any{"extra": map[string]string{"plan_type": "pro", "access_token": "new"}})
+			return http.StatusOK, nil, body, nil
+		},
+	})
+	defer runtime.cleanup()
+	item := Account{ID: 9, Platform: "openai", Credentials: map[string]string{"plan_type": "team", "access_token": "old"}, Extra: map[string]any{"plan_type_locked": true}}
+	var captured UpdateInput
+	service := NewService(stubRepository{update: func(_ context.Context, _ int, input UpdateInput) (Account, error) {
+		captured = input
+		item.Credentials = input.Credentials
+		return item, nil
+	}}, accountGatewayCatalog{instances: map[string]*plugin.PluginInstance{"openai": runtime.instance}}, nil, nil)
+	result, err := service.refreshToken(t.Context(), item, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PlanType != "team" || captured.Credentials["plan_type"] != "team" || captured.Credentials["access_token"] != "new" || !captured.AutomaticCredentials {
+		t.Fatalf("result=%+v patch=%+v", result, captured)
+	}
+}
+
 func TestTokenRefreshThroughGatewayPersistsCredentialsAndUsage(t *testing.T) {
 	var mu sync.Mutex
 	requestedPaths := make([]string, 0, 2)
