@@ -28,8 +28,8 @@
     radial-gradient(circle at 82% 18%, color-mix(in oklab, white 10%, transparent), transparent 22rem),
     repeating-linear-gradient(135deg, color-mix(in oklab, white 4%, transparent) 0 1px, transparent 1px 12px),
     color-mix(in oklab, var(--background) 58%, transparent);
+  /* Let the CSS optimizer generate vendor prefixes from the standard property. */
   backdrop-filter: saturate(125%) blur(10px);
-  -webkit-backdrop-filter: saturate(125%) blur(10px);
   animation: none;
 }
 
