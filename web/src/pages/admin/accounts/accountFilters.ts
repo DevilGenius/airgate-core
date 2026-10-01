@@ -1,5 +1,6 @@
 import type { AccountListFilter } from '../../../shared/api/accounts';
 import { compareAccountFilterPlatforms } from './accountFilterOrder';
+import { NO_ACCOUNT_FILTER } from './accountFilterConstants';
 
 export const ACCOUNT_FILTER_STATES = ['working', 'active', 'family_limited', 'rate_limited', 'degraded', 'disabled'] as const;
 export type AccountFilters = {
@@ -32,12 +33,15 @@ export function normalizeAccountFilters(value: unknown): AccountFilters {
     }
   }
   const types = new Set(strings(raw.accountTypes));
+  const accountTypes = ['oauth', 'apikey'].filter((key) => types.has(key));
+  const rawPlatforms = strings(raw.platforms);
+  const platforms = rawPlatforms.filter((key) => key !== NO_ACCOUNT_FILTER && !/[,:]/.test(key)).sort(compareAccountFilterPlatforms);
   const states = new Set(strings(raw.states));
   return {
     version: 1,
     keyword: typeof raw.keyword === 'string' ? raw.keyword : '',
-    platforms: strings(raw.platforms).filter((key) => !/[,:]/.test(key)).sort(compareAccountFilterPlatforms),
-    accountTypes: ['oauth', 'apikey'].filter((key) => types.has(key)),
+    platforms: platforms.length === 0 && rawPlatforms.includes(NO_ACCOUNT_FILTER) ? [NO_ACCOUNT_FILTER] : platforms,
+    accountTypes: accountTypes.length === 0 && types.has(NO_ACCOUNT_FILTER) ? [NO_ACCOUNT_FILTER] : accountTypes,
     plans: [...plans.values()].sort((a, b) => compareAccountFilterPlatforms(a.platform, b.platform) || a.key.localeCompare(b.key, 'en')),
     groupIds: ids(raw.groupIds),
     ungrouped: raw.ungrouped === true,
@@ -59,16 +63,17 @@ export function parseAccountPlanFilterIds(values: readonly string[]): AccountFil
   });
 }
 
-// Both the list and export use this encoder. Ordinary auth filters use the
-// established account_type contract; plan intersections additionally use auth_type.
+// Both list and export use the account_type OR union. Plans replace only the
+// OAuth branch, so API Key visibility depends solely on its icon.
 export function accountFiltersToQuery(filters: AccountFilters): AccountListFilter {
-  const types = filters.accountTypes.join(',');
-  const plans = filters.plans.map(accountPlanFilterId).join(',');
+  const types = filters.accountTypes.length ? filters.accountTypes : ['oauth', 'apikey'];
+  const accountTypes = types.flatMap((type) => type === 'oauth' && filters.plans.length
+    ? filters.plans.map(accountPlanFilterId) : [type]);
   return {
     platform: filters.platforms.join(',') || undefined,
     state: filters.states.join(',') || undefined,
-    account_type: plans || types || undefined,
-    auth_type: plans && types ? types : undefined,
+    account_type: filters.accountTypes.length === 0 && filters.plans.length === 0 ? undefined : accountTypes.join(','),
+    auth_type: undefined,
     group_id: filters.groupIds.join(',') || undefined,
     ungrouped: filters.ungrouped || undefined,
     proxy_id: filters.proxyIds.join(',') || undefined,

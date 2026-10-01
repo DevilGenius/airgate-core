@@ -474,7 +474,8 @@ export function useAccountTableColumns({
     const nextMeta = new Map<number, AccountRowRenderMeta>();
 
     for (const row of rows) {
-      const groupNames = (row.group_ids ?? []).map((gid) => groupMap.get(gid) ?? `#${gid}`);
+      // Keep newer groups first regardless of relation query order after filter changes.
+      const groupNames = [...(row.group_ids ?? [])].sort((a, b) => b - a).map((gid) => groupMap.get(gid) ?? `#${gid}`);
       const visibleGroups = groupNames.length > 3 ? groupNames.slice(0, 2) : groupNames.slice(0, 3);
 
       const rowMeta: AccountRowRenderMeta = {

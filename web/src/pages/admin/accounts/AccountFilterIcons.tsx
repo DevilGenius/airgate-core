@@ -3,6 +3,7 @@ import { KeyRound, Link, Server } from 'lucide-react';
 import { getPluginPlatformIcon, getPlatformIconVersion, onPlatformIconChange } from '../../../app/plugin-frontend-registry';
 import styles from './AccountFilterIcons.module.css';
 import { compareAccountFilterPlatforms } from './accountFilterOrder';
+import { NO_ACCOUNT_FILTER } from './accountFilterConstants';
 
 type Option = { key: string; label: string };
 const AUTH_OPTIONS = [{ key: 'oauth', label: 'OAuth', Icon: Link }, { key: 'apikey', label: 'API Key', Icon: KeyRound }] as const;
@@ -20,13 +21,15 @@ export const AccountFilterIcons = memo(function AccountFilterIcons({
 }) {
   useSyncExternalStore(onPlatformIconChange, getPlatformIconVersion, getPlatformIconVersion);
   const orderedPlatforms = useMemo(() => [...platforms].sort((a, b) => compareAccountFilterPlatforms(a.key, b.key)), [platforms]);
-  // Empty stored selections mean unrestricted (all), including new platforms.
+  // Empty stored selections mean all; the explicit marker keeps every icon off.
   const platformKeys = orderedPlatforms.map(({ key }) => key);
   const authKeys = AUTH_OPTIONS.map(({ key }) => key);
   const activePlatforms = selectedPlatforms.length ? selectedPlatforms : platformKeys;
   const activeTypes = selectedTypes.length ? selectedTypes : authKeys;
   const toggle = (selected: readonly string[], key: string, all: readonly string[]) => {
-    const next = selected.includes(key) ? selected.filter((value) => value !== key) : [...selected, key];
+    const current = selected.filter((value) => value !== NO_ACCOUNT_FILTER);
+    const next = current.includes(key) ? current.filter((value) => value !== key) : [...current, key];
+    if (next.length === 0) return [NO_ACCOUNT_FILTER];
     return all.every((value) => next.includes(value)) ? [] : next;
   };
   return (

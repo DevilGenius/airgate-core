@@ -53,12 +53,17 @@ const account: AccountResp = {
   updated_at: '',
 };
 
-function Harness({ usageData }: { usageData: AccountUsageData }) {
+function Harness({ usageData, row = account, groupMap = new Map(), columnKey = 'usage_window' }: {
+  usageData: AccountUsageData;
+  row?: AccountResp;
+  groupMap?: Map<number, string>;
+  columnKey?: string;
+}) {
   const { columns, rowMetaById } = useAccountTableColumns({
     accountPoolAdjustmentPlans: parseAccountPoolAdjustmentPlans(''),
     showAccountPoolAdjustedBaseFiveHour: false,
     capacityStore: new AccountCapacityStore(),
-    groupMap: new Map(),
+    groupMap,
     onClearRateLimitMarkers: vi.fn(),
     onDeleteAccount: vi.fn(),
     onEditAccount: vi.fn(),
@@ -69,12 +74,12 @@ function Harness({ usageData }: { usageData: AccountUsageData }) {
     platformFilter: 'openai',
     platformName: (platform) => platform,
     platformsKey: 'openaiopenai',
-    rows: [account],
+    rows: [row],
     usageData,
   });
-  const usageColumn = columns.find((column) => column.key === 'usage_window');
-  if (!usageColumn) throw new Error('usage column not found');
-  return usageColumn.render(account, rowMetaById.get(account.id)) as ReactNode;
+  const column = columns.find((column) => column.key === columnKey);
+  if (!column) throw new Error(`column ${columnKey} not found`);
+  return column.render(row, rowMetaById.get(row.id)) as ReactNode;
 }
 
 function RecentUsageHarness({ row }: { row: AccountResp }) {
@@ -107,6 +112,28 @@ describe('useAccountTableColumns usage refresh', () => {
     mocks.usageOne.mockResolvedValue({
       windows: [{ key: '5h', label: '5h', used_percent: 75, reset_after_seconds: 1800 }],
     });
+  });
+
+  it('keeps newer groups first in chips and the tooltip when refetches reorder group IDs', () => {
+    const client = new QueryClient();
+    const groupMap = new Map([[1, '第一组'], [2, '第二组'], [3, '第三组'], [4, '第四组']]);
+    const row = { ...account, group_ids: [4, 2, 3, 1] };
+    const view = (current: AccountResp) => (
+      <QueryClientProvider client={client}>
+        <Harness usageData={{ accounts: {} }} row={current} groupMap={groupMap} columnKey="groups" />
+      </QueryClientProvider>
+    );
+    const { container, rerender } = render(view(row));
+    const groupList = () => container.querySelector('.ag-account-group-list');
+    const chips = () => Array.from(container.querySelectorAll('.ag-account-group-chip')).map((chip) => chip.textContent);
+    expect(chips()).toEqual(['第四组', '第三组', '+2']);
+    expect(groupList()).toHaveAttribute('title', '第四组\n第三组\n第二组\n第一组');
+    for (const groupIds of [[1, 3, 2, 4], [3, 4, 1, 2]]) {
+      rerender(view({ ...row, group_ids: groupIds }));
+      expect(chips()).toEqual(['第四组', '第三组', '+2']);
+      expect(groupList()).toHaveAttribute('title', '第四组\n第三组\n第二组\n第一组');
+    }
+    expect(row.group_ids).toEqual([4, 2, 3, 1]);
   });
 
   it('compares observed ISO timestamps in the browser local timezone', () => {

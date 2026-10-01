@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { AccountFilterIcons } from './AccountFilterIcons';
 import { MonitorMultiFilterSelect } from '../monitor/MonitorFilterSelect';
 import * as registry from '../../../app/plugin-frontend-registry';
+import { NO_ACCOUNT_FILTER } from './accountFilterConstants';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -37,11 +38,16 @@ it('supports independent multiple platform and authentication selections, includ
   await user.click(screen.getByRole('button', { name: 'OpenAI' }));
   await user.click(screen.getByRole('button', { name: 'OAuth' }));
   expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(2);
+  await user.click(screen.getByRole('button', { name: 'Claude' }));
+  await user.click(screen.getByRole('button', { name: 'API Key' }));
+  expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0);
+  await user.click(screen.getByRole('button', { name: 'OpenAI' }));
+  expect(screen.getAllByRole('button', { pressed: true }).map((button) => button.getAttribute('aria-label'))).toEqual(['OpenAI']);
   const oauth = screen.getByRole('button', { name: 'OAuth' });
   oauth.focus();
   await user.keyboard(' ');
   expect(oauth).toHaveAttribute('aria-pressed', 'true');
-  expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(3);
+  expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(2);
   expect(subscribe).toHaveBeenCalledTimes(1);
 });
 
@@ -53,6 +59,8 @@ it('selects asynchronously loaded platforms by default without rewriting stored 
   const platforms = [{ key: 'openai', label: 'OpenAI' }, { key: 'claude', label: 'Claude' }];
   rerender(<AccountFilterIcons {...props} platforms={platforms} />);
   expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(4);
+  rerender(<AccountFilterIcons {...props} platforms={platforms} selectedPlatforms={[NO_ACCOUNT_FILTER]} selectedTypes={[NO_ACCOUNT_FILTER]} />);
+  expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0);
   rerender(<AccountFilterIcons {...props} platforms={platforms} selectedPlatforms={['claude']} selectedTypes={['apikey']} />);
   expect(screen.getByRole('button', { name: 'OpenAI' })).toHaveAttribute('aria-pressed', 'false');
   expect(screen.getByRole('button', { name: 'OAuth' })).toHaveAttribute('aria-pressed', 'false');

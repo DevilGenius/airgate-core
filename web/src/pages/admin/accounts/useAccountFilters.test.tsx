@@ -7,6 +7,7 @@ import { accountsApi } from '../../../shared/api/accounts';
 import { accountFiltersToQuery, normalizeAccountFilters } from './accountFilters';
 import { useAccountFilters } from './useAccountFilters';
 import { AccountFilterIcons } from './AccountFilterIcons';
+import { NO_ACCOUNT_FILTER } from './accountFilterConstants';
 
 const api = vi.hoisted(() => ({ get: vi.fn(async () => ({ list: [], total: 0 })) }));
 vi.mock('../../../shared/api/client', () => ({ get: api.get, post: vi.fn(), put: vi.fn(), patch: vi.fn(), del: vi.fn() }));
@@ -36,11 +37,12 @@ it('atomically merges rapid independent changes and persists explicit clearing',
     result.current.updateFilters({ plans: [{ platform: 'openai', key: 'plus' }] });
   });
   expect(result.current.filters).toMatchObject({ accountTypes: ['oauth'], platforms: ['openai'], groupIds: [2], plans: [{ platform: 'openai', key: 'plus' }] });
-  act(() => result.current.updateFilters({ accountTypes: [], plans: [], groupIds: [], states: [], proxyIds: [] }));
+  act(() => result.current.updateFilters({ accountTypes: [NO_ACCOUNT_FILTER], platforms: [NO_ACCOUNT_FILTER], plans: [], groupIds: [], states: [], proxyIds: [] }));
   unmount();
   window.history.replaceState(null, '', '/admin/accounts');
   const restored = renderHook(useAccountFilters);
-  expect(restored.result.current.filters).toMatchObject({ accountTypes: [], plans: [], groupIds: [], platforms: ['openai'] });
+  expect(restored.result.current.filters).toMatchObject({ accountTypes: [NO_ACCOUNT_FILTER], plans: [], groupIds: [], platforms: [NO_ACCOUNT_FILTER] });
+  expect(accountFiltersToQuery(restored.result.current.filters)).toMatchObject({ account_type: NO_ACCOUNT_FILTER, platform: NO_ACCOUNT_FILTER });
 });
 
 it('migrates existing per-field selections without turning a plan into an OAuth selection', () => {
@@ -87,7 +89,7 @@ it('issues new list requests for OAuth, API Key, both, and clearing the actual i
   render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>);
   await waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
   expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(3);
-  for (const [name, expected] of [['OAuth', 'apikey'], ['OAuth', undefined], ['API Key', 'oauth'], ['API Key', undefined]] as const) {
+  for (const [name, expected] of [['OAuth', 'apikey'], ['API Key', NO_ACCOUNT_FILTER], ['OAuth', 'oauth'], ['API Key', undefined]] as const) {
     const calls = api.get.mock.calls.length;
     await user.click(screen.getByRole('button', { name }));
     await waitFor(() => expect(api.get.mock.calls.length).toBeGreaterThan(calls));
@@ -95,5 +97,10 @@ it('issues new list requests for OAuth, API Key, both, and clearing the actual i
   }
   expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(3);
   expect(JSON.parse(window.localStorage.getItem(storageKey)!).accountTypes).toEqual([]);
+  await user.click(screen.getByRole('button', { name: 'OpenAI' }));
+  await waitFor(() => expect(api.get).toHaveBeenLastCalledWith('/api/v1/admin/accounts', expect.objectContaining({ platform: NO_ACCOUNT_FILTER })));
+  expect(screen.getByRole('button', { name: 'OpenAI' })).toHaveAttribute('aria-pressed', 'false');
+  await user.click(screen.getByRole('button', { name: 'OpenAI' }));
+  await waitFor(() => expect(api.get).toHaveBeenLastCalledWith('/api/v1/admin/accounts', expect.objectContaining({ platform: undefined })));
   client.clear();
 });
