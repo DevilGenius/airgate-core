@@ -9,6 +9,7 @@ import { AlertDialog, Button, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
+import { PlatformIcon } from '../../shared/ui/display/PlatformIcon';
 import { useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -243,8 +244,13 @@ export default function GroupsPage() {
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="inline-flex max-w-[6.5rem] items-center">
-                        <span className="truncate">{platformName(row.platform)}</span>
+                      <span
+                        className="inline-flex items-center"
+                        role="img"
+                        title={platformName(row.platform)}
+                        aria-label={platformName(row.platform)}
+                      >
+                        <PlatformIcon platform={row.platform} className="size-4" />
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>

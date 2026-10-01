@@ -201,8 +201,8 @@ export function CompatImportModal({
       description={t('accounts.compat_import_description')}
       dialogStyle={{
         height: 'min(800px, calc(100dvh - 2rem))',
-        maxWidth: '700px',
-        width: 'min(100%, calc(100vw - 2rem))',
+        maxWidth: '960px',
+        width: 'min(960px, calc(100vw - 2rem))',
       }}
       footer={(
         <div className="flex w-full justify-end gap-2">

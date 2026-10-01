@@ -117,13 +117,13 @@
 }
 
 .ag-usage-page .ag-column-visibility-menu .ag-toolbar-menu-popover {
-  left: 0;
-  right: auto;
   box-sizing: border-box;
   width: min(13.5rem, calc(100vw - 2rem));
   min-width: min(10.5rem, calc(100vw - 2rem));
   max-width: calc(100vw - 2rem);
-  overflow: hidden;
+  max-height: min(28rem, calc(100dvh - var(--ag-floating-top, 0px) - 0.75rem));
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .ag-usage-page .ag-column-visibility-menu .ag-toolbar-menu-list {
@@ -140,6 +140,11 @@
 
 .ag-usage-page .ag-column-visibility-menu .ag-toolbar-menu-item-check {
   width: 1.25rem;
+}
+
+.ag-usage-page .ag-column-visibility-menu .ag-toolbar-menu-item-label {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .ag-usage-rich-tooltip-content {
@@ -243,13 +248,6 @@
 .ag-usage-tooltip-divider {
   margin: var(--ag-usage-tooltip-divider-margin);
   border-top: 1px solid var(--ag-border);
-}
-
-@media (min-width: 1280px) {
-  .ag-usage-page .ag-column-visibility-menu .ag-toolbar-menu-popover {
-    left: auto;
-    right: 0;
-  }
 }
 
 .ag-usage-table {
