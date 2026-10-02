@@ -33,7 +33,7 @@ import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { createPagedRowsStructuralSharing } from '../../shared/utils/structuralSharing';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../shared/ui/metricTones';
-import { combineUsageTimingColumns, readUsageColumnSelection, usageTokensPerSecond } from './usage/usageTimingColumns';
+import { combineUsageTimingColumns, createUsageTpsColumn, readUsageColumnSelection } from './usage/usageTimingColumns';
 
 const UsageTokenTrendChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsageTokenTrendChart })),
@@ -187,16 +187,14 @@ const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
   'stream',
   'ws_dial_ms',
   'first_event_ms',
-  'first_token_ms',
-  'duration_ms',
+  'latency',
   'tps',
   'tokens',
   'cost',
   'endpoint',
   'api_key',
   'account_name',
-  'ip_address',
-  'user_agent',
+  'client',
 ] as const;
 
 type StoredAdminUsageFilters = {
@@ -302,7 +300,20 @@ function readAdminUsageColumnKeys() {
     const raw = window.localStorage.getItem(ADMIN_USAGE_COLUMN_STORAGE_KEY);
     if (!raw) return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
     const parsed = JSON.parse(raw);
-    return readUsageColumnSelection(parsed, ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
+    const keys = readUsageColumnSelection(parsed, ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
+    // Migrate the former separate IP and User-Agent preferences to the
+    // compact client column without resetting the rest of the user's layout.
+    if (keys.has('ip_address') || keys.has('user_agent')) {
+      keys.delete('ip_address');
+      keys.delete('user_agent');
+      keys.add('client');
+    }
+    if (keys.has('first_token_ms') || keys.has('duration_ms')) {
+      keys.delete('first_token_ms');
+      keys.delete('duration_ms');
+      keys.add('latency');
+    }
+    return keys;
   } catch {
     return new Set<string>(ADMIN_USAGE_DEFAULT_COLUMN_KEYS);
   }
@@ -870,7 +881,7 @@ export default function UsagePage() {
       }));
     const leadingSharedColumns = sharedColumns
       .slice(0, modelIdx + 1)
-      .map((column) => (column.key === 'model' ? { ...column, width: '224px' } : column));
+      .map((column) => (column.key === 'model' ? { ...column, width: '256px' } : column));
     const sharedColumnsAfterModel = sharedColumns
       .slice(modelIdx + 1)
       .filter((column) => !timingKeys.has(column.key) && column.key !== 'stream')
@@ -928,42 +939,33 @@ export default function UsagePage() {
         );
       },
     };
-    const userAgentColumn: UsageColumnConfig<UsageLogResp> = {
-      key: 'user_agent',
-      title: t('usage.user_agent', 'User-Agent'),
-      width: '184px',
-      hideOnMobile: true,
-      render: (row) => {
-        const rawUserAgent = compactText(row.user_agent);
-        const userAgent = displayUserAgent(row.user_agent);
-        return (
-          <span
-            className="block w-full min-w-0 max-w-full overflow-hidden text-left font-mono text-[11px] leading-tight tracking-tight text-text-secondary"
-            style={{
-              display: '-webkit-box',
-              overflowWrap: 'anywhere',
-              WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: 2,
-              whiteSpace: 'normal',
-            }}
-            title={rawUserAgent}
-          >
-            {userAgent}
-          </span>
-        );
-      },
-    };
-    const ipAddressColumn: UsageColumnConfig<UsageLogResp> = {
-      key: 'ip_address',
-      title: t('usage.ip_address', 'IP'),
-      width: '108px',
+    const clientColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'client',
+      title: t('usage.client', '客户端'),
+      width: '152px',
       hideOnMobile: true,
       render: (row) => {
         const ipAddress = compactText(row.ip_address);
+        const rawUserAgent = compactText(row.user_agent);
+        const userAgent = displayUserAgent(row.user_agent);
         return (
-          <span className="block max-w-full truncate font-mono text-xs leading-tight text-text-secondary" title={ipAddress}>
-            {ipAddress}
-          </span>
+          <div className="flex w-full min-w-0 flex-col items-start text-left" title={`${ipAddress}\n${rawUserAgent}`}>
+            <span className="block w-full truncate font-mono text-xs leading-tight text-text-secondary">
+              {ipAddress}
+            </span>
+            <span
+              className="block w-full min-w-0 max-w-full overflow-hidden font-mono text-[11px] leading-tight tracking-tight text-text-tertiary"
+              style={{
+                display: '-webkit-box',
+                overflowWrap: 'anywhere',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 1,
+                whiteSpace: 'normal',
+              }}
+            >
+              {userAgent}
+            </span>
+          </div>
         );
       },
     };
@@ -978,20 +980,7 @@ export default function UsagePage() {
         </span>
       ),
     };
-    const tpsColumn: UsageColumnConfig<UsageLogResp> = {
-      key: 'tps',
-      title: t('usage.tps'),
-      width: '72px',
-      hideOnMobile: true,
-      render: (row) => {
-        const rate = usageTokensPerSecond(row);
-        return (
-          <span className="block text-center font-mono text-[13px] tabular-nums text-text-secondary" title={t('usage.tps_hint')}>
-            {rate == null ? '-' : rate.toFixed(1)}
-          </span>
-        );
-      },
-    };
+    const tpsColumn = createUsageTpsColumn<UsageLogResp>(t);
     return [
       ...adminColumns,
       ...leadingSharedColumns,
@@ -1003,18 +992,23 @@ export default function UsagePage() {
       endpointColumn,
       apiKeyColumn,
       accountColumn,
-      ipAddressColumn,
-      userAgentColumn,
+      clientColumn,
     ] as UsageColumnConfig<UsageLogResp>[];
   }, [sharedColumns, t]);
 
-  const columnOptions = useMemo(
-    () => allColumns.map((column) => ({
-      key: column.key,
-      label: typeof column.title === 'string' ? column.title : column.key,
-    })),
-    [allColumns],
-  );
+  const columnOptions = useMemo(() => {
+    return allColumns
+      .flatMap((column) => {
+        if (column.key === 'duration_ms') return [];
+        if (column.key === 'first_token_ms') {
+          return [{ key: 'latency', label: `${t('usage.first_token')}/${t('usage.duration')}` }];
+        }
+        return [{
+          key: column.key,
+          label: typeof column.title === 'string' ? column.title : column.key,
+        }];
+      });
+  }, [allColumns, t]);
 
   const selectedVisibleColumnKeys = useMemo(
     () => new Set(columnOptions.map((option) => option.key).filter((key) => selectedColumnKeys.has(key))),
@@ -1042,7 +1036,12 @@ export default function UsagePage() {
   }, [selectedColumnKeys]);
 
   const columns = useMemo(() => {
-    const visible = allColumns.filter((column) => selectedVisibleColumnKeys.has(column.key));
+    const selectedActualKeys = new Set(selectedVisibleColumnKeys);
+    if (selectedVisibleColumnKeys.has('latency')) {
+      selectedActualKeys.add('first_token_ms');
+      selectedActualKeys.add('duration_ms');
+    }
+    const visible = allColumns.filter((column) => selectedActualKeys.has(column.key));
     return combineUsageTimingColumns(visible.length > 0 ? visible : allColumns.slice(0, 1));
   }, [allColumns, selectedVisibleColumnKeys]);
 

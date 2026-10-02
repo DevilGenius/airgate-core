@@ -32,6 +32,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { createPagedRowsStructuralSharing } from '../../shared/utils/structuralSharing';
 import { formatRateMultiplier } from '../../shared/utils/rateMultiplier';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../shared/ui/metricTones';
+import { combineUsageTimingColumns, createUsageTpsColumn } from '../admin/usage/usageTimingColumns';
 
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
 const USER_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.userUsageFilters;
@@ -399,8 +400,10 @@ export default function UserUsageContent() {
     const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
     const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
     const streamColumn = sharedColumns.find((column) => column.key === 'stream');
-    const timingKeys = new Set(['first_event_ms', 'duration_ms']);
-    const timingColumns = sharedColumns.filter((column) => timingKeys.has(column.key));
+    const timingKeys = new Set(['first_event_ms', 'first_token_ms', 'duration_ms']);
+    const timingColumns = combineUsageTimingColumns(
+      sharedColumns.filter((column) => timingKeys.has(column.key)),
+    );
     const sharedColumnsAfterModel = sharedColumns
       .slice(modelColumnIndex + 1)
       .filter((column) => !timingKeys.has(column.key) && column.key !== 'stream');
@@ -439,6 +442,7 @@ export default function UserUsageContent() {
         );
       },
     };
+    const tpsColumn = createUsageTpsColumn<UsageRow>(t);
     return modelColumnIndex >= 0
       ? [
           ...sharedColumns.slice(0, timeColumnIndex + 1),
@@ -446,11 +450,13 @@ export default function UserUsageContent() {
           ...sharedColumns.slice(timeColumnIndex + 1, modelColumnIndex + 1),
           ...(streamColumn ? [streamColumn] : []),
           ...timingColumns,
+          tpsColumn,
           ...sharedColumnsAfterModel,
           endpointColumn,
         ]
       : [
           ...sharedColumns,
+          tpsColumn,
           endpointColumn,
           ...(customerScope ? [] : [apiKeyColumn]),
         ];

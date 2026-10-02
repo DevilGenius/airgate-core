@@ -1,7 +1,11 @@
-import { usageLatencyTone, type UsageColumnConfig, type UsageLatencyTone } from '../../../shared/columns/usageColumns';
+import type { TFunction } from 'i18next';
+import { usageLatencyTone, type UsageColumnConfig, type UsageLatencyTone, type UsageRow } from '../../../shared/columns/usageColumns';
 import type { UsageLogResp } from '../../../shared/types';
 
 type TimingRow = Pick<UsageLogResp, 'output_tokens' | 'duration_ms' | 'first_token_ms' | 'stream' | 'account_type'>;
+
+const TPS_WARNING_THRESHOLD = 10;
+const TPS_GOOD_THRESHOLD = 30;
 
 const LATENCY_BAR_COLORS: Record<UsageLatencyTone, string> = {
   normal: 'var(--ag-success)',
@@ -9,7 +13,7 @@ const LATENCY_BAR_COLORS: Record<UsageLatencyTone, string> = {
   critical: 'var(--ag-danger)',
 };
 
-function latencyBarBackground(row: UsageLogResp): string {
+function latencyBarBackground(row: UsageRow): string {
   const firstTokenTone = usageLatencyTone(row.first_token_ms, 5_000, 15_000);
   const durationTone = usageLatencyTone(row.duration_ms, 30_000, 120_000);
   const top = firstTokenTone ? LATENCY_BAR_COLORS[firstTokenTone] : 'var(--ag-border)';
@@ -31,10 +35,53 @@ export function usageTokensPerSecond(row: TimingRow): number | null {
   return Number.isFinite(rate) ? rate : null;
 }
 
+/** Dot color bands: below 10 tps danger, below 30 warning, 30 and above good, no sample border. */
+function tpsDotClass(rate: number | null): string {
+  if (rate == null || !Number.isFinite(rate)) return 'bg-border';
+  if (rate >= TPS_GOOD_THRESHOLD) return 'bg-success';
+  if (rate >= TPS_WARNING_THRESHOLD) return 'bg-warning';
+  return 'bg-danger';
+}
+
+function formatTpsParts(rate: number | null): [string, string] {
+  if (rate == null || !Number.isFinite(rate)) return ['-', ''];
+  const compact = rate >= 10_000;
+  return [String(Math.round(compact ? rate / 1000 : rate)), compact ? 'k' : ''];
+}
+
+/**
+ * TPS column shared by the admin and the user usage tables.
+ * The value slot is three characters wide — the width of the English "TPS" header label —
+ * and the whole group stays centered, so with that header the last two digits land under
+ * "TP". Right alignment inside the slot keeps the last digit (or `k`) and the dot in the
+ * same column on every row; the wider Chinese header (生成速度) simply stays centered above
+ * the same group.
+ */
+export function createUsageTpsColumn<T extends UsageRow>(t: TFunction): UsageColumnConfig<T> {
+  return {
+    key: 'tps',
+    title: t('usage.tps'),
+    width: '72px',
+    hideOnMobile: true,
+    render: (row) => {
+      const rate = usageTokensPerSecond(row);
+      const [integerPart, suffix] = formatTpsParts(rate);
+      return (
+        <span className="inline-flex w-full items-center justify-center gap-[1ch] font-mono text-[13px] tabular-nums text-text-secondary" title={t('usage.tps_hint')}>
+          <span className="inline-block w-[3ch] text-right">
+            {integerPart}{suffix}
+          </span>
+          <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${tpsDotClass(rate)}`} />
+        </span>
+      );
+    },
+  };
+}
+
 /** Keep each metric's visibility preference while displaying two stacked columns. */
-export function combineUsageTimingColumns(
-  columns: UsageColumnConfig<UsageLogResp>[],
-): UsageColumnConfig<UsageLogResp>[] {
+export function combineUsageTimingColumns<T extends UsageRow>(
+  columns: UsageColumnConfig<T>[],
+): UsageColumnConfig<T>[] {
   const pairs = [
     ['ws_dial_ms', 'first_event_ms'],
     ['first_token_ms', 'duration_ms'],
@@ -60,10 +107,10 @@ export function combineUsageTimingColumns(
       key: bottomKey,
       title,
       width: top && bottom ? '96px' : '78px',
-      render: (row: UsageLogResp) => {
+      render: (row: T) => {
         const values = (
           <div className="flex flex-col items-center gap-1 text-center tabular-nums">
-            {[top, bottom].filter((item): item is UsageColumnConfig<UsageLogResp> => Boolean(item)).map((item) => (
+            {[top, bottom].filter((item): item is UsageColumnConfig<T> => Boolean(item)).map((item) => (
               <div key={item.key} title={typeof item.title === 'string' ? item.title : undefined}>
                 {item.render(row)}
               </div>

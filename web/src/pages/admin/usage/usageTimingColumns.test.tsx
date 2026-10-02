@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { TFunction } from 'i18next';
 import { formatTimingMs, usageLatencyTone, type UsageColumnConfig } from '../../../shared/columns/usageColumns';
 import type { UsageLogResp } from '../../../shared/types';
-import { combineUsageTimingColumns, readUsageColumnSelection, usageTokensPerSecond } from './usageTimingColumns';
+import { combineUsageTimingColumns, createUsageTpsColumn, readUsageColumnSelection, usageTokensPerSecond } from './usageTimingColumns';
 
 describe('admin usage timing columns', () => {
   it.each([
@@ -65,6 +66,49 @@ describe('admin usage timing columns', () => {
 
   it('omits both timing columns when all time metrics are hidden', () => {
     expect(combineUsageTimingColumns(columns.filter((column) => column.key === 'tps')).map((column) => column.key)).toEqual(['tps']);
+  });
+});
+
+describe('shared TPS column', () => {
+  const t = ((key: string) => key) as unknown as TFunction;
+  const column = createUsageTpsColumn<UsageLogResp>(t);
+  const renderTps = (row: Partial<UsageLogResp>) => renderToStaticMarkup(<div>{column.render(row as UsageLogResp)}</div>);
+
+  it('is shared by the admin and the user usage table with the same metadata', () => {
+    expect([column.key, column.title, column.width, column.hideOnMobile])
+      .toEqual(['tps', 'usage.tps', '72px', true]);
+  });
+
+  it('right-aligns the value in a three-character slot placed before the dot', () => {
+    const html = renderTps({ output_tokens: 300, duration_ms: 3000, first_token_ms: 1000, stream: true });
+    expect(html).toContain('w-[3ch] text-right');
+    expect(html.indexOf('150')).toBeGreaterThan(-1);
+    expect(html.indexOf('150')).toBeLessThan(html.indexOf('rounded-full'));
+  });
+
+  it.each([
+    [5, 'bg-danger'],
+    [9, 'bg-danger'],
+    [10, 'bg-warning'],
+    [29, 'bg-warning'],
+    [30, 'bg-success'],
+    [120, 'bg-success'],
+  ])('marks %s tps with the %s dot', (rate, expected) => {
+    const html = renderTps({ output_tokens: rate * 1000, duration_ms: 1_000_000, first_token_ms: 0, stream: true });
+    expect(html).toContain(expected);
+  });
+
+  it('falls back to a dash and a neutral dot when no sample is available', () => {
+    const html = renderTps({ output_tokens: 0, duration_ms: 0, stream: true });
+    expect(html).toContain('>-<');
+    expect(html).toContain('bg-border');
+  });
+
+  it('compacts rates at or above 10000 tps into k units', () => {
+    const html = renderTps({ output_tokens: 20_000, duration_ms: 1000, first_token_ms: 0, stream: true });
+    expect(html).toContain('20');
+    expect(html).toContain('k');
+    expect(html).not.toContain('20000');
   });
 });
 

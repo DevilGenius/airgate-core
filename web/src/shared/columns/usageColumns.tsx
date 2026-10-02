@@ -1125,7 +1125,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         </span>
       ),
     },
-    ...(adminView ? [firstTokenColumn] : []),
+    firstTokenColumn,
     {
       key: 'duration_ms',
       title: t('usage.duration'),
