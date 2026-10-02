@@ -59,39 +59,39 @@ type UsageLogResp struct {
 // 保留与普通用户使用记录一致的基础单价和分项成本明细；不暴露 actual_cost、
 // account_cost 以及组成最终计费的中间倍率，只返回客户最终倍率 effective_rate。
 type CustomerUsageLogResp struct {
-	ID                    int64             `json:"id"`
-	APIKeyID              int64             `json:"api_key_id"`
-	Platform              string            `json:"platform"`
-	Model                 string            `json:"model"`
-	InputTokens           int               `json:"input_tokens"`
-	OutputTokens          int               `json:"output_tokens"`
-	CachedInputTokens     int               `json:"cached_input_tokens"`
-	CacheCreationTokens   int               `json:"cache_creation_tokens"`
-	ReasoningOutputTokens int               `json:"reasoning_output_tokens"`
-	InputPrice            float64           `json:"input_price"`
-	OutputPrice           float64           `json:"output_price"`
-	CachedInputPrice      float64           `json:"cached_input_price"`
-	CacheCreationPrice    float64           `json:"cache_creation_price"`
-	InputCost             float64           `json:"input_cost"`
-	OutputCost            float64           `json:"output_cost"`
-	CachedInputCost       float64           `json:"cached_input_cost"`
-	CacheCreationCost     float64           `json:"cache_creation_cost"`
-	TotalCost             float64           `json:"total_cost"`
-	BilledCost            float64           `json:"cost"` // 客户视角："本次消耗 = X 美元"
-	EffectiveRate         float64           `json:"effective_rate"`
-	ServiceTier           string            `json:"service_tier,omitempty"`
-	Stream                bool              `json:"stream"`
-	DurationMs            int64             `json:"duration_ms"`
-	FirstEventMs          int64             `json:"first_event_ms"`
-	FirstTokenMs          int64             `json:"first_token_ms"`
-	WSDialMs              int64             `json:"ws_dial_ms"`
+	ID                    int64   `json:"id"`
+	APIKeyID              int64   `json:"api_key_id"`
+	Platform              string  `json:"platform"`
+	Model                 string  `json:"model"`
+	InputTokens           int     `json:"input_tokens"`
+	OutputTokens          int     `json:"output_tokens"`
+	CachedInputTokens     int     `json:"cached_input_tokens"`
+	CacheCreationTokens   int     `json:"cache_creation_tokens"`
+	ReasoningOutputTokens int     `json:"reasoning_output_tokens"`
+	InputPrice            float64 `json:"input_price"`
+	OutputPrice           float64 `json:"output_price"`
+	CachedInputPrice      float64 `json:"cached_input_price"`
+	CacheCreationPrice    float64 `json:"cache_creation_price"`
+	InputCost             float64 `json:"input_cost"`
+	OutputCost            float64 `json:"output_cost"`
+	CachedInputCost       float64 `json:"cached_input_cost"`
+	CacheCreationCost     float64 `json:"cache_creation_cost"`
+	TotalCost             float64 `json:"total_cost"`
+	BilledCost            float64 `json:"cost"` // 客户视角："本次消耗 = X 美元"
+	EffectiveRate         float64 `json:"effective_rate"`
+	ServiceTier           string  `json:"service_tier,omitempty"`
+	Stream                bool    `json:"stream"`
+	DurationMs            int64   `json:"duration_ms"`
+	FirstEventMs          int64   `json:"first_event_ms"`
+	FirstTokenMs          int64   `json:"first_token_ms"`
+	WSDialMs              int64   `json:"ws_dial_ms"`
 	// 客户端来源信息：都是该 Key 自身请求的 IP / User-Agent，用户端与管理端共用同一个“客户端”列。
-	UserAgent             string            `json:"user_agent,omitempty"`
-	IPAddress             string            `json:"ip_address,omitempty"`
-	Endpoint              string            `json:"endpoint,omitempty"`
-	ReasoningEffort       string            `json:"reasoning_effort,omitempty"` // 推理强度档位
-	UsageMetadata         map[string]string `json:"usage_metadata,omitempty"`
-	CreatedAt             string            `json:"created_at"`
+	UserAgent       string            `json:"user_agent,omitempty"`
+	IPAddress       string            `json:"ip_address,omitempty"`
+	Endpoint        string            `json:"endpoint,omitempty"`
+	ReasoningEffort string            `json:"reasoning_effort,omitempty"` // 推理强度档位
+	UsageMetadata   map[string]string `json:"usage_metadata,omitempty"`
+	CreatedAt       string            `json:"created_at"`
 }
 
 // UsageQuery 使用记录查询参数

@@ -1,8 +1,9 @@
 package handler
 
 import (
-	"github.com/DevilGenius/airgate-core/internal/adminevents"
 	"github.com/gin-gonic/gin"
+
+	"github.com/DevilGenius/airgate-core/internal/adminevents"
 )
 
 // EventHandler handles admin server event streams.
