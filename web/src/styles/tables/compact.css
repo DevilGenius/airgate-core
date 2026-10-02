@@ -145,6 +145,38 @@
   flex-direction: column;
 }
 
+/* Only the inner wrapper scrolls; reserve its scrollbar space even with few rows. */
+.ag-distribution-table-scroll.ag-dashboard-distribution-scroll {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+/* Row heights include their bottom border, so the viewport ends after row 15. */
+.ag-distribution-table-scroll > .ag-dashboard-distribution-table {
+  height: calc(var(--ag-compact-table-header-height) + 15 * var(--ag-compact-table-row-height));
+  flex: 0 0 auto;
+}
+
+.ag-dashboard-distribution-scroll .ag-dashboard-distribution-table > [data-slot="wrapper"] {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.ag-dashboard-distribution-table [data-slot="table"] {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.ag-dashboard-distribution-table .ag-compact-data-table-heading {
+  height: calc(var(--ag-compact-table-header-height) - 1px);
+}
+
+.ag-dashboard-distribution-table .ag-compact-data-table-cell {
+  height: calc(var(--ag-compact-table-row-height) - 1px);
+}
+
 .ag-markdown-table {
   --ag-table-row-background: var(--surface);
   --ag-table-row-alt-background: color-mix(in oklab, var(--surface-secondary) 62%, var(--surface) 38%);

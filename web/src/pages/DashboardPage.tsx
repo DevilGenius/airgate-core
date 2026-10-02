@@ -504,10 +504,10 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
 
   return (
     <Panel title={activeTitle} extra={distributionTabs}>
-      <div className="ag-distribution-table-scroll">
+      <div className="ag-distribution-table-scroll ag-dashboard-distribution-scroll">
         <CompactDataTable
           ariaLabel={activeTitle}
-          className="ag-compact-data-table--dense"
+          className="ag-compact-data-table--dense ag-dashboard-distribution-table"
           emptyText={t('common.no_data')}
           minWidth={480}
           rowKey={(row) => row.key}
