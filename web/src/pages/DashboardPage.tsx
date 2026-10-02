@@ -140,27 +140,38 @@ function GreenCost({ text, symbolClassName = 'text-success' }: { text: string; s
   );
 }
 
-/** 总量和可用时间使用卡片主字号，5h 小计与相邻卡片金额字体一致。 */
+function MutedSlashText({ text }: { text: string }) {
+  const parts = text.split('/');
+  return parts.map((part, index) => (
+    <Fragment key={`${part}-${index}`}>
+      {index > 0 ? <span className="mx-1 text-text-tertiary">/</span> : null}
+      {part}
+    </Fragment>
+  ));
+}
+
+/** 短期额度 / 时间使用主字号，5h 账号额度 / 时间使用小字。 */
 export function UsageEstimateCell({ estimate }: { estimate?: DashboardUsageEstimate }) {
   const { t } = useTranslation();
-  const total = estimate?.total;
-  const fiveHour = estimate?.five_hour;
-  if (total?.status !== 'ready' || total.remaining_cost == null) {
-    return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
-  }
-  const duration = total.remaining_minutes == null
-    ? '>1000h'
-    : fmtUsageEstimateDuration(total.remaining_minutes);
-  const cost = fmtUsageEstimateCost(total.remaining_cost);
-  if (!duration) return <span className="font-sans text-xs font-semibold text-text">{t('dashboard.usage_estimate_insufficient')}</span>;
+  const renderWindow = (window: DashboardUsageEstimate['total'] | undefined, compact = false) => {
+    if (window?.status !== 'ready' || window.remaining_cost == null) {
+      return <span className="font-sans text-xs">{t('dashboard.usage_estimate_insufficient')}</span>;
+    }
+    const duration = window.remaining_cost === 0 ? '0m' : window.remaining_minutes == null
+      ? '>1000h'
+      : fmtUsageEstimateDuration(window.remaining_minutes);
+    return (
+      <span className="inline-flex items-baseline gap-1">
+        <GreenCost text={fmtUsageEstimateCost(window.remaining_cost)} />
+        <span className={compact ? 'text-text-tertiary' : 'font-mono text-base leading-none text-text-tertiary'}>/</span>
+        <span>{duration || '-'}</span>
+      </span>
+    );
+  };
   return (
-    <span className="inline-flex items-baseline gap-x-1.5 whitespace-nowrap font-mono font-semibold leading-none text-text">
-      <span className="ag-dashboard-metric-value text-xl leading-none"><GreenCost text={cost} /></span>{' '}
-      <span className="font-sans text-xs font-semibold">
-        <GreenCost text={fiveHour?.status === 'ready' && fiveHour.remaining_cost != null
-          ? fmtUsageEstimateCost(fiveHour.remaining_cost) : '-'} />
-      </span>{' '}
-      <span className="ag-dashboard-metric-value text-xl leading-none">{duration}</span>
+    <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-1 font-mono font-semibold leading-none text-text">
+      <span className="ag-dashboard-metric-value whitespace-nowrap text-xl leading-none">{renderWindow(estimate?.total)}</span>{' '}
+      <span className="whitespace-nowrap text-xs leading-none">{renderWindow(estimate?.five_hour, true)}</span>
     </span>
   );
 }
@@ -177,7 +188,7 @@ function MetricCard({
   icon: ReactNode;
   meta: ReactNode;
   metaTone?: MetaTone;
-  title: string;
+  title: ReactNode;
   tone: MetricTone;
   value: ReactNode;
   valueSuffix?: string;
@@ -268,8 +279,8 @@ function PerformanceMetricCard({
     <Card density="compact" className="ag-dashboard-metric min-h-[72px]">
       <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
-          <div className="flex h-5 min-w-0 items-center gap-1 text-sm font-semibold tracking-normal text-text">
-            <span className="truncate">{title}</span>
+          <div className="flex h-5 min-w-0 items-center gap-1 text-sm font-semibold tracking-normal text-text-secondary">
+            <span className="truncate">{typeof title === 'string' ? <MutedSlashText text={title} /> : title}</span>
             {rpmTrend === 'up' ? (
               <MoveUp className="h-3.5 w-3.5 shrink-0 text-success" />
             ) : rpmTrend === 'down' ? (
@@ -278,24 +289,24 @@ function PerformanceMetricCard({
               <MoveRight className="h-3.5 w-3.5 shrink-0 text-black" />
             )}
           </div>
-          <div className="mt-auto flex min-w-0 items-baseline gap-x-2 whitespace-nowrap pt-1">
+          <div className="mt-auto flex min-w-0 items-baseline gap-x-1 whitespace-nowrap pt-1">
             {rpmTexts.map((rpmText, index) => (
               <Fragment key={index}>
                 {index > 0 ? (
-                  <span aria-hidden="true" className="font-mono text-base leading-none text-text">/</span>
+                  <span aria-hidden="true" className="font-mono text-base leading-none text-text-tertiary">/</span>
                 ) : null}
-                <span className="flex items-baseline gap-x-1.5">
+                <span className="flex items-baseline gap-x-1">
                   <span className="flex items-baseline gap-1">
-                    <span className="ag-dashboard-metric-value font-mono text-xl font-semibold leading-none text-text">
+                    <span className="ag-dashboard-metric-value font-mono text-xl font-semibold leading-none text-text-secondary">
                       {rpmText}
                     </span>
-                    <span className="text-[11px] font-medium leading-none text-text">{t('dashboard.rpm')}</span>
+                    <span className="text-[11px] font-medium leading-none text-text-secondary">{t('dashboard.rpm')}</span>
                   </span>
                   <span className="flex items-baseline gap-1">
-                    <span className="font-mono text-sm font-semibold leading-none text-text">
+                    <span className="font-mono text-sm font-semibold leading-none text-text-secondary">
                       {tpmTexts[index]}
                     </span>
-                    <span className="text-[11px] font-medium leading-none text-text">{t('dashboard.tpm')}</span>
+                    <span className="text-[11px] font-medium leading-none text-text-secondary">{t('dashboard.tpm')}</span>
                   </span>
                 </span>
               </Fragment>
@@ -347,7 +358,8 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         <Card.Content className="ag-dashboard-metric-content p-3">
         <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
           <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">
-            {t('dashboard.users_summary', { active: stats.active_users, total: stats.total_users })} {t('dashboard.new_users', { count: stats.new_users_today })}
+            <MutedSlashText text={t('dashboard.users_summary', { active: stats.active_users, total: stats.total_users })} />{' '}
+            {t('dashboard.new_users', { count: stats.new_users_today })}
           </div>
           <div className="mt-auto flex min-w-0 items-baseline gap-x-2 whitespace-nowrap pt-1">
               <span className="flex items-baseline gap-1">
@@ -379,7 +391,13 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         icon={<Activity className="h-5 w-5" />}
         tone="cyan"
         title={t('dashboard.today_requests')}
-        value={`${fmtNum(todayTextRequests)}/${fmtNum(todayImageRequests)}`}
+        value={(
+          <span className="inline-flex items-baseline gap-1">
+            <span>{fmtNum(todayTextRequests)}</span>
+            <span className="font-mono text-base leading-none text-text-tertiary">/</span>
+            <span>{fmtNum(todayImageRequests)}</span>
+          </span>
+        )}
         valueSuffix={t('dashboard.image_suffix')}
         meta={t('dashboard.alltime_requests', { count: fmtNum(stats.alltime_requests) } as Record<string, string>)}
       />
@@ -387,7 +405,13 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         icon={<Clock className="h-5 w-5" />}
         tone="rose"
         title={t('dashboard.avg_response')}
-        value={`${fmtDurationMs(stats.avg_first_event_ms)}/${fmtDurationMs(stats.avg_duration_ms)}`}
+        value={(
+          <span className="inline-flex items-baseline gap-1">
+            <span>{fmtDurationMs(stats.avg_first_event_ms)}</span>
+            <span className="font-mono text-base leading-none text-text-tertiary">/</span>
+            <span>{fmtDurationMs(stats.avg_duration_ms)}</span>
+          </span>
+        )}
         meta={
           (stats.avg_image_duration_ms ?? 0) > 0
             ? t('dashboard.image_response_time', { time: fmtDurationMs(stats.avg_image_duration_ms) })
@@ -409,7 +433,7 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         <Card.Content className="ag-dashboard-metric-content p-3">
           <div className="ag-dashboard-metric-copy flex flex-col self-stretch">
             <div className="flex h-5 min-w-0 items-center truncate text-sm font-semibold tracking-normal text-text">
-              {t('dashboard.usage_estimate')} (1min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_1m)} />/10min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_10m)} />)
+              {t('dashboard.usage_estimate')}(1min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_1m)} /><span className="mx-1 text-text-tertiary">/</span>10min-<GreenCost text={fmtCostPerMinute(stats.account_cost_per_minute_10m)} />)
             </div>
             <div className="mt-auto flex min-w-0 items-baseline whitespace-nowrap pt-1">
               <UsageEstimateCell estimate={usageEstimate} />

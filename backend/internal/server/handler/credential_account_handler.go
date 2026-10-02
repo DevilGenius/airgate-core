@@ -254,35 +254,22 @@ func isHTTP401Reason(reason string) bool {
 }
 
 func credentialUsageEstimateResp(stats appdashboard.Stats) dto.CredentialUsageEstimateResp {
-	insufficient := func() dto.CredentialUsageAvailabilityResp {
-		return dto.CredentialUsageAvailabilityResp{Status: "insufficient"}
+	// Keep both quota/time pairs consistent with the dashboard API.
+	estimate := toDashboardUsageEstimate(stats.UsageEstimates)
+	availability := func(window dto.DashboardUsageEstimateWindow) dto.CredentialUsageAvailabilityResp {
+		return dto.CredentialUsageAvailabilityResp{
+			AccountCount:          window.AccountCount,
+			Status:                window.Status,
+			AvailableMinutes:      window.RemainingMinutes,
+			AvailableStandardCost: window.RemainingCost,
+		}
 	}
-	result := dto.CredentialUsageEstimateResp{
+	return dto.CredentialUsageEstimateResp{
 		StandardCostPerMinute1M:  stats.AccountCostPerMinute1M,
 		StandardCostPerMinute10M: stats.AccountCostPerMinute10M,
-		Total:                    insufficient(),
-		FiveHour:                 insufficient(),
+		Total:                    availability(estimate.Total),
+		FiveHour:                 availability(estimate.FiveHour),
 	}
-	for _, estimate := range stats.UsageEstimates {
-		if estimate.Plan != "non_free" {
-			continue
-		}
-		for _, window := range estimate.Windows {
-			availability := dto.CredentialUsageAvailabilityResp{
-				AccountCount:          window.AccountCount,
-				Status:                window.Status,
-				AvailableMinutes:      window.RemainingMinutes,
-				AvailableStandardCost: window.RemainingCost,
-			}
-			switch window.Window {
-			case "total":
-				result.Total = availability
-			case "5h":
-				result.FiveHour = availability
-			}
-		}
-	}
-	return result
 }
 
 func credentialAccountResp(account appaccount.Account, current int) dto.CredentialAccountResp {

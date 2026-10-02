@@ -10,12 +10,20 @@ import {
 } from './DashboardPage';
 
 describe('dashboard usage estimate formatting', () => {
-  it('shows the short-term total, 5h subtotal, and duration of the total', () => {
+  it('pairs each quota with its own duration', () => {
     const markup = renderToStaticMarkup(createElement(UsageEstimateCell, { estimate: {
       total: { status: 'ready', account_count: 5, remaining_cost: 3150, remaining_minutes: 315 },
       five_hour: { status: 'ready', account_count: 2, remaining_cost: 150, remaining_minutes: 15 },
     } }));
-    expect(markup.replace(/<[^>]*>/g, '')).toBe('$3.2K $150 5h15m');
+    expect(markup.replace(/<[^>]*>/g, '')).toBe('$3.2K / 5h15m $150 / 15m');
+  });
+
+  it('distinguishes exhausted and idle windows independently', () => {
+    const markup = renderToStaticMarkup(createElement(UsageEstimateCell, { estimate: {
+      total: { status: 'ready', account_count: 5, remaining_cost: 900 },
+      five_hour: { status: 'ready', account_count: 0, remaining_cost: 0 },
+    } }));
+    expect(markup.replace(/<[^>]*>/g, '').replace(/&gt;/g, '>')).toBe('$900 / >1000h $0 / 0m');
   });
 
   it('formats account cost rates compactly', () => {

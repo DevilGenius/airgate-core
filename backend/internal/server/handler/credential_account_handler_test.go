@@ -343,6 +343,10 @@ func TestCredentialUsageEstimateRespMapsShortTermTotalAndFiveHour(t *testing.T) 
 		t.Fatalf("credential estimate = %+v", result)
 	}
 	dashboard := toDashboardStatsResp(stats).UsageEstimate
+	if result.FiveHour.AvailableMinutes == nil || *result.FiveHour.AvailableMinutes != fiveMinutes ||
+		dashboard.FiveHour.RemainingMinutes == nil || *dashboard.FiveHour.RemainingMinutes != fiveMinutes {
+		t.Fatalf("5h duration mismatch: credential=%+v dashboard=%+v", result.FiveHour, dashboard.FiveHour)
+	}
 	if dashboard.Total.RemainingCost == nil || *dashboard.Total.RemainingCost != totalCost || dashboard.FiveHour.RemainingCost == nil || *dashboard.FiveHour.RemainingCost != fiveCost || dashboard.Total.RemainingMinutes == nil || *dashboard.Total.RemainingMinutes != totalMinutes {
 		t.Fatalf("dashboard estimate = %+v", dashboard)
 	}
