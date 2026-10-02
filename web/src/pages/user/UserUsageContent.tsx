@@ -13,7 +13,7 @@ import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
 import { Activity, DollarSign, Clock, Gauge, Percent, Sigma, Upload } from 'lucide-react';
 import type { UsageQuery } from '../../shared/types';
-import { UsageRichTooltipProvider, useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
+import { UsageRichTooltipProvider, createUsageClientColumn, useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey, getTokenAPIKeyID } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
 import { RecordsTable } from '../../shared/components/RecordsTable';
@@ -443,6 +443,7 @@ export default function UserUsageContent() {
       },
     };
     const tpsColumn = createUsageTpsColumn<UsageRow>(t);
+    const clientColumn = createUsageClientColumn(t);
     return modelColumnIndex >= 0
       ? [
           ...sharedColumns.slice(0, timeColumnIndex + 1),
@@ -453,12 +454,14 @@ export default function UserUsageContent() {
           tpsColumn,
           ...sharedColumnsAfterModel,
           endpointColumn,
+          clientColumn,
         ]
       : [
           ...sharedColumns,
           tpsColumn,
           endpointColumn,
           ...(customerScope ? [] : [apiKeyColumn]),
+          clientColumn,
         ];
   }, [customerScope, sharedColumns, t]);
 

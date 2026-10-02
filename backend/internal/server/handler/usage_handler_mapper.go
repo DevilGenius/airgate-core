@@ -91,6 +91,8 @@ func toCustomerUsageLogResp(record appusage.LogRecord) dto.CustomerUsageLogResp 
 		FirstEventMs:          record.FirstEventMs,
 		FirstTokenMs:          record.FirstTokenMs,
 		WSDialMs:              record.WSDialMs,
+		UserAgent:             record.UserAgent,
+		IPAddress:             record.IPAddress,
 		Endpoint:              record.Endpoint,
 		ReasoningEffort:       record.ReasoningEffort,
 		UsageMetadata:         record.UsageMetadata,

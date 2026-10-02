@@ -899,6 +899,71 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
   };
 }
 
+function compactClientText(value: string | undefined, fallback = '-') {
+  const trimmed = value?.trim();
+  return trimmed || fallback;
+}
+
+// UA 串在行渲染路径上高度重复，正则裁剪结果做有界缓存，避免每行每次渲染都跑正则链。
+const USER_AGENT_DISPLAY_CACHE_LIMIT = 500;
+const userAgentDisplayCache = new Map<string, string>();
+
+function displayUserAgent(value: string | undefined) {
+  const raw = compactClientText(value);
+  if (raw === '-') return raw;
+
+  const cached = userAgentDisplayCache.get(raw);
+  if (cached !== undefined) return cached;
+
+  const display = raw
+    .replace(/^Mozilla\/5\.0\s*(?:\([^)]*\)\s*)?/i, '')
+    .replace(/^AppleWebKit\/[\d.]+\s*(?:\([^)]*\)\s*)?/i, '')
+    .replace(/\s+AppleWebKit\/[\d.]+\s*(?:\([^)]*\)\s*)?/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const result = display || raw;
+  if (userAgentDisplayCache.size >= USER_AGENT_DISPLAY_CACHE_LIMIT) {
+    userAgentDisplayCache.clear();
+  }
+  userAgentDisplayCache.set(raw, result);
+  return result;
+}
+
+/** 客户端列：上行 IP、下行 User-Agent 的两行排版，管理端与用户端共用。 */
+export function createUsageClientColumn(t: TFunction): UsageColumnConfig<UsageRow> {
+  return {
+    key: 'client',
+    title: t('usage.client'),
+    width: '152px',
+    hideOnMobile: true,
+    render: (row) => {
+      const ipAddress = compactClientText(row.ip_address);
+      const rawUserAgent = compactClientText(row.user_agent);
+      const userAgent = displayUserAgent(row.user_agent);
+      return (
+        <div className="flex w-full min-w-0 flex-col items-start text-left" title={`${ipAddress}\n${rawUserAgent}`}>
+          <span className="block w-full truncate font-mono text-xs leading-tight text-text-secondary">
+            {ipAddress}
+          </span>
+          <span
+            className="block w-full min-w-0 max-w-full overflow-hidden font-mono text-[11px] leading-tight tracking-tight text-text-tertiary"
+            style={{
+              display: '-webkit-box',
+              overflowWrap: 'anywhere',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 1,
+              whiteSpace: 'normal',
+            }}
+          >
+            {userAgent}
+          </span>
+        </div>
+      );
+    },
+  };
+}
+
 /**
  * 使用记录表格的共享列定义。
  * 管理端和用户端共用，管理端额外在前面插入 user / api_key / account 列。

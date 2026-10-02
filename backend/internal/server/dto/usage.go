@@ -85,6 +85,9 @@ type CustomerUsageLogResp struct {
 	FirstEventMs          int64             `json:"first_event_ms"`
 	FirstTokenMs          int64             `json:"first_token_ms"`
 	WSDialMs              int64             `json:"ws_dial_ms"`
+	// 客户端来源信息：都是该 Key 自身请求的 IP / User-Agent，用户端与管理端共用同一个“客户端”列。
+	UserAgent             string            `json:"user_agent,omitempty"`
+	IPAddress             string            `json:"ip_address,omitempty"`
 	Endpoint              string            `json:"endpoint,omitempty"`
 	ReasoningEffort       string            `json:"reasoning_effort,omitempty"` // 推理强度档位
 	UsageMetadata         map[string]string `json:"usage_metadata,omitempty"`

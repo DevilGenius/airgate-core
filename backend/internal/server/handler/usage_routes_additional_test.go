@@ -186,6 +186,7 @@ func TestUsageRoutesReturnScopedAndAdminPayloads(t *testing.T) {
 	if !strings.Contains(w.Body.String(), `"cost":1.2`) || !strings.Contains(w.Body.String(), `"effective_rate":1.875`) ||
 		!strings.Contains(w.Body.String(), `"input_price":0.1`) || !strings.Contains(w.Body.String(), `"cached_input_price":0.03`) ||
 		!strings.Contains(w.Body.String(), `"input_cost":0.5`) || !strings.Contains(w.Body.String(), `"total_cost":0.82`) ||
+		!strings.Contains(w.Body.String(), `"user_agent":"agent"`) || !strings.Contains(w.Body.String(), `"ip_address":"127.0.0.1"`) ||
 		strings.Contains(w.Body.String(), `"rate_multiplier"`) || strings.Contains(w.Body.String(), `"sell_rate"`) ||
 		strings.Contains(w.Body.String(), `"actual_cost"`) || strings.Contains(w.Body.String(), `"account_cost"`) {
 		t.Fatalf("scoped usage body leaked reseller/account fields: %s", w.Body.String())

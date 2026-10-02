@@ -9,7 +9,7 @@ import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { isUsagePaginationExpired, useUsagePageIndex } from '../../shared/hooks/useUsagePageIndex';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { Activity, ChevronDown, ChevronUp, Columns3, DollarSign, Sigma } from 'lucide-react';
-import { UsageRichTooltipProvider, useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
+import { UsageRichTooltipProvider, createUsageClientColumn, useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { RecordsTable } from '../../shared/components/RecordsTable';
@@ -213,11 +213,6 @@ type AdminUsageFilterState = {
   userLabel: string;
 };
 
-function compactText(value: string | undefined, fallback = '-') {
-  const trimmed = value?.trim();
-  return trimmed || fallback;
-}
-
 function formatUsageTimingMs(value: number) {
   if (!Number.isFinite(value) || value <= 0) return '-';
   return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
@@ -325,32 +320,6 @@ function writeAdminUsageColumnKeys(keys: Set<string>) {
   } catch {
     // localStorage may be unavailable in restricted browser modes.
   }
-}
-
-// UA 串在行渲染路径上高度重复，正则裁剪结果做有界缓存，避免每行每次渲染都跑正则链。
-const USER_AGENT_DISPLAY_CACHE_LIMIT = 500;
-const userAgentDisplayCache = new Map<string, string>();
-
-function displayUserAgent(value: string | undefined) {
-  const raw = compactText(value);
-  if (raw === '-') return raw;
-
-  const cached = userAgentDisplayCache.get(raw);
-  if (cached !== undefined) return cached;
-
-  const display = raw
-    .replace(/^Mozilla\/5\.0\s*(?:\([^)]*\)\s*)?/i, '')
-    .replace(/^AppleWebKit\/[\d.]+\s*(?:\([^)]*\)\s*)?/i, '')
-    .replace(/\s+AppleWebKit\/[\d.]+\s*(?:\([^)]*\)\s*)?/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const result = display || raw;
-  if (userAgentDisplayCache.size >= USER_AGENT_DISPLAY_CACHE_LIMIT) {
-    userAgentDisplayCache.clear();
-  }
-  userAgentDisplayCache.set(raw, result);
-  return result;
 }
 
 // ==================== 分布表格卡片 ====================
@@ -939,36 +908,7 @@ export default function UsagePage() {
         );
       },
     };
-    const clientColumn: UsageColumnConfig<UsageLogResp> = {
-      key: 'client',
-      title: t('usage.client', '客户端'),
-      width: '152px',
-      hideOnMobile: true,
-      render: (row) => {
-        const ipAddress = compactText(row.ip_address);
-        const rawUserAgent = compactText(row.user_agent);
-        const userAgent = displayUserAgent(row.user_agent);
-        return (
-          <div className="flex w-full min-w-0 flex-col items-start text-left" title={`${ipAddress}\n${rawUserAgent}`}>
-            <span className="block w-full truncate font-mono text-xs leading-tight text-text-secondary">
-              {ipAddress}
-            </span>
-            <span
-              className="block w-full min-w-0 max-w-full overflow-hidden font-mono text-[11px] leading-tight tracking-tight text-text-tertiary"
-              style={{
-                display: '-webkit-box',
-                overflowWrap: 'anywhere',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: 1,
-                whiteSpace: 'normal',
-              }}
-            >
-              {userAgent}
-            </span>
-          </div>
-        );
-      },
-    };
+    const clientColumn = createUsageClientColumn(t);
     const wsDialColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'ws_dial_ms',
       title: t('usage.ws_dial', 'WS'),

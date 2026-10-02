@@ -141,12 +141,15 @@ func TestDashboardAndUsageMappers(t *testing.T) {
 		CacheCreationTokens:   11,
 		ReasoningOutputTokens: 22,
 		ReasoningEffort:       "high",
+		UserAgent:             "agent",
+		IPAddress:             "127.0.0.1",
 	})
 	if logResp.ActualCost != 1.2 || logResp.EffectiveRate != 2.4 || !logResp.AccountDeleted ||
 		customerResp.BilledCost != 2.4 || customerResp.EffectiveRate != 2.4 || customerResp.Model != "gpt" ||
 		customerResp.InputPrice != 2.5 || customerResp.CachedInputPrice != 0.25 ||
 		customerResp.InputCost != 0.5 || customerResp.CachedInputCost != 0.05 || customerResp.TotalCost != 1 ||
-		customerResp.CacheCreationTokens != 11 || customerResp.ReasoningOutputTokens != 22 || customerResp.ReasoningEffort != "high" {
+		customerResp.CacheCreationTokens != 11 || customerResp.ReasoningOutputTokens != 22 || customerResp.ReasoningEffort != "high" ||
+		customerResp.UserAgent != "agent" || customerResp.IPAddress != "127.0.0.1" {
 		t.Fatalf("用量日志响应异常: full=%+v customer=%+v", logResp, customerResp)
 	}
 

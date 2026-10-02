@@ -656,6 +656,9 @@ export interface CustomerUsageLogResp {
   first_event_ms: number;
   first_token_ms: number;
   ws_dial_ms: number;
+  /** 客户端来源信息：该 Key 自身请求的 IP / User-Agent，与管理端共用“客户端”列。 */
+  user_agent?: string;
+  ip_address?: string;
   /** 请求端点 */
   endpoint?: string;
   /** 推理强度档位 */
