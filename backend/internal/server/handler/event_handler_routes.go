@@ -11,6 +11,13 @@ const adminEventsPingInterval = 15 * time.Second
 
 // StreamAdminEvents keeps an authenticated admin SSE connection open.
 func (h *EventHandler) StreamAdminEvents(c *gin.Context) {
+	h.streamEvents(c)
+}
+
+// streamEvents serves both administrator and credential-management clients.
+// All payloads come from the in-memory event hub; no persistence dependency is
+// accessed after the route middleware has authenticated the request.
+func (h *EventHandler) streamEvents(c *gin.Context) {
 	w := c.Writer
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache, no-transform")

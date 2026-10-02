@@ -247,6 +247,8 @@ func (s *Server) registerRoutes() {
 	credentialGroup := v1.Group("/credentials")
 	credentialGroup.Use(middleware.PublicRateLimit(20, time.Minute), middleware.CredentialKeyAuth(s.db))
 	{
+		// 凭证管理页事件流复用内存 Hub；连接建立后不执行数据库读写。
+		credentialGroup.GET("/accounts/events", handlers.Event.StreamCredentialEvents)
 		credentialGroup.POST("/accounts/overview", handlers.CredentialAccount.GetOverview)
 		credentialGroup.POST("/accounts/import/compat", handlers.CredentialImport.ImportCompatibleAccounts)
 		credentialGroup.POST("/accounts/delete", handlers.CredentialImport.DeleteAccount)

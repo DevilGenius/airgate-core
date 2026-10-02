@@ -34,3 +34,27 @@ func TestStreamAdminEventsSendsInitialEvent(t *testing.T) {
 		t.Fatalf("expected sequence baseline, got %q", body)
 	}
 }
+
+func TestStreamCredentialEventsSendsInitialEventWithoutPersistence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	ctx, cancel := context.WithCancel(context.Background())
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/credentials/accounts/events", nil).WithContext(ctx)
+
+	// Cancel after the handler has entered the stream. A nil hub is valid and
+	// exercises the same no-persistence path used by the real in-memory hub.
+	cancel()
+	NewEventHandler(nil).StreamCredentialEvents(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	if got := w.Header().Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected text/event-stream, got %q", got)
+	}
+	if body := w.Body.String(); !strings.Contains(body, `"type":"connected"`) {
+		t.Fatalf("expected connected event, got %q", body)
+	}
+}
