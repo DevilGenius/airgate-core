@@ -1,7 +1,21 @@
-import type { UsageColumnConfig } from '../../../shared/columns/usageColumns';
+import { usageLatencyTone, type UsageColumnConfig, type UsageLatencyTone } from '../../../shared/columns/usageColumns';
 import type { UsageLogResp } from '../../../shared/types';
 
 type TimingRow = Pick<UsageLogResp, 'output_tokens' | 'duration_ms' | 'first_token_ms' | 'stream' | 'account_type'>;
+
+const LATENCY_BAR_COLORS: Record<UsageLatencyTone, string> = {
+  normal: 'var(--ag-success)',
+  slow: 'var(--ag-warning)',
+  critical: 'var(--ag-danger)',
+};
+
+function latencyBarBackground(row: UsageLogResp): string {
+  const firstTokenTone = usageLatencyTone(row.first_token_ms, 5_000, 15_000);
+  const durationTone = usageLatencyTone(row.duration_ms, 30_000, 120_000);
+  const top = firstTokenTone ? LATENCY_BAR_COLORS[firstTokenTone] : 'var(--ag-border)';
+  const bottom = durationTone ? LATENCY_BAR_COLORS[durationTone] : 'var(--ag-border)';
+  return `linear-gradient(to bottom, ${top} 0%, ${top} 42%, ${bottom} 58%, ${bottom} 100%)`;
+}
 
 /** Output tokens already include reasoning tokens; never add them a second time. */
 export function usageTokensPerSecond(row: TimingRow): number | null {
@@ -40,20 +54,34 @@ export function combineUsageTimingColumns(
         ? `${top.title}/${bottom.title}`
         : <>{top.title}/{bottom.title}</>
       : (top ?? bottom)!.title;
+    const isLatencyPair = topKey === 'first_token_ms' && bottomKey === 'duration_ms';
     return [{
       ...column,
       key: bottomKey,
       title,
       width: top && bottom ? '96px' : '78px',
-      render: (row: UsageLogResp) => (
-        <div className="flex flex-col items-center gap-1 text-center tabular-nums">
-          {[top, bottom].filter((item): item is UsageColumnConfig<UsageLogResp> => Boolean(item)).map((item) => (
-            <div key={item.key} title={typeof item.title === 'string' ? item.title : undefined}>
-              {item.render(row)}
-            </div>
-          ))}
-        </div>
-      ),
+      render: (row: UsageLogResp) => {
+        const values = (
+          <div className="flex flex-col items-center gap-1 text-center tabular-nums">
+            {[top, bottom].filter((item): item is UsageColumnConfig<UsageLogResp> => Boolean(item)).map((item) => (
+              <div key={item.key} title={typeof item.title === 'string' ? item.title : undefined}>
+                {item.render(row)}
+              </div>
+            ))}
+          </div>
+        );
+        if (!isLatencyPair) return values;
+        return (
+          <div className="flex items-stretch justify-center gap-px">
+            <span
+              aria-hidden="true"
+              className="my-0.5 w-[3px] shrink-0 rounded-full"
+              style={{ background: latencyBarBackground(row) }}
+            />
+            {values}
+          </div>
+        );
+      },
     }];
   });
 }

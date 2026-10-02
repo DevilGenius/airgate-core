@@ -1,10 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { UsageColumnConfig } from '../../../shared/columns/usageColumns';
+import { formatTimingMs, usageLatencyTone, type UsageColumnConfig } from '../../../shared/columns/usageColumns';
 import type { UsageLogResp } from '../../../shared/types';
 import { combineUsageTimingColumns, readUsageColumnSelection, usageTokensPerSecond } from './usageTimingColumns';
 
 describe('admin usage timing columns', () => {
+  it.each([
+    [4999, 5000, 15000, 'normal'],
+    [5000, 5000, 15000, 'slow'],
+    [14999, 5000, 15000, 'slow'],
+    [15000, 5000, 15000, 'critical'],
+    [0, 5000, 15000, null],
+  ] as const)('classifies latency boundaries: %s ms => %s', (value, warningAt, criticalAt, expected) => {
+    expect(usageLatencyTone(value, warningAt, criticalAt)).toBe(expected);
+  });
+
+  it.each([
+    [120, '0.12s'],
+    [999, '0.99s'],
+    [60_000, '1m'],
+    [61_000, '1m 1s'],
+    [119_600, '2m'],
+    [59_999, '60.00s'],
+  ] as const)('formats long latency %s ms as %s', (value, expected) => {
+    expect(formatTimingMs(value)).toBe(expected);
+  });
+
   const metric = (key: string, title: string): UsageColumnConfig<UsageLogResp> => ({
     key, title, render: () => <span>{key}</span>,
   });

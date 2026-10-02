@@ -39,10 +39,41 @@ const RICH_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const RICH_TOOLTIP_WIDTH_PX = 336;
 const RICH_TOOLTIP_ESTIMATED_HALF_HEIGHT_PX = 160;
 
-function formatTimingMs(value: number): string {
+export function formatTimingMs(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '-';
-  return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
+  if (value >= 60_000) {
+    const totalSeconds = Math.round(value / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  const seconds = value < 1000 ? Math.floor(value / 10) / 100 : value / 1000;
+  return `${seconds.toFixed(2)}s`;
 }
+
+/** Latency bands used by the compact first-token/total-duration cell. */
+export type UsageLatencyTone = 'normal' | 'slow' | 'critical';
+
+export function usageLatencyTone(value: number, warningAt: number, criticalAt: number): UsageLatencyTone | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (value >= criticalAt) return 'critical';
+  if (value >= warningAt) return 'slow';
+  return 'normal';
+}
+
+function usageLatencyClass(tone: UsageLatencyTone | null): string {
+  switch (tone) {
+    case 'critical': return 'text-danger';
+    case 'slow': return 'text-warning';
+    case 'normal': return 'text-success';
+    default: return 'text-text-tertiary';
+  }
+}
+
+const FIRST_TOKEN_WARNING_MS = 5_000;
+const FIRST_TOKEN_CRITICAL_MS = 15_000;
+const DURATION_WARNING_MS = 30_000;
+const DURATION_CRITICAL_MS = 120_000;
 
 function isImageGenerationModel(model: string): boolean {
   return model.trim().toLowerCase().startsWith('gpt-image');
@@ -891,11 +922,14 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       // 与管理端 72px 的纯时间列合计 142px，保持新增 TTFT 前的总列宽不变。
       width: '70px',
       hideOnMobile: true,
-      render: (row) => (
-        <span className="block text-center font-mono text-[13px] text-text-tertiary">
-          {formatTimingMs(row.first_token_ms)}
-        </span>
-      ),
+      render: (row) => {
+        const tone = usageLatencyTone(row.first_token_ms, FIRST_TOKEN_WARNING_MS, FIRST_TOKEN_CRITICAL_MS);
+        return (
+          <span className={`block w-[4rem] text-right font-mono text-[13px] tabular-nums ${usageLatencyClass(tone)}`}>
+            {formatTimingMs(row.first_token_ms)}
+          </span>
+        );
+      },
     };
 
     return [
@@ -1097,11 +1131,14 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       title: t('usage.duration'),
       width: '76px',
       hideOnMobile: true,
-      render: (row) => (
-        <span className="block text-center font-mono text-[13px] text-text-secondary">
-          {row.duration_ms >= 1000 ? `${(row.duration_ms / 1000).toFixed(2)}s` : `${row.duration_ms}ms`}
-        </span>
-      ),
+      render: (row) => {
+        const tone = usageLatencyTone(row.duration_ms, DURATION_WARNING_MS, DURATION_CRITICAL_MS);
+        return (
+          <span className={`block w-[4rem] text-right font-mono text-[13px] tabular-nums ${usageLatencyClass(tone)}`}>
+            {formatTimingMs(row.duration_ms)}
+          </span>
+        );
+      },
     },
     ];
   }, [adminView, costDetailVersion, customerScope, metricDetailVersion, modelMetaVersion, t]);
