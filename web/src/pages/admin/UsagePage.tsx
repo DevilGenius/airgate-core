@@ -1,17 +1,16 @@
 import { PageToolbarFrame } from '../../shared/components/PageToolbar';
-import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { memo, startTransition, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card } from '../../shared/components/Card';
-import { Skeleton, Tabs } from '@heroui/react';
+import { Skeleton } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { isUsagePaginationExpired, useUsagePageIndex } from '../../shared/hooks/useUsagePageIndex';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { Activity, ChevronDown, ChevronUp, Columns3, DollarSign, Sigma } from 'lucide-react';
+import { Activity, Columns3, DollarSign, Sigma } from 'lucide-react';
 import { UsageRichTooltipProvider, createUsageClientColumn, useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
-import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
-import { CompactDataTable } from '../../shared/components/CompactDataTable';
+import type { UsageLogResp, UsageQuery } from '../../shared/types';
 import { RecordsTable } from '../../shared/components/RecordsTable';
 import { TablePage } from '../../shared/components/TablePage';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
@@ -22,12 +21,11 @@ import {
   UserOrAPIKeySearchFilterComboBox,
   type UserOrAPIKeySearchSelection,
 } from '../../shared/components/UserOrAPIKeySearchFilterComboBox';
-import { DISTRIBUTION_COLORS, PAGE_SIZE_OPTIONS } from '../../shared/constants';
+import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
 import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
-import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { STORAGE_KEYS } from '../../shared/storageKeys';
 import { getTotalPages } from '../../shared/utils/pagination';
@@ -35,42 +33,12 @@ import { createPagedRowsStructuralSharing } from '../../shared/utils/structuralS
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../shared/ui/metricTones';
 import { combineUsageTimingColumns, createUsageTpsColumn, readUsageColumnSelection } from './usage/usageTimingColumns';
 
-const UsageTokenTrendChart = lazy(() =>
-  import('./usage/UsageCharts').then((m) => ({ default: m.UsageTokenTrendChart })),
-);
-
 const EMPTY_USAGE_ROWS: UsageLogResp[] = [];
 const shareAdminUsageRows = createPagedRowsStructuralSharing<UsageLogResp>();
-
-const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 
 interface ColumnVisibilityOption {
   key: string;
   label: string;
-}
-
-function SectionCard({
-  children,
-  extra,
-  title,
-}: {
-  children: ReactNode;
-  extra?: ReactNode;
-  title: string;
-}) {
-  return (
-    <Card className="ag-dashboard-panel">
-      <div
-        className="flex min-w-0 items-center justify-between gap-3 p-3 pb-2"
-      >
-        <h3 className="min-w-0 truncate text-base font-semibold leading-none text-text">{title}</h3>
-        {extra ? (
-          <div className="min-w-0 shrink">{extra}</div>
-        ) : null}
-      </div>
-      <Card.Content className="px-3 pb-3">{children}</Card.Content>
-    </Card>
-  );
 }
 
 function StatCard({
@@ -161,23 +129,7 @@ const ColumnVisibilityMenu = memo(function ColumnVisibilityMenu({
   );
 });
 
-// 分组统计 key 映射
-const groupByKeys: Record<string, string> = {
-  model: 'usage.by_model',
-  user: 'usage.by_user',
-  account: 'usage.by_account',
-  group: 'usage.by_group',
-};
-
-const groupByHeaderKeys: Record<string, string> = {
-  model: 'usage.model',
-  user: 'usage.user_id',
-  account: 'usage.by_account',
-  group: 'usage.by_group',
-};
-
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageAutoRefresh;
-const ADMIN_USAGE_CARDS_COLLAPSED_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageCardsCollapsed;
 const ADMIN_USAGE_COLUMN_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageColumns;
 const ADMIN_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminUsageFilters;
 const ADMIN_USAGE_DEFAULT_COLUMN_KEYS = [
@@ -322,248 +274,6 @@ function writeAdminUsageColumnKeys(keys: Set<string>) {
   }
 }
 
-// ==================== 分布表格卡片 ====================
-
-interface DistributionItem {
-  name: string;
-  requests: number;
-  tokens: number;
-  totalCost: number;
-  actualCost: number;
-}
-
-function DistributionCard({
-  title,
-  data,
-  firstColumnTitle,
-  firstColumnWidth = '30%',
-}: {
-  title: string;
-  data: DistributionItem[];
-  firstColumnTitle: string;
-  firstColumnWidth?: string;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <SectionCard title={title}>
-      <div className="ag-distribution-table-scroll">
-        <CompactDataTable
-          ariaLabel={title}
-          className="ag-compact-data-table--dense"
-          emptyText={t('common.no_data')}
-          minWidth={480}
-          rowKey={(row) => row.name}
-          rows={data}
-          columns={[
-            {
-              key: 'name',
-              title: firstColumnTitle,
-              width: firstColumnWidth,
-              render: (item, index) => (
-                <>
-                  <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DISTRIBUTION_DOT_COLORS[index % DISTRIBUTION_DOT_COLORS.length] }} />
-                  <span className="min-w-0 truncate font-medium text-text" title={item.name}>{item.name}</span>
-                </>
-              ),
-            },
-            {
-              align: 'end',
-              key: 'requests',
-              title: t('usage.requests'),
-              width: '16%',
-              render: (item) => <span className="truncate font-mono text-text-secondary">{item.requests.toLocaleString()}</span>,
-            },
-            {
-              align: 'end',
-              key: 'tokens',
-              title: t('usage.tokens'),
-              width: '18%',
-              render: (item) => <span className="truncate font-mono text-text-secondary">{fmtNum(item.tokens)}</span>,
-            },
-            {
-              align: 'end',
-              key: 'actualCost',
-              title: t('usage.actual_cost'),
-              width: '18%',
-              render: (item) => <CostValue className="truncate font-mono" value={item.actualCost} tone="actual" />,
-            },
-            {
-              align: 'end',
-              key: 'totalCost',
-              title: t('usage.standard_cost'),
-              width: '18%',
-              render: (item) => <CostValue className="truncate font-mono" value={item.totalCost} tone="standard" />,
-            },
-          ]}
-        />
-      </div>
-    </SectionCard>
-  );
-}
-
-type GroupStatsRow = {
-  key: string | number;
-  name: string;
-  requests: number;
-  tokens: number;
-  total_cost: number;
-  actual_cost: number;
-};
-
-function GroupStatsCard({
-  activeKey,
-  rows,
-  onActiveKeyChange,
-}: {
-  activeKey: string;
-  rows: GroupStatsRow[];
-  onActiveKeyChange: (key: string) => void;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <SectionCard
-      title={t('usage.group_stats')}
-      extra={
-        <Tabs
-          className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto"
-          selectedKey={activeKey}
-          onSelectionChange={(key) => {
-            const nextKey = String(key);
-            if (nextKey !== activeKey) {
-              onActiveKeyChange(nextKey);
-            }
-          }}
-        >
-          <Tabs.List>
-            {Object.entries(groupByKeys).map(([key, i18nKey], index) => (
-              <Tabs.Tab id={key} key={key}>
-                {index > 0 ? <Tabs.Separator /> : null}
-                <Tabs.Indicator />
-                <span>{t(i18nKey)}</span>
-              </Tabs.Tab>
-            ))}
-          </Tabs.List>
-        </Tabs>
-      }
-    >
-      <div className="ag-overview-chart h-[248px] min-w-0 overflow-auto">
-        <CompactDataTable
-          ariaLabel={t('usage.group_stats')}
-          className="ag-compact-data-table--dense"
-          emptyText={t('common.no_data')}
-          minWidth={520}
-          rowKey={(row) => row.key}
-          rows={rows}
-          columns={[
-            {
-              key: 'name',
-              title: t(groupByHeaderKeys[activeKey] ?? 'usage.model'),
-              width: '30%',
-              render: (row, index) => (
-                <>
-                  <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DISTRIBUTION_DOT_COLORS[index % DISTRIBUTION_DOT_COLORS.length] }} />
-                  <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
-                </>
-              ),
-            },
-            {
-              align: 'end',
-              key: 'requests',
-              title: t('usage.requests'),
-              width: '16%',
-              render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
-            },
-            {
-              align: 'end',
-              key: 'tokens',
-              title: t('usage.tokens'),
-              width: '18%',
-              render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
-            },
-            {
-              align: 'end',
-              key: 'actualCost',
-              title: t('usage.actual_cost'),
-              width: '18%',
-              render: (row) => <CostValue className="truncate font-mono" value={row.actual_cost} tone="actual" />,
-            },
-            {
-              align: 'end',
-              key: 'totalCost',
-              title: t('usage.standard_cost'),
-              width: '18%',
-              render: (row) => <CostValue className="truncate font-mono" value={row.total_cost} tone="standard" />,
-            },
-          ]}
-        />
-      </div>
-    </SectionCard>
-  );
-}
-
-// ==================== Token 使用趋势 ====================
-
-function TokenTrendCard({
-  data,
-  granularity,
-  onGranularityChange,
-}: {
-  data: UsageTrendBucket[];
-  granularity: string;
-  onGranularityChange: (g: string) => void;
-}) {
-  const { t } = useTranslation();
-
-  const lineLabels: Record<string, string> = {
-    input: t('usage.input'),
-    output: t('usage.output'),
-    cacheCreation: t('usage.cache_creation'),
-    cacheRead: t('usage.cache_read'),
-    cacheRatio: t('usage.cache_ratio'),
-    cacheCumulativeRatio: t('usage.cache_cumulative_ratio'),
-  };
-  const granularityTabs = (
-    <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={granularity} onSelectionChange={(key) => onGranularityChange(String(key))}>
-      <Tabs.List>
-        {(['hour', 'day'] as const).map((g, index) => (
-          <Tabs.Tab id={g} key={g}>
-            {index > 0 ? <Tabs.Separator /> : null}
-            <Tabs.Indicator />
-            <span>{t(`usage.granularity_${g}`)}</span>
-          </Tabs.Tab>
-        ))}
-      </Tabs.List>
-    </Tabs>
-  );
-
-  if (data.length === 0) {
-    return (
-      <SectionCard title={t('usage.token_trend')} extra={granularityTabs}>
-        <div className="ag-overview-chart flex h-[248px] items-center justify-center text-sm text-text-tertiary">
-          {t('common.no_data')}
-        </div>
-      </SectionCard>
-    );
-  }
-
-  return (
-    <SectionCard
-      title={t('usage.token_trend')}
-      extra={granularityTabs}
-    >
-      <div className="ag-overview-chart h-[248px]">
-        <Suspense fallback={<div className="h-full w-full" />}>
-          <UsageTokenTrendChart data={data} lineLabels={lineLabels} />
-        </Suspense>
-      </div>
-    </SectionCard>
-  );
-}
-
 // ==================== 主页面 ====================
 
 export default function UsagePage() {
@@ -575,13 +285,10 @@ export default function UsagePage() {
   const paginationView = activeSnapshot ?? (pageInfo?.status === 'ready' ? pageInfo : undefined);
   const [selectedUserLabel, setSelectedUserLabel] = useState(initialFilterState.userLabel);
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState(initialFilterState.apiKeyLabel);
-  const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
-  const [granularity, setGranularity] = useState<string>('hour');
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(
     readAdminUsageColumnKeys,
   );
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
-  const [usageCardsCollapsed, setUsageCardsCollapsed] = usePersistentBoolean(ADMIN_USAGE_CARDS_COLLAPSED_STORAGE_KEY, false);
   const { platforms, platformName } = usePlatforms();
   const autoRefreshEnabled = autoRefresh > 0;
   const autoRefreshLabel = `${t('usage.auto_update')} `;
@@ -653,7 +360,6 @@ export default function UsagePage() {
   const {
     data: summaryStats,
     isFetching: isSummaryStatsFetching,
-    isPlaceholderData: isSummaryStatsPlaceholderData,
     refetch: refetchSummaryStats,
   } = useQuery({
     queryKey: ['admin-usage-stats', 'summary', statsFilters],
@@ -665,63 +371,13 @@ export default function UsagePage() {
     placeholderData: keepPreviousData,
   });
 
-  const analysisGroupBy = useMemo(
-    () => Array.from(new Set(['model', 'group', statsGroupBy])).join(','),
-    [statsGroupBy],
-  );
-  const analysisStatsEnabled = !usageCardsCollapsed && summaryStats != null && !isSummaryStatsPlaceholderData;
-  const {
-    data: analysisStats,
-    isFetching: isAnalysisStatsFetching,
-    refetch: refetchAnalysisStats,
-  } = useQuery({
-    queryKey: ['admin-usage-stats', 'analysis', analysisGroupBy, statsFilters],
-    queryFn: ({ signal }) =>
-      usageApi.stats({
-        ...statsFilters,
-        group_by: analysisGroupBy,
-        include_summary: false,
-      }, { signal }),
-    enabled: analysisStatsEnabled,
-    meta: { globalLoading: false },
-    refetchOnReconnect: false,
-    refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData,
-  });
-
-  // Token 趋势
-  const { data: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useQuery({
-    queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.account, filters.user_id, filters.api_key_id],
-    queryFn: ({ signal }) =>
-      usageApi.trend({
-        granularity,
-        start_date: filters.start_date,
-        end_date: filters.end_date,
-        platform: filters.platform,
-        model: filters.model,
-        account: filters.account,
-        user_id: filters.user_id ? Number(filters.user_id) : undefined,
-        api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
-      }, { signal }),
-    meta: { globalLoading: false },
-    refetchOnReconnect: false,
-    refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData,
-  });
-
-  const isStatsFetching = isSummaryStatsFetching || (analysisStatsEnabled && isAnalysisStatsFetching);
-  const isRefreshing = isUsageFetching || isStatsFetching || isTrendFetching;
+  const isRefreshing = isUsageFetching || isSummaryStatsFetching;
   const isUsageTableRefreshing = isUsageFetching;
 
   const handleManualRefresh = useCallback(() => {
     refreshPagination();
-    void refetchTrend({ cancelRefetch: false });
-    void refetchSummaryStats({ cancelRefetch: false }).then((result) => {
-      if (!usageCardsCollapsed && result.isSuccess) {
-        void refetchAnalysisStats({ cancelRefetch: false });
-      }
-    });
-  }, [refetchAnalysisStats, refetchSummaryStats, refetchTrend, refreshPagination, usageCardsCollapsed]);
+    void refetchSummaryStats({ cancelRefetch: false });
+  }, [refetchSummaryStats, refreshPagination]);
 
   const handleAutoRefresh = useCallback(() => {
     void refetchUsage({ cancelRefetch: false });
@@ -773,40 +429,6 @@ export default function UsagePage() {
   }, [filters.account, filters.api_key_id, filters.model, filters.platform, filters.user_id, selectedAPIKeyLabel, selectedUserLabel]);
 
   const activeStats = summaryStats;
-
-  // 分布表格数据
-  const modelDistribution: DistributionItem[] = useMemo(
-    () => (analysisStats?.by_model ?? []).map((s) => ({
-      name: s.model,
-      requests: s.requests,
-      tokens: s.tokens,
-      totalCost: s.total_cost,
-      actualCost: s.actual_cost,
-    })),
-    [analysisStats?.by_model],
-  );
-
-  const groupDistribution: DistributionItem[] = useMemo(
-    () => (analysisStats?.by_group ?? []).map((s) => ({
-      name: s.name || `#${s.group_id}`,
-      requests: s.requests,
-      tokens: s.tokens,
-      totalCost: s.total_cost,
-      actualCost: s.actual_cost,
-    })),
-    [analysisStats?.by_group],
-  );
-
-  const groupStatsRows: GroupStatsRow[] = useMemo(() => {
-    if (!analysisStats) return [];
-    const dataMap: Record<string, GroupStatsRow[]> = {
-      account: analysisStats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      group: analysisStats.by_group?.map((s) => ({ key: s.group_id, name: s.name || `#${s.group_id}`, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      model: analysisStats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-      user: analysisStats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
-    };
-    return dataMap[statsGroupBy] ?? [];
-  }, [analysisStats, statsGroupBy]);
 
   const sharedColumns = useUsageColumns();
 
@@ -1045,37 +667,6 @@ export default function UsagePage() {
           <StatsSkeleton />
         )}
 
-        {activeStats && !usageCardsCollapsed ? (
-          <>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <DistributionCard
-                title={t('usage.model_distribution')}
-                firstColumnTitle={t('usage.model')}
-                firstColumnWidth="30%"
-                data={modelDistribution}
-              />
-              <DistributionCard
-                title={t('usage.group_distribution')}
-                firstColumnTitle={t('groups.group')}
-                firstColumnWidth="26%"
-                data={groupDistribution}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <TokenTrendCard
-                data={trendData ?? []}
-                granularity={granularity}
-                onGranularityChange={setGranularity}
-              />
-              <GroupStatsCard
-                activeKey={statsGroupBy}
-                rows={groupStatsRows}
-                onActiveKeyChange={setStatsGroupBy}
-              />
-            </div>
-          </>
-        ) : null}
       </div>
 
       <TablePage
@@ -1178,18 +769,6 @@ export default function UsagePage() {
             isAutoRefreshing={isUsageTableRefreshing}
             isRefreshing={isRefreshing}
           />
-          <button
-            type="button"
-            aria-label={usageCardsCollapsed ? t('usage.show_analysis_cards') : t('usage.hide_analysis_cards')}
-            aria-pressed={usageCardsCollapsed}
-            className="ag-page-toolbar-button ag-usage-cards-toggle-button ag-toolbar-menu-trigger button button--sm button--secondary inline-flex items-center justify-center gap-2 whitespace-nowrap px-3"
-            onClick={() => setUsageCardsCollapsed((value) => !value)}
-          >
-            {usageCardsCollapsed ? <ChevronDown className="ag-toolbar-menu-caret" aria-hidden="true" /> : <ChevronUp className="ag-toolbar-menu-caret" aria-hidden="true" />}
-            <span className="ag-toolbar-menu-trigger-label truncate">
-              {usageCardsCollapsed ? t('usage.show_analysis_cards') : t('usage.hide_analysis_cards')}
-            </span>
-          </button>
           <ColumnVisibilityMenu
             label={t('usage.column_visibility', '列显示')}
             options={columnOptions}

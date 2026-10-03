@@ -10,6 +10,7 @@ type Repository interface {
 	LoadStatsSnapshot(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, userID int) (StatsSnapshot, error)
 	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]TrendLog, error)
 	ListAPIKeyTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]APIKeyTrendLog, error)
+	LoadDistributionStats(ctx context.Context, startTime, endTime time.Time, userID int) (DistributionSnapshot, error)
 }
 
 // StatsSnapshot 表示从存储层读取的原始统计快照。
@@ -113,11 +114,29 @@ type TrendQuery struct {
 
 // Trend 表示仪表盘趋势结果。
 type Trend struct {
-	ModelDistribution []ModelStats
-	UserRanking       []UserRanking
-	TokenTrend        []TimeBucket
-	TopUsers          []UserTrend
-	TopAPIKeys        []APIKeyTrend
+	ModelDistribution   []ModelStats
+	UserRanking         []UserRanking
+	AccountDistribution []DistributionStats
+	GroupDistribution   []DistributionStats
+	TokenTrend          []TimeBucket
+	TopUsers            []UserTrend
+	TopAPIKeys          []APIKeyTrend
+}
+
+// DistributionSnapshot 表示小时汇总中按上游凭证和分组聚合的统计。
+type DistributionSnapshot struct {
+	Accounts []DistributionStats
+	Groups   []DistributionStats
+}
+
+// DistributionStats 表示一个上游凭证或分组的分布统计。
+type DistributionStats struct {
+	ID           int64
+	Name         string
+	Requests     int64
+	Tokens       int64
+	ActualCost   float64
+	StandardCost float64
 }
 
 // TrendLog 表示趋势聚合所需的使用日志。

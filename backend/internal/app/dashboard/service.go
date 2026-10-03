@@ -39,7 +39,7 @@ const (
 	trendLockTTL  = 5 * time.Second
 	trendLockWait = 1 * time.Second
 	// 缓存键版本随 payload 结构变化递增，避免旧缓存缺少新增字段（如 Key Top 12 的 billed_cost）。
-	trendCacheKeyPrefix = "ag:dashboard:trend:v3"
+	trendCacheKeyPrefix = "ag:dashboard:trend:v4"
 	// tpmPerRPMBaseline is the reference workload of 1 RPM and 100k TPM.
 	tpmPerRPMBaseline = 100000.0
 )
@@ -187,13 +187,19 @@ func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *tim
 	if err != nil {
 		return Trend{}, err
 	}
+	distribution, err := s.repo.LoadDistributionStats(ctx, startTime, endTime, query.UserID)
+	if err != nil {
+		return Trend{}, err
+	}
 
 	return Trend{
-		ModelDistribution: aggregateModelDistribution(logs),
-		UserRanking:       aggregateUserRanking(logs),
-		TokenTrend:        aggregateTokenTrend(logs, query.Granularity, loc),
-		TopUsers:          aggregateTopUsers(logs, query.Granularity, loc),
-		TopAPIKeys:        aggregateTopAPIKeys(apiKeyLogs, query.Granularity, loc),
+		ModelDistribution:   aggregateModelDistribution(logs),
+		UserRanking:         aggregateUserRanking(logs),
+		AccountDistribution: distribution.Accounts,
+		GroupDistribution:   distribution.Groups,
+		TokenTrend:          aggregateTokenTrend(logs, query.Granularity, loc),
+		TopUsers:            aggregateTopUsers(logs, query.Granularity, loc),
+		TopAPIKeys:          aggregateTopAPIKeys(apiKeyLogs, query.Granularity, loc),
 	}, nil
 }
 

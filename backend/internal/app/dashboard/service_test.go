@@ -629,9 +629,10 @@ func TestAggregateTopAPIKeysLimitsAndSortsDailyPoints(t *testing.T) {
 }
 
 type dashboardStubRepository struct {
-	loadStatsSnapshot   func(context.Context, time.Time, time.Time, time.Time) (StatsSnapshot, error)
-	listTrendLogs       func(context.Context, time.Time, time.Time) ([]TrendLog, error)
-	listAPIKeyTrendLogs func(context.Context, time.Time, time.Time) ([]APIKeyTrendLog, error)
+	loadStatsSnapshot     func(context.Context, time.Time, time.Time, time.Time) (StatsSnapshot, error)
+	listTrendLogs         func(context.Context, time.Time, time.Time) ([]TrendLog, error)
+	listAPIKeyTrendLogs   func(context.Context, time.Time, time.Time) ([]APIKeyTrendLog, error)
+	loadDistributionStats func(context.Context, time.Time, time.Time, int) (DistributionSnapshot, error)
 }
 
 func (s dashboardStubRepository) LoadStatsSnapshot(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, _ int) (StatsSnapshot, error) {
@@ -653,4 +654,11 @@ func (s dashboardStubRepository) ListAPIKeyTrendLogs(ctx context.Context, startT
 		return nil, nil
 	}
 	return s.listAPIKeyTrendLogs(ctx, startTime, endTime)
+}
+
+func (s dashboardStubRepository) LoadDistributionStats(ctx context.Context, startTime, endTime time.Time, userID int) (DistributionSnapshot, error) {
+	if s.loadDistributionStats == nil {
+		return DistributionSnapshot{}, nil
+	}
+	return s.loadDistributionStats(ctx, startTime, endTime, userID)
 }

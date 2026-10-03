@@ -955,9 +955,20 @@ export interface DashboardTrendReq {
 export interface DashboardTrendResp {
   model_distribution: DashboardModelStats[];
   user_ranking: DashboardUserRanking[];
+  account_distribution?: DashboardDistributionStats[];
+  group_distribution?: DashboardDistributionStats[];
   token_trend: DashboardTimeBucket[];
   top_users: DashboardUserTrend[];
   top_api_keys?: DashboardAPIKeyTrend[];
+}
+
+export interface DashboardDistributionStats {
+  id: number;
+  name: string;
+  requests: number;
+  tokens: number;
+  actual_cost: number;
+  standard_cost: number;
 }
 
 export interface DashboardModelStats {

@@ -48,16 +48,10 @@
   line-height: var(--ag-usage-toolbar-line-height);
 }
 
-.ag-usage-page .ag-usage-cards-toggle-button {
-  font: inherit;
-  font-size: var(--ag-usage-toolbar-font-size);
-  line-height: var(--ag-usage-toolbar-line-height);
-}
-
-/* Keep the three usage actions aligned to one metric-card column. */
+/* Keep the usage actions aligned to one metric-card column. */
 .ag-usage-page .ag-usage-toolbar-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.5rem;
   width: 100%;

@@ -88,11 +88,23 @@ type DashboardTrendReq struct {
 
 // DashboardTrendResp 仪表盘趋势响应
 type DashboardTrendResp struct {
-	ModelDistribution []DashboardModelStats  `json:"model_distribution"`
-	UserRanking       []DashboardUserRanking `json:"user_ranking"`
-	TokenTrend        []DashboardTimeBucket  `json:"token_trend"`
-	TopUsers          []DashboardUserTrend   `json:"top_users"`
-	TopAPIKeys        []DashboardAPIKeyTrend `json:"top_api_keys"`
+	ModelDistribution   []DashboardModelStats        `json:"model_distribution"`
+	UserRanking         []DashboardUserRanking       `json:"user_ranking"`
+	AccountDistribution []DashboardDistributionStats `json:"account_distribution"`
+	GroupDistribution   []DashboardDistributionStats `json:"group_distribution"`
+	TokenTrend          []DashboardTimeBucket        `json:"token_trend"`
+	TopUsers            []DashboardUserTrend         `json:"top_users"`
+	TopAPIKeys          []DashboardAPIKeyTrend       `json:"top_api_keys"`
+}
+
+// DashboardDistributionStats 上游凭证或分组的分布统计。
+type DashboardDistributionStats struct {
+	ID           int64   `json:"id"`
+	Name         string  `json:"name"`
+	Requests     int64   `json:"requests"`
+	Tokens       int64   `json:"tokens"`
+	ActualCost   float64 `json:"actual_cost"`
+	StandardCost float64 `json:"standard_cost"`
 }
 
 // DashboardModelStats 模型分布统计

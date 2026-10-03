@@ -473,6 +473,40 @@ type DashboardDistributionTableRow = {
   tokens: number;
 };
 
+type DashboardDistributionTab = 'model' | 'user' | 'account' | 'group';
+
+function dashboardDistributionRows(trend: DashboardTrendResp, tab: DashboardDistributionTab): DashboardDistributionTableRow[] {
+  if (tab === 'model') {
+    return (trend.model_distribution ?? []).map((item) => ({
+      actualCost: item.actual_cost,
+      key: `model:${item.model}`,
+      name: item.model,
+      requests: item.requests,
+      standardCost: item.standard_cost,
+      tokens: item.tokens,
+    }));
+  }
+  if (tab === 'user') {
+    return (trend.user_ranking ?? []).map((item) => ({
+      actualCost: item.actual_cost,
+      key: `user:${item.user_id}`,
+      name: item.email || `#${item.user_id}`,
+      requests: item.requests,
+      standardCost: item.standard_cost,
+      tokens: item.tokens,
+    }));
+  }
+  const items = tab === 'account' ? trend.account_distribution : trend.group_distribution;
+  return (items ?? []).map((item) => ({
+    actualCost: item.actual_cost,
+    key: `${tab}:${item.id}`,
+    name: item.name || `#${item.id}`,
+    requests: item.requests,
+    standardCost: item.standard_cost,
+    tokens: item.tokens,
+  }));
+}
+
 const DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS = {
   name: '32%',
   requests: '16%',
@@ -481,47 +515,36 @@ const DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS = {
   standard: '17%',
 } as const;
 
-function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
+export function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'model' | 'user'>('model');
-  const models = trend.model_distribution ?? [];
-  const users = trend.user_ranking ?? [];
-  const activeTitle = tab === 'model' ? t('dashboard.model_distribution') : t('dashboard.user_ranking');
+  const [tab, setTab] = useState<DashboardDistributionTab>('model');
+  const tabTitleKeys = {
+    model: 'dashboard.model_distribution',
+    user: 'dashboard.user_ranking',
+    account: 'dashboard.by_account',
+    group: 'dashboard.by_group',
+  } as const;
+  const activeTitle = t(tabTitleKeys[tab]);
   const tableRows: DashboardDistributionTableRow[] = useMemo(
-    () => (
-      tab === 'model'
-        ? models.map((item, index) => ({
-            actualCost: item.actual_cost,
-            key: item.model || index,
-            name: item.model,
-            requests: item.requests,
-            standardCost: item.standard_cost,
-            tokens: item.tokens,
-          }))
-        : users.map((item, index) => ({
-            actualCost: item.actual_cost,
-            key: item.user_id || index,
-            name: item.email,
-            requests: item.requests,
-            standardCost: item.standard_cost,
-            tokens: item.tokens,
-          }))
-    ),
-    [models, tab, users],
+    () => dashboardDistributionRows(trend, tab),
+    [trend, tab],
   );
-  const firstColumnTitle = tab === 'model' ? t('dashboard.model') : t('dashboard.email');
+  const firstColumnTitle = t({
+    model: 'dashboard.model',
+    user: 'dashboard.email',
+    account: 'usage.upstream_credential',
+    group: 'groups.group',
+  }[tab]);
   const distributionTabs = (
-    <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={tab} onSelectionChange={(key) => setTab(key as 'model' | 'user')}>
+    <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto" selectedKey={tab} onSelectionChange={(key) => setTab(key as DashboardDistributionTab)}>
       <Tabs.List>
-        <Tabs.Tab id="model">
-          <Tabs.Indicator />
-          <span>{t('dashboard.model_distribution')}</span>
-        </Tabs.Tab>
-        <Tabs.Tab id="user">
-          <Tabs.Separator />
-          <Tabs.Indicator />
-          <span>{t('dashboard.user_ranking')}</span>
-        </Tabs.Tab>
+        {(['model', 'user', 'account', 'group'] as const).map((key, index) => (
+          <Tabs.Tab id={key} key={key}>
+            {index > 0 ? <Tabs.Separator /> : null}
+            <Tabs.Indicator />
+            <span>{t(tabTitleKeys[key])}</span>
+          </Tabs.Tab>
+        ))}
       </Tabs.List>
     </Tabs>
   );

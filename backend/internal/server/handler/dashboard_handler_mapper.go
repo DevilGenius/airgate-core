@@ -70,12 +70,29 @@ func toDashboardUsageEstimate(items []appdashboard.UsageEstimate) dto.DashboardU
 
 func toDashboardTrendResp(item appdashboard.Trend) dto.DashboardTrendResp {
 	return dto.DashboardTrendResp{
-		ModelDistribution: toDashboardModelStats(item.ModelDistribution),
-		UserRanking:       toDashboardUserRankings(item.UserRanking),
-		TokenTrend:        toDashboardTimeBuckets(item.TokenTrend),
-		TopUsers:          toDashboardUserTrends(item.TopUsers),
-		TopAPIKeys:        toDashboardAPIKeyTrends(item.TopAPIKeys),
+		ModelDistribution:   toDashboardModelStats(item.ModelDistribution),
+		UserRanking:         toDashboardUserRankings(item.UserRanking),
+		AccountDistribution: toDashboardDistributionStats(item.AccountDistribution),
+		GroupDistribution:   toDashboardDistributionStats(item.GroupDistribution),
+		TokenTrend:          toDashboardTimeBuckets(item.TokenTrend),
+		TopUsers:            toDashboardUserTrends(item.TopUsers),
+		TopAPIKeys:          toDashboardAPIKeyTrends(item.TopAPIKeys),
 	}
+}
+
+func toDashboardDistributionStats(items []appdashboard.DistributionStats) []dto.DashboardDistributionStats {
+	result := make([]dto.DashboardDistributionStats, 0, len(items))
+	for _, item := range items {
+		result = append(result, dto.DashboardDistributionStats{
+			ID:           item.ID,
+			Name:         item.Name,
+			Requests:     item.Requests,
+			Tokens:       item.Tokens,
+			ActualCost:   item.ActualCost,
+			StandardCost: item.StandardCost,
+		})
+	}
+	return result
 }
 
 func toDashboardAPIKeyTrends(items []appdashboard.APIKeyTrend) []dto.DashboardAPIKeyTrend {
