@@ -285,6 +285,19 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
               <ChevronLeft aria-hidden="true" />
               <span className={styles.directionLabel}>上一页</span>
             </button>
+            <div className={styles.pageWindow}>
+            {/* Reserve the widest end-of-range layout without widening individual buttons. */}
+            <div className={`${styles.pages} ${styles.pageSizer}`} aria-hidden="true">
+              {getPaginationItems(safeTotalPages, safeTotalPages).map((item, index) => (
+                <span key={index} className={styles.pageSlot}>
+                  {item === '...' ? (
+                    <span className={styles.ellipsis}>…</span>
+                  ) : (
+                    <span className={`${styles.button} ${styles.pageButton}`}>{item}</span>
+                  )}
+                </span>
+              ))}
+            </div>
             <ol className={styles.pages} aria-label="页码">
               {paginationItems.map((item, index) => (
                 <li key={item === '...' ? `ellipsis-${index}` : item}>
@@ -305,6 +318,7 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
                 </li>
               ))}
             </ol>
+            </div>
             <span className={styles.position} aria-label={`第 ${visiblePage} 页，共${totalExact ? '' : '至少'} ${safeTotalPages} 页`}>
               <strong className={styles.number}>{visiblePage}</strong>
               <span className={styles.pageCount}>/ {safeTotalPages}{totalExact ? '' : '+'}</span>

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TablePaginationFooter } from './TablePaginationFooter';
+import styles from './TablePaginationFooter.module.css';
 
 function exposePopoverInJSDOM() {
   // JSDOM does not implement the native popover top layer.
@@ -9,6 +10,20 @@ function exposePopoverInJSDOM() {
 }
 
 describe('usage page jump controls', () => {
+  it('reserves the same page-number region across six-digit boundaries and ellipsis changes', () => {
+    const setPage = vi.fn();
+    const { container, rerender } = render(<TablePaginationFooter page={1} total={2_000_000} totalPages={200000} setPage={setPage} />);
+    const sizingContent = container.querySelector(`.${styles.pageSizer}`)!.innerHTML;
+    for (const page of [2, 5, 99999, 100000, 199999, 200000]) {
+      rerender(<TablePaginationFooter page={page} total={2_000_000} totalPages={200000} setPage={setPage} />);
+      const sizer = container.querySelector(`.${styles.pageSizer}`)!;
+      expect(sizer.innerHTML).toBe(sizingContent);
+      expect(sizer).toHaveAttribute('aria-hidden', 'true');
+      expect(sizer.querySelector('button')).toBeNull();
+      expect(screen.getByRole('button', { name: `第 ${page} 页` })).toHaveAttribute('aria-current', 'page');
+    }
+  });
+
   it('shows the exact page count and submits an arbitrary deep page', async () => {
     const setPage = vi.fn();
     render(<TablePaginationFooter page={1} pageSize={20} total={5_851_096} totalPages={292555} totalExact setPage={setPage} enablePageJump paginationStatus="ready" />);
