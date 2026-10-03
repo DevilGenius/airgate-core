@@ -73,7 +73,7 @@ body::selection {
 #root :focus-visible,
 .ag-elevation-modal :focus-visible,
 :where(.select__popover, .combo-box__popover, .date-picker__popover, .date-range-picker__popover, .dropdown__popover, .popover) :focus-visible {
-  outline: 1.5px solid var(--focus);
+  outline: var(--ag-focus-outline-width, 1.5px) solid var(--focus);
   outline-offset: var(--ring-offset-width);
 }
 

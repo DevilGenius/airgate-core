@@ -3,6 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
+function exposePopoverInJSDOM() {
+  // JSDOM does not implement the native popover top layer.
+  screen.getByRole('menu', { hidden: true }).parentElement?.removeAttribute('popover');
+}
+
 describe('usage page jump controls', () => {
   it('shows the exact page count and submits an arbitrary deep page', async () => {
     const setPage = vi.fn();
@@ -58,10 +63,39 @@ describe('usage page jump controls', () => {
     const user = userEvent.setup();
     const setPageSize = vi.fn();
     render(<TablePaginationFooter page={2} pageSize={20} total={1000} totalPages={50} setPage={vi.fn()} setPageSize={setPageSize} />);
-    await user.selectOptions(screen.getByRole('combobox', { name: '每页数量' }), '100');
+    const trigger = screen.getByRole('button', { name: '每页数量' });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    exposePopoverInJSDOM();
+    expect(screen.getByRole('menuitemradio', { name: '20' })).toHaveAttribute('aria-checked', 'true');
+    screen.getByRole('menuitemradio', { name: '100' }).focus();
+    await user.keyboard('{Enter}');
     await waitFor(() => expect(setPageSize).toHaveBeenCalledExactlyOnceWith(100));
-    expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('100');
+    expect(trigger).toHaveTextContent('100');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled();
+  });
+
+  it('uses the shared dropdown for pointer selection and Escape dismissal', async () => {
+    const user = userEvent.setup();
+    const setPageSize = vi.fn();
+    const { container } = render(<TablePaginationFooter page={1} pageSize={20} total={1000} totalPages={50} setPage={vi.fn()} setPageSize={setPageSize} />);
+    expect(container.querySelector('select')).toBeNull();
+    const trigger = screen.getByRole('button', { name: '每页数量' });
+    expect(trigger).toHaveClass('ag-simple-select-trigger');
+    await user.click(trigger);
+    await user.keyboard('{Escape}');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(setPageSize).not.toHaveBeenCalled();
+    await user.click(trigger);
+    exposePopoverInJSDOM();
+    await user.click(screen.getByRole('menuitemradio', { name: '50' }));
+    await waitFor(() => expect(setPageSize).toHaveBeenCalledExactlyOnceWith(50));
+    expect(trigger).toHaveTextContent('50');
+    await user.click(trigger);
+    exposePopoverInJSDOM();
+    expect(screen.getByRole('menuitemradio', { name: '50' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('associates jump errors with the input and submits valid pages using Enter', async () => {

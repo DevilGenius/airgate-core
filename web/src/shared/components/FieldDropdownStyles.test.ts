@@ -33,8 +33,10 @@ describe('shared field dropdown width contract', () => {
         const arrowButton = host.querySelector('.combo-box__trigger');
         if (arrowButton) expect(getComputedStyle(arrowButton).width).toBe('var(--ag-dropdown-arrow-width, 2.25rem)');
       }
-      host.innerHTML = '<div class="' + paginationStyles.pagination + '"><span class="' + paginationStyles.selectControl + '"><select class="' + paginationStyles.select + '"></select><svg></svg></span></div>';
-      expect(getComputedStyle(host.firstElementChild!).getPropertyValue('--control-height').trim().split(' ').join('')).toBe('var(--ag-dropdown-control-height,2.5rem)');
+      host.innerHTML = '<div class="' + paginationStyles.pagination + '"><div class="ag-simple-select ' + paginationStyles.pageSizeControl + '"><button class="ag-toolbar-menu-trigger ag-simple-select-trigger select__trigger"><svg class="ag-toolbar-menu-caret"></svg></button></div></div>';
+      expect(getComputedStyle(host.firstElementChild!).getPropertyValue('--control-height').trim()).toBe('2.125rem');
+      expect(getComputedStyle(host.querySelector('.ag-simple-select')!).getPropertyValue('--ag-dropdown-control-height').trim()).toBe('var(--control-height)');
+      expect(getComputedStyle(host.querySelector('button')!).height).toBe('var(--ag-dropdown-control-height, 2.5rem)');
       expect(getComputedStyle(host.querySelector('svg')!).width).toBe('var(--ag-dropdown-icon-size, 1rem)');
     } finally { host.remove(); sheet.remove(); }
   });

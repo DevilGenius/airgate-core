@@ -9,10 +9,11 @@ import {
   useState,
   type PointerEvent,
   type FormEvent,
+  type CSSProperties,
 } from 'react';
 import { flushSync } from 'react-dom';
 import { ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
-import { DropdownIndicator } from './DropdownIndicator';
+import { SimpleSelect } from './SimpleSelect';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getPaginationItems } from '../utils/pagination';
 import styles from './TablePaginationFooter.module.css';
 
@@ -226,21 +227,17 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
             条
           </span>
           {showPageSize ? (
-            <label className={styles.pageSize}>
+            <div className={styles.pageSize}>
               每页
-              <span className={styles.selectControl}>
-                <select
-                  aria-label="每页数量"
-                  className={styles.select}
-                  value={selectedPageSize}
-                  onChange={(event) => handlePageSizeChange(event.target.value)}
-                >
-                  {pageSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}
-                </select>
-                <DropdownIndicator />
-              </span>
+              <SimpleSelect
+                ariaLabel="每页数量"
+                className={styles.pageSizeControl}
+                selectedKey={selectedPageSize}
+                items={pageSizeOptions.map((size) => ({ key: String(size), label: String(size) }))}
+                onSelectionChange={handlePageSizeChange}
+              />
               条
-            </label>
+            </div>
           ) : null}
           {paginationStatus === 'preparing' || paginationStatus === 'failed' || isPaginationRefreshing || snapshotAt || onRefreshPagination ? (
             <div className={styles.metadata}>
@@ -272,7 +269,10 @@ export const TablePaginationFooter = memo(function TablePaginationFooter({
         </div>
 
         <div className={styles.controls}>
-          <div className={styles.navigation}>
+          <div
+            className={styles.navigation}
+            style={{ '--page-digits-width': `${String(safeTotalPages).length}ch` } as CSSProperties}
+          >
             <button
               type="button"
               aria-label="上一页"

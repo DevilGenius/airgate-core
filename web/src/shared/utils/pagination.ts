@@ -22,15 +22,8 @@ export function getTotalPages(total: number, pageSize: number): number {
 
 export function getPaginationItems(current: number, total: number): PaginationItem[] {
   if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
-
-  const pages: PaginationItem[] = [1];
-  if (current > 3) pages.push('...');
-
-  for (let index = Math.max(2, current - 1); index <= Math.min(total - 1, current + 1); index += 1) {
-    pages.push(index);
-  }
-
-  if (current < total - 2) pages.push('...');
-  pages.push(total);
-  return pages;
+  // Always occupy seven slots so the navigation controls do not move on paging.
+  if (current <= 4) return [1, 2, 3, 4, 5, '...', total];
+  if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+  return [1, '...', current - 1, current, current + 1, '...', total];
 }
