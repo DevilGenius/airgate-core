@@ -51,11 +51,9 @@ function formatTpsParts(rate: number | null): [string, string] {
 
 /**
  * TPS column shared by the admin and the user usage tables.
- * The value slot is three characters wide — the width of the English "TPS" header label —
- * and the whole group stays centered, so with that header the last two digits land under
- * "TP". Right alignment inside the slot keeps the last digit (or `k`) and the dot in the
- * same column on every row; the wider Chinese header (生成速度) simply stays centered above
- * the same group.
+ * A fixed, non-shrinking four-character slot fits values through 9999.
+ * End-aligned flex content also keeps longer compact values aligned at the right edge,
+ * so the last digit (or `k`) and the status dot stay in the same column on every row.
  */
 export function createUsageTpsColumn<T extends UsageRow>(t: TFunction): UsageColumnConfig<T> {
   return {
@@ -68,7 +66,7 @@ export function createUsageTpsColumn<T extends UsageRow>(t: TFunction): UsageCol
       const [integerPart, suffix] = formatTpsParts(rate);
       return (
         <span className="inline-flex w-full items-center justify-center gap-[1ch] font-mono text-[13px] tabular-nums text-text-secondary" title={t('usage.tps_hint')}>
-          <span className="inline-block w-[3ch] text-right">
+          <span className="inline-flex w-[4ch] shrink-0 justify-end whitespace-nowrap text-right">
             {integerPart}{suffix}
           </span>
           <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${tpsDotClass(rate)}`} />

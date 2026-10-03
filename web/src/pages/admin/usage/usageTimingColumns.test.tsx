@@ -74,14 +74,21 @@ describe('shared TPS column', () => {
   const column = createUsageTpsColumn<UsageLogResp>(t);
   const renderTps = (row: Partial<UsageLogResp>) => renderToStaticMarkup(<div>{column.render(row as UsageLogResp)}</div>);
 
+  it.each([999, 1000, 9999, 10000, 20000, 1000000])('keeps a fixed right-aligned slot at %s TPS', (rate) => {
+    const html = renderTps({ output_tokens: rate, duration_ms: 1000, first_token_ms: 0, stream: true });
+    expect(html).toContain('w-[4ch] shrink-0 justify-end whitespace-nowrap text-right');
+    const label = rate >= 10000 ? `${Math.round(rate / 1000)}k` : String(rate);
+    expect(html).toContain(`>${label}</span>`);
+  });
+
   it('is shared by the admin and the user usage table with the same metadata', () => {
     expect([column.key, column.title, column.width, column.hideOnMobile])
       .toEqual(['tps', 'usage.tps', '72px', true]);
   });
 
-  it('right-aligns the value in a three-character slot placed before the dot', () => {
+  it('right-aligns the value in a non-shrinking four-character slot placed before the dot', () => {
     const html = renderTps({ output_tokens: 300, duration_ms: 3000, first_token_ms: 1000, stream: true });
-    expect(html).toContain('w-[3ch] text-right');
+    expect(html).toContain('w-[4ch] shrink-0 justify-end whitespace-nowrap text-right');
     expect(html.indexOf('150')).toBeGreaterThan(-1);
     expect(html.indexOf('150')).toBeLessThan(html.indexOf('rounded-full'));
   });
