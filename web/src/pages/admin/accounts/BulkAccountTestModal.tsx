@@ -11,9 +11,16 @@ import type { AccountResp, ModelInfo } from '../../../shared/types';
 import {
   filterConnectivityTestModels,
   runAccountConnectivityTest,
+  type AccountTestRunResult,
 } from './accountTestRunner';
 
-type ItemStatus = 'pending' | 'running' | 'success' | 'warning' | 'error';
+type ItemStatus = 'pending' | 'running' | 'success' | 'warning' | 'cognition' | 'error';
+
+export function bulkAccountTestStatus(result: AccountTestRunResult): ItemStatus {
+  if (isRateLimitWarning(result.error)) return 'warning';
+  if (result.cognitionDegraded === true) return 'cognition';
+  return result.success ? 'success' : 'error';
+}
 
 interface ItemState {
   groupKey: string;
@@ -55,6 +62,7 @@ export function BulkAccountTestModal({
   const [done, setDone] = useState(0);
   const [success, setSuccess] = useState(0);
   const [warning, setWarning] = useState(0);
+  const [cognition, setCognition] = useState(0);
   const [failed, setFailed] = useState(0);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -81,6 +89,7 @@ export function BulkAccountTestModal({
     setDone(0);
     setSuccess(0);
     setWarning(0);
+    setCognition(0);
     setFailed(0);
     setRunning(false);
     setFinished(false);
@@ -143,12 +152,8 @@ export function BulkAccountTestModal({
     });
   }, []);
 
-  const recordResult = useCallback((accountId: number, result: { success: boolean; error?: string }) => {
-    const status: ItemStatus = result.success
-      ? 'success'
-      : isRateLimitWarning(result.error)
-        ? 'warning'
-        : 'error';
+  const recordResult = useCallback((accountId: number, result: AccountTestRunResult) => {
+    const status = bulkAccountTestStatus(result);
     setItems((previous) => previous.map((item) => (
       item.id === accountId
         ? { ...item, status, error: result.error }
@@ -157,6 +162,7 @@ export function BulkAccountTestModal({
     setDone((value) => value + 1);
     if (status === 'success') setSuccess((value) => value + 1);
     else if (status === 'warning') setWarning((value) => value + 1);
+    else if (status === 'cognition') setCognition((value) => value + 1);
     else setFailed((value) => value + 1);
   }, []);
 
@@ -180,6 +186,7 @@ export function BulkAccountTestModal({
     setDone(0);
     setSuccess(0);
     setWarning(0);
+    setCognition(0);
     setFailed(0);
     setFinished(false);
     setRunning(true);
@@ -231,11 +238,12 @@ export function BulkAccountTestModal({
   const progress = accounts.length > 0 ? Math.round((done / accounts.length) * 100) : 0;
   const successPercent = accounts.length > 0 ? (success / accounts.length) * 100 : 0;
   const warningPercent = accounts.length > 0 ? (warning / accounts.length) * 100 : 0;
+  const cognitionPercent = accounts.length > 0 ? (cognition / accounts.length) * 100 : 0;
   const failedPercent = accounts.length > 0 ? (failed / accounts.length) * 100 : 0;
   const groupStats = useMemo(() => {
     const stats = new Map<string, number>();
     for (const item of items) {
-      if (item.status === 'success' || item.status === 'warning' || item.status === 'error') {
+      if (item.status === 'success' || item.status === 'warning' || item.status === 'cognition' || item.status === 'error') {
         stats.set(item.groupKey, (stats.get(item.groupKey) ?? 0) + 1);
       }
     }
@@ -316,7 +324,7 @@ export function BulkAccountTestModal({
             <span className="text-[var(--ag-text-secondary)]">
               {t('accounts.bulk_test_progress', { done, total: accounts.length })}
             </span>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center gap-1 text-success">
                 <Check className="w-3.5 h-3.5" />
                 {t('accounts.bulk_test_success_count', { count: success })}
@@ -324,6 +332,10 @@ export function BulkAccountTestModal({
               <span className="inline-flex items-center gap-1 text-warning">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 {t('accounts.bulk_test_warning_count', { count: warning })}
+              </span>
+              <span className="inline-flex items-center gap-1 text-[#a855f7]">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {t('accounts.bulk_test_cognition_count', { count: cognition })}
               </span>
               <span className="inline-flex items-center gap-1 text-danger">
                 <X className="w-3.5 h-3.5" />
@@ -342,6 +354,10 @@ export function BulkAccountTestModal({
             <div
               className="h-full bg-warning transition-[width] duration-300"
               style={{ width: `${warningPercent}%` }}
+            />
+            <div
+              className="h-full bg-[#a855f7] transition-[width] duration-300"
+              style={{ width: `${cognitionPercent}%` }}
             />
             <div
               className="h-full bg-danger transition-[width] duration-300"
@@ -369,7 +385,7 @@ export function BulkAccountTestModal({
                   ) : null}
                 </div>
                 {items.filter((item) => item.groupKey === group.key).map((item) => {
-                  const message = item.status === 'error' || item.status === 'warning' ? item.error : item.text;
+                  const message = item.status === 'error' || item.status === 'warning' ? item.error ?? item.text : item.text;
                   return (
                     <div
                       key={item.id}
@@ -378,6 +394,7 @@ export function BulkAccountTestModal({
                       <div className="flex items-center gap-2">
                         <TestStatusIcon status={item.status} />
                         <span className="min-w-0 flex-1 truncate text-[var(--ag-text)]">{item.name}</span>
+                        {item.status === 'cognition' ? <span className="text-[#a855f7]">{t('accounts.bulk_test_cognition')}</span> : null}
                       </div>
                       <StreamMessage
                         placeholder={t('accounts.bulk_test_waiting')}
@@ -432,11 +449,13 @@ function StreamMessage({
 
   useEffect(() => {
     const element = ref.current;
-    if (element) element.scrollTop = element.scrollHeight;
+    if (element) element.scrollLeft = element.scrollWidth;
   }, [text]);
 
   const colorClass = !text
     ? 'text-[var(--ag-text-tertiary)]'
+    : status === 'cognition'
+      ? 'text-[#a855f7]'
     : status === 'error'
       ? 'text-danger'
       : status === 'warning'
@@ -448,7 +467,7 @@ function StreamMessage({
   return (
     <div
       ref={ref}
-      className={`mt-1.5 h-8 overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-[var(--ag-border-subtle)] bg-[var(--ag-bg)] px-2 py-1.5 font-mono text-[11px] leading-relaxed ${colorClass}`}
+      className={`mt-1.5 h-8 overflow-x-auto overflow-y-hidden whitespace-nowrap rounded-md border border-[var(--ag-border-subtle)] bg-[var(--ag-bg)] px-2 py-1.5 font-mono text-[11px] leading-relaxed ${colorClass}`}
     >
       {text || placeholder}
     </div>
@@ -456,6 +475,9 @@ function StreamMessage({
 }
 
 function TestStatusIcon({ status }: { status: ItemStatus }) {
+  if (status === 'cognition') {
+    return <AlertTriangle className="w-3.5 h-3.5 text-[#a855f7]" />;
+  }
   if (status === 'running') {
     return <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />;
   }
