@@ -569,7 +569,7 @@
     "stats_range_7d": "近 7 天",
     "stats_range_30d": "近 30 天",
     "stats_range_90d": "近 90 天",
-    "stats_range_custom": "自定义",
+    "stats_range_1y": "近 1 年",
     "stats_start_date": "开始日期",
     "stats_end_date": "结束日期",
     "stats_range_summary": "共 {{days}} 天，活跃 {{active}} 天",

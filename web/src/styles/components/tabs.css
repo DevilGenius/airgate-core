@@ -64,7 +64,7 @@
 .ag-segmented-tabs-compact :where(.tabs__tab, [data-slot="tabs-tab"]) {
   height: 1.625rem;
   min-height: 1.625rem;
-  min-width: 4.75rem;
+  min-width: var(--ag-tabs-compact-min-width, 4.75rem);
   padding-inline: 0.625rem;
 }
 

@@ -570,7 +570,7 @@
     "stats_range_7d": "Last 7 Days",
     "stats_range_30d": "Last 30 Days",
     "stats_range_90d": "Last 90 Days",
-    "stats_range_custom": "Custom",
+    "stats_range_1y": "Last Year",
     "stats_start_date": "Start date",
     "stats_end_date": "End date",
     "stats_range_summary": "{{days}} days total, {{active}} days active",

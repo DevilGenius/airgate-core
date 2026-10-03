@@ -16,7 +16,6 @@ import {
   type AccountModelSuccessRateWindow,
   type AccountStatsResp,
 } from '../../shared/api/accounts';
-import { CommonDatePicker } from '../../shared/components/CommonDatePicker';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CommonModal } from '../../shared/components/CommonModal';
 import { DISTRIBUTION_COLORS } from '../../shared/constants';
@@ -28,8 +27,8 @@ const DISTRIBUTION_DOT_COLORS = DISTRIBUTION_COLORS;
 const MODEL_RATE_REFRESH_INTERVAL_MS = 10_000;
 
 // 预设时间范围；rate 是近 24 小时模型成功率视图，排在最前且默认选中
-type RangePreset = 'rate' | '7d' | '30d' | '90d' | 'custom';
-const RANGE_PRESETS = ['rate', '7d', '30d', '90d', 'custom'] as const;
+type RangePreset = 'rate' | '7d' | '30d' | '90d' | '1y';
+const RANGE_PRESETS = ['rate', '7d', '30d', '90d', '1y'] as const;
 
 // 按浏览器本地时区拼出 YYYY-MM-DD（不要用 toISOString，那是 UTC，会跨日）。
 function localDateStr(d: Date): string {
@@ -40,11 +39,10 @@ function localDateStr(d: Date): string {
 }
 
 function getPresetDates(preset: RangePreset): { start_date?: string; end_date?: string } {
-  if (preset === 'custom') return {};
   const now = new Date();
   const end = localDateStr(now);
   // rate 视图只展示调度器统计，账号头部不需要历史费用数据，按当天查询即可降低刷新成本。
-  const days = preset === 'rate' ? 1 : preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
+  const days = { rate: 1, '7d': 7, '30d': 30, '90d': 90, '1y': 365 }[preset];
   const start = new Date(now);
   start.setDate(start.getDate() - (days - 1));
   return { start_date: localDateStr(start), end_date: end };
@@ -85,15 +83,7 @@ export function AccountStatsModal({
 
   // 时间范围状态，默认"模型成功率"
   const [preset, setPreset] = useState<RangePreset>('rate');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
-
-  const queryParams = useMemo(() => {
-    if (preset === 'custom' && customStart) {
-      return { start_date: customStart, end_date: customEnd || undefined };
-    }
-    return getPresetDates(preset);
-  }, [preset, customStart, customEnd]);
+  const queryParams = useMemo(() => getPresetDates(preset), [preset]);
   const queryKey = useMemo(
     () => ['account-stats', accountId, preset, queryParams.start_date ?? '', queryParams.end_date ?? ''] as const,
     [accountId, preset, queryParams.end_date, queryParams.start_date],
@@ -125,12 +115,8 @@ export function AccountStatsModal({
     >
       <div className="space-y-4" aria-busy={isFetching}>
         <AccountStatsRangeControls
-          customEnd={customEnd}
-          customStart={customStart}
           isRefreshing={isRefreshing}
           preset={preset}
-          onCustomEndChange={setCustomEnd}
-          onCustomStartChange={setCustomStart}
           onPresetChange={setPreset}
         />
 
@@ -160,29 +146,21 @@ export function AccountStatsModal({
 }
 
 function AccountStatsRangeControls({
-  customEnd,
-  customStart,
   isRefreshing,
-  onCustomEndChange,
-  onCustomStartChange,
   onPresetChange,
   preset,
 }: {
-  customEnd: string;
-  customStart: string;
   isRefreshing: boolean;
-  onCustomEndChange: (value: string) => void;
-  onCustomStartChange: (value: string) => void;
   onPresetChange: (value: RangePreset) => void;
   preset: RangePreset;
 }) {
   const { t } = useTranslation();
 
   return (
-    // 固定 min-h-10（等于日期选择器行高），切到自定义出现日期行时不再顶移下方内容
     <div className="flex min-h-10 flex-wrap items-center gap-2">
       <Tabs
-        className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto"
+        className="ag-segmented-tabs ag-segmented-tabs-compact"
+        style={{ '--ag-tabs-compact-min-width': '7rem' } as CSSProperties}
         selectedKey={preset}
         onSelectionChange={(key) => onPresetChange(key as RangePreset)}
       >
@@ -196,26 +174,6 @@ function AccountStatsRangeControls({
           ))}
         </Tabs.List>
       </Tabs>
-
-      {preset === 'custom' && (
-        <div className="ag-account-stats-date-range grid w-full grid-cols-1 gap-2 sm:ml-2 sm:w-auto sm:grid-cols-[minmax(13.5rem,1fr)_auto_minmax(13.5rem,1fr)] sm:items-end">
-          <CommonDatePicker
-            className="w-full sm:w-56"
-            hideLabel
-            label={t('accounts.stats_start_date')}
-            value={customStart}
-            onChange={onCustomStartChange}
-          />
-          <span className="hidden h-10 items-center text-xs text-text-tertiary sm:inline-flex">—</span>
-          <CommonDatePicker
-            className="w-full sm:w-56"
-            hideLabel
-            label={t('accounts.stats_end_date')}
-            value={customEnd}
-            onChange={onCustomEndChange}
-          />
-        </div>
-      )}
 
       <span className="sr-only" aria-live="polite">
         {isRefreshing ? t('common.loading') : ''}
