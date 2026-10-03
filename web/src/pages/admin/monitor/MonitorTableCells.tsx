@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+export { TimeCell } from '../../../shared/components/TimeCell';
 import type { MonitorEventResp, MonitorRequestEventResp } from '../../../shared/types';
 
 type DetailEntry = {
@@ -8,27 +9,6 @@ type DetailEntry = {
 };
 
 type DetailEntryOptions = Pick<DetailEntry, 'hidden'>;
-
-const MONITOR_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
-  hour: '2-digit',
-  hour12: false,
-  minute: '2-digit',
-  second: '2-digit',
-});
-const MONITOR_DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN');
-
-function monitorTimeLabels(value?: string) {
-  if (!value) {
-    return { dateLabel: '', fullLabel: '-', timeLabel: '-' };
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return { dateLabel: '', fullLabel: value, timeLabel: value };
-  }
-  const timeLabel = MONITOR_TIME_FORMATTER.format(date);
-  const dateLabel = MONITOR_DATE_FORMATTER.format(date);
-  return { dateLabel, fullLabel: `${dateLabel} ${timeLabel}`, timeLabel };
-}
 
 function detailString(detail: Record<string, unknown> | undefined, key: string): string {
   const value = detail?.[key];
@@ -250,18 +230,6 @@ export function requestDetailEntries(event: MonitorRequestEventResp): DetailEntr
   appendDetail(entries, 'outcome_kind', detailValue(detail, 'outcome_kind'));
   appendDetail(entries, 'reason', detailValue(detail, 'reason'));
   return entries;
-}
-
-export function TimeCell({ value }: { value?: string }) {
-  const { dateLabel, fullLabel, timeLabel } = monitorTimeLabels(value);
-  return (
-    <div className="flex min-w-0 flex-col justify-center gap-1 text-left" title={fullLabel}>
-      <span className="truncate font-mono text-[13px] font-medium leading-none text-text">{timeLabel}</span>
-      {dateLabel ? (
-        <span className="truncate font-mono text-[11px] leading-none text-text-tertiary">{dateLabel}</span>
-      ) : null}
-    </div>
-  );
 }
 
 export function StackCell({

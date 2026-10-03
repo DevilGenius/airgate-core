@@ -4,7 +4,7 @@ import { MobileRecordList, type MobileRecordItem } from '../../../shared/compone
 import type { TableRowMoreMenuItem } from '../../../shared/components/TableRowMoreMenu';
 import type { UserResp } from '../../../shared/types';
 import { getAvatarColor } from '../../../shared/utils/avatar';
-import { formatDateTime } from '../../../shared/utils/format';
+import { TimeCell } from '../../../shared/components/TimeCell';
 
 export function UsersMobileList({
   emptyTitle,
@@ -54,7 +54,7 @@ export function UsersMobileList({
       },
       {
         label: t('users.created_at'),
-        value: formatDateTime(row.created_at),
+        value: <TimeCell value={row.created_at} />,
       },
       {
         label: 'ID',

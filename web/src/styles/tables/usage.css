@@ -636,47 +636,13 @@
   animation: ag-usage-row-new-enter 1.4s ease-out both;
 }
 
-.ag-usage-date-label {
-  display: none;
-}
-
-.ag-usage-table-desktop .ag-usage-time-only {
-  justify-content: center;
-}
-
-.ag-usage-table :where([data-slot="td"].ag-usage-col-created_at:has(.ag-usage-time-only),
-  [data-slot="td"].ag-usage-col-first_token_ms) {
+.ag-usage-table :where([data-slot="td"].ag-usage-col-first_token_ms) {
   padding-inline: 0.25rem !important;
-}
-
-@container usage-records (min-width: 1440px) {
-  .ag-usage-date-label {
-    display: inline;
-  }
-}
-
-/* 管理端桌面表格的时间列保持只显示时间（日期仅移动端卡片展示）。 */
-
-.ag-usage-date-label--mobile {
-  display: none;
-}
-
-/* 移动端卡片顶部：时间 + 日期。 */
-
-.ag-usage-table-mobile .ag-usage-date-label,
-.ag-usage-table-mobile .ag-usage-date-label--mobile {
-  display: inline;
 }
 
 @container usage-records (max-width: 1439px) {
   .ag-usage-table {
     min-width: calc(var(--ag-usage-table-min-width) - var(--ag-usage-table-mobile-delta)) !important;
-  }
-
-  .ag-usage-table:has(.ag-usage-date-label) .ag-usage-col-created_at {
-    width: 92px !important;
-    min-width: 92px !important;
-    max-width: 92px !important;
   }
 
 }

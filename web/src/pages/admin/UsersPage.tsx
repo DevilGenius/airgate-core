@@ -21,7 +21,7 @@ import { TableRowMoreMenu, type TableRowMoreMenuItem } from '../../shared/compon
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { getAvatarColor } from '../../shared/utils/avatar';
-import { formatDateTime } from '../../shared/utils/format';
+import { TimeCell } from '../../shared/components/TimeCell';
 import { CreateUserModal } from './users/CreateUserModal';
 import { EditUserModal } from './users/EditUserModal';
 import { BalanceModal } from './users/BalanceModal';
@@ -409,7 +409,7 @@ export default function UsersPage() {
                       {renderUserStatus(row)}
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="ag-users-cell-truncate text-xs text-text-secondary" title={formatDateTime(row.created_at)}>{formatDateTime(row.created_at)}</span>
+                      <TimeCell value={row.created_at} />
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       {renderUserActions(row)}

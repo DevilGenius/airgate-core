@@ -16,6 +16,7 @@ import {
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
+import { TimeCell } from '../components/TimeCell';
 import { formatRateMultiplier } from '../utils/rateMultiplier';
 
 /**
@@ -49,6 +50,11 @@ export function formatTimingMs(value: number): string {
   }
   const seconds = value < 1000 ? Math.floor(value / 10) / 100 : value / 1000;
   return `${seconds.toFixed(2)}s`;
+}
+
+export function formatResponseTimeMs(value: number): string {
+  if (Number.isFinite(value) && value > 0 && value < 1000) return `${value}ms`;
+  return formatTimingMs(value);
 }
 
 /** Latency bands used by the compact first-token/total-duration cell. */
@@ -509,13 +515,6 @@ const STREAM_CHIP_STYLE: CSSProperties = {
   boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${HEROUI_BLUE} 34%, transparent)`,
   color: HEROUI_BLUE,
 };
-const USAGE_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
-  hour: '2-digit',
-  hour12: false,
-  minute: '2-digit',
-  second: '2-digit',
-});
-const USAGE_DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN');
 
 /** 单行 token 数据行：固定宽度图标 + 右对齐等宽数字 */
 function TokenRow({
@@ -984,7 +983,6 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
     const firstTokenColumn: UsageColumnConfig<UsageRow> = {
       key: 'first_token_ms',
       title: t('usage.first_token'),
-      // 与管理端 72px 的纯时间列合计 142px，保持新增 TTFT 前的总列宽不变。
       width: '70px',
       hideOnMobile: true,
       render: (row) => {
@@ -1001,24 +999,8 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
     {
       key: 'created_at',
       title: t('usage.time'),
-      width: adminView ? '72px' : '142px',
-      render: (row) => {
-        const date = new Date(row.created_at);
-        const timeLabel = USAGE_TIME_FORMATTER.format(date);
-        const dateLabel = USAGE_DATE_FORMATTER.format(date);
-        const fullLabel = `${dateLabel} ${timeLabel}`;
-
-        return (
-          <div className={`flex min-w-0 items-center gap-1.5 font-mono text-xs ${adminView ? 'ag-usage-time-only' : ''}`} title={fullLabel}>
-            <span className="shrink-0 font-mono text-[13px] font-medium text-text">
-              {timeLabel}
-            </span>
-            <span className={`shrink-0 font-light text-text-tertiary ${adminView ? 'ag-usage-date-label--mobile' : 'ag-usage-date-label'}`}>
-              {dateLabel}
-            </span>
-          </div>
-        );
-      },
+      width: '92px',
+      render: (row) => <TimeCell value={row.created_at} />,
     },
     {
       key: 'model',
@@ -1186,7 +1168,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       hideOnMobile: true,
       render: (row) => (
         <span className="block text-center font-mono text-[13px] text-text-secondary">
-          {customerScope && isImageGenerationModel(row.model) ? '-' : formatTimingMs(row.first_event_ms)}
+          {customerScope && isImageGenerationModel(row.model) ? '-' : formatResponseTimeMs(row.first_event_ms)}
         </span>
       ),
     },

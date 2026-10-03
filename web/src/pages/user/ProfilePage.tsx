@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../../shared/components/Card';
+import { TimeCell } from '../../shared/components/TimeCell';
 import { ContentPage } from '../../shared/components/ContentPage';
 import { Button, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
@@ -391,14 +392,7 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
                               </span>
                             </CommonTable.Cell>
                             <CommonTable.Cell>
-                              <span className="text-xs text-text-secondary">
-                                {new Date(row.created_at).toLocaleString('zh-CN', {
-                                  day: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  month: '2-digit',
-                                })}
-                              </span>
+                              <TimeCell value={row.created_at} />
                             </CommonTable.Cell>
                           </CommonTable.Row>
                         ))

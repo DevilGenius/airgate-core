@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '../../../shared/api/users';
 import { getTotalPages } from '../../../shared/utils/pagination';
 import { CommonTable } from '../../../shared/components/CommonTable';
+import { TimeCell } from '../../../shared/components/TimeCell';
 import { TablePaginationFooter } from '../../../shared/components/TablePaginationFooter';
 import { DEFAULT_PAGE_SIZE } from '../../../shared/constants';
 import type { UserResp, BalanceLogResp } from '../../../shared/types';
@@ -136,14 +137,7 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
                       <span className="text-xs text-text-tertiary">{row.remark || '-'}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <span className="text-xs text-text-secondary">
-                        {new Date(row.created_at).toLocaleString('zh-CN', {
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          month: '2-digit',
-                        })}
-                      </span>
+                      <TimeCell value={row.created_at} />
                     </CommonTable.Cell>
                   </CommonTable.Row>
                 ))

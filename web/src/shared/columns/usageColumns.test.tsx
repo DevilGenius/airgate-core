@@ -1,10 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { TFunction } from 'i18next';
-import { createUsageClientColumn } from './usageColumns';
+import { createUsageClientColumn, formatResponseTimeMs } from './usageColumns';
 import type { CustomerUsageLogResp, UsageLogResp } from '../types';
 
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+
+describe('shared usage response time formatting', () => {
+  it.each([
+    [0, '-'],
+    [-1, '-'],
+    [Number.NaN, '-'],
+    [Number.POSITIVE_INFINITY, '-'],
+    [1, '1ms'],
+    [120, '120ms'],
+    [999, '999ms'],
+    [1000, '1.00s'],
+    [1500, '1.50s'],
+    [60_000, '1m'],
+    [61_000, '1m 1s'],
+    [119_600, '2m'],
+  ] as const)('formats %s ms as %s for both usage pages', (value, expected) => {
+    expect(formatResponseTimeMs(value)).toBe(expected);
+  });
+});
 
 describe('shared usage client column', () => {
   const t = ((key: string) => key) as unknown as TFunction;
