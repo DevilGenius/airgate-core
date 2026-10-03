@@ -1,13 +1,14 @@
 package store
 
 import (
-	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	"testing"
+
+	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 )
 
 func TestAccountCognitionFlagPreservesExtra(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	row, err := db.Account.Create().SetName("cognition").SetPlatform("openai").SetType("oauth").SetCredentials(map[string]string{}).SetExtra(map[string]any{"other": "keep"}).Save(t.Context())
 	if err != nil {
 		t.Fatal(err)

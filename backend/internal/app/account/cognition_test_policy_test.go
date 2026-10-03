@@ -102,7 +102,7 @@ func TestCognitionResponseCapture(t *testing.T) {
 	if w.text() != "42" {
 		t.Fatalf("text=%q", w.text())
 	}
-	w.Write(make([]byte, (4<<20)+1))
+	_, _ = w.Write(make([]byte, (4<<20)+1))
 	if !w.overflow || w.body.Len() > 4<<20 {
 		t.Fatal("capture not bounded")
 	}
