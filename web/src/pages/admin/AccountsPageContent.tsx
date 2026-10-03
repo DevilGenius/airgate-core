@@ -1091,6 +1091,7 @@ export default function AccountsPageContent() {
   const clearRateLimitMarkersMutation = useMutation({
     mutationFn: (id: number) => accountsApi.clearFamilyCooldowns(id),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
       queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
       toast('success', t('accounts.clear_family_cooldowns_success'));
     },
@@ -1174,6 +1175,7 @@ export default function AccountsPageContent() {
   const bulkClearRateLimitMarkersMutation = useMutation({
     mutationFn: (ids: number[]) => accountsApi.bulkClearFamilyCooldowns(ids),
     onSuccess: (res) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
       handleBulkResult(res, 'accounts.bulk_clear_family_cooldowns_success');
       queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
     },
@@ -1244,11 +1246,13 @@ export default function AccountsPageContent() {
   const handleCloseBulkTest = useCallback(() => {
     setBulkTestAccounts(null);
     clearSelection();
-  }, [clearSelection]);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+  }, [clearSelection, queryClient]);
 
   const handleAccountTestComplete = useCallback(() => {
-    // Account state changes are applied by account_status.changed SSE events.
-  }, []);
+    // Test metadata (including cognition flags) is not part of status SSE events.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+  }, [queryClient]);
 
   // 批量刷新令牌：只有 OAuth 类型账号支持，预先过滤后开进度弹窗
   const handleBulkRefresh = useCallback(() => {

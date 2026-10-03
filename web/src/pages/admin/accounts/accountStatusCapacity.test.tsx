@@ -2,7 +2,29 @@ import { StrictMode, Suspense } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountCapacityStore } from './accountRuntimeStores';
-import { AccountCapacityChip, AccountCapacityLiveChip } from './accountStatusCapacity';
+import { AccountCapacityChip, AccountCapacityLiveChip, AccountStatusCell } from './accountStatusCapacity';
+import type { AccountResp } from '../../../shared/types';
+
+describe('account cognition status', () => {
+  it.each([true, false])('shows detected status %s in the second status row', (degraded) => {
+    const row: AccountResp = {
+      id: 1, name: 'test-account', email: null,
+      platform: 'openai', type: 'oauth', credentials: {}, model_policy: {},
+      state: 'degraded', state_until: new Date(Date.now() + 60000).toISOString(),
+      extra: { cognition_degraded: degraded },
+      priority: 0, max_concurrency: 4, current_concurrency: 0,
+      rate_multiplier: 1, upstream_is_pool: false, group_ids: [],
+      created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z',
+    };
+    const { container, rerender } = render(<AccountStatusCell row={row} />);
+    const tag = screen.getByText(degraded ? '降智' : '正常');
+    expect(tag).toHaveAttribute('data-degraded', String(degraded));
+    expect(tag.parentElement?.parentElement).toBe(container.firstElementChild?.children[1]);
+    expect(container.firstElementChild?.children[0]?.textContent).toContain('降级');
+    rerender(<AccountStatusCell row={{ ...row, extra: {} }} />);
+    expect(screen.queryByTitle('账号降智检测结果')).not.toBeInTheDocument();
+  });
+});
 
 describe('account capacity animation lifecycle', () => {
   const cancel = vi.fn();

@@ -1208,9 +1208,17 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 		return nil, ErrModelRequired
 	}
 
+	policy, err := loadCognitionTestPolicy(ctx, inst, item.Platform)
+	if err != nil {
+		return nil, err
+	}
+	prompt := "hi"
+	if policy.Enabled {
+		prompt = policy.Prompt
+	}
 	testBody, _ := json.Marshal(map[string]any{
 		"model":    modelID,
-		"messages": []map[string]string{{"role": "user", "content": "hi"}},
+		"messages": []map[string]string{{"role": "user", "content": prompt}},
 		"stream":   true,
 	})
 
@@ -1235,14 +1243,29 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 	}
 
 	return &ConnectivityTest{
+		Prompt:      prompt,
 		AccountName: item.Name,
 		AccountType: item.Type,
 		ModelID:     modelID,
 		run: func(runCtx context.Context, writer http.ResponseWriter) (ConnectivityTestTiming, error) {
 			req := *forwardReq
 			req.Writer = writer
+			capture := &cognitionResponseWriter{ResponseWriter: writer}
+			if policy.Enabled {
+				req.Writer = capture
+			}
 			outcome, forwardErr := inst.Forward(runCtx, &req)
 			timing := connectivityTestTiming(outcome)
+			if policy.Enabled {
+				degraded := forwardErr != nil || outcome.Kind != sdk.OutcomeSuccess || capture.overflow || !policy.matcher.MatchString(capture.text())
+				if _, persistErr := s.repo.Update(runCtx, item.ID, UpdateInput{CognitionDegraded: &degraded}); persistErr != nil {
+					return timing, fmt.Errorf("保存降智检测结果失败: %w", persistErr)
+				}
+				timing.CognitionDegraded = &degraded
+				if s.stateWriter != nil {
+					s.stateWriter.RefreshRouteGraphAccount(runCtx, item.ID)
+				}
+			}
 			if forwardErr != nil {
 				s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, forwardErr)
 				s.recordConnectivityTestFailure(runCtx, item, modelID, "plugin_forward_error", forwardErr)
@@ -1253,6 +1276,9 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			if outcome.Kind == sdk.OutcomeSuccess {
 				s.applyConnectivityTestOutcome(runCtx, item, modelID, outcome, nil)
 				s.resolveAccountMonitorEvents(runCtx, item.ID)
+				if timing.CognitionDegraded != nil && *timing.CognitionDegraded {
+					return timing, errors.New("降智检测未命中正常回复正则，已标记降智")
+				}
 				return timing, nil
 			}
 			msg := connectivityTestErrorMessage(outcome)

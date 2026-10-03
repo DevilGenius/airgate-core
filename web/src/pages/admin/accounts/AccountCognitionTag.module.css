@@ -1,0 +1,21 @@
+.tag {
+  --cognition-color: var(--ag-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 0.875rem;
+  padding-inline: 0.375rem;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in oklab, var(--cognition-color) 70%, transparent);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--cognition-color) 18%, transparent);
+  color: var(--cognition-color);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tag[data-degraded='true'] {
+  --cognition-color: #a855f7;
+}

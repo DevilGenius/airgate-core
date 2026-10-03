@@ -31,6 +31,13 @@ const account: AccountResp = {
 };
 
 describe('accountTableCellRowsEqual', () => {
+  it('refreshes status when cognition results are set or cleared', () => {
+    const degraded = { ...account, extra: { cognition_degraded: true } };
+    const normal = { ...account, extra: { cognition_degraded: false } };
+    expect(accountTableCellRowsEqual('status', account, degraded)).toBe(false);
+    expect(accountTableCellRowsEqual('status', degraded, normal)).toBe(false);
+    expect(accountTableCellRowsEqual('status', normal, { ...account, extra: {} })).toBe(false);
+  });
   it('invalidates recent usage when only the 7d observation timestamp changes', () => {
     expect(accountTableCellRowsEqual('last_used_at', account, {
       ...account,

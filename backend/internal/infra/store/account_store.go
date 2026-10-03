@@ -641,6 +641,32 @@ func sameOAuthAccount(existing *ent.Account, input appaccount.CreateInput) bool 
 
 // Update 更新账号。
 func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.UpdateInput) (appaccount.Account, error) {
+	if input.ClearCognitionTest {
+		query := `UPDATE accounts SET extra = json_remove(COALESCE(extra, '{}'), '$.cognition_degraded'), updated_at = ? WHERE id = ? AND deleted_at IS NULL`
+		if s.db.Driver().Dialect() == dialect.Postgres {
+			query = `UPDATE accounts SET extra = COALESCE(extra, '{}'::jsonb) - 'cognition_degraded', updated_at = $1 WHERE id = $2 AND deleted_at IS NULL`
+		}
+		var result sql.Result
+		if err := s.db.Driver().Exec(ctx, query, []any{time.Now(), id}, &result); err != nil {
+			return appaccount.Account{}, err
+		}
+		return s.FindByID(ctx, id, appaccount.LoadOptions{})
+	}
+	if input.CognitionDegraded != nil {
+		value := "false"
+		if *input.CognitionDegraded {
+			value = "true"
+		}
+		query := `UPDATE accounts SET extra = json_set(COALESCE(extra, '{}'), '$.cognition_degraded', json(?)), updated_at = ? WHERE id = ? AND deleted_at IS NULL`
+		if s.db.Driver().Dialect() == dialect.Postgres {
+			query = `UPDATE accounts SET extra = jsonb_set(COALESCE(extra, '{}'::jsonb), '{cognition_degraded}', $1::jsonb, true), updated_at = $2 WHERE id = $3 AND deleted_at IS NULL`
+		}
+		var result sql.Result
+		if err := s.db.Driver().Exec(ctx, query, []any{value, time.Now(), id}, &result); err != nil {
+			return appaccount.Account{}, err
+		}
+		return s.FindByID(ctx, id, appaccount.LoadOptions{})
+	}
 	if input.AutomaticCredentials {
 		updated, err := accountcredentials.UpdateAutomatic(ctx, s.db, id, input.Credentials)
 		if err != nil {

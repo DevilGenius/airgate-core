@@ -164,6 +164,9 @@ type CreateInput struct {
 // State 传 "active" / "disabled" 表示运维手动恢复 / 禁用；
 // 其它 state 值（rate_limited / degraded）由调度状态机自行维护，不由 API 写入。
 type UpdateInput struct {
+	ClearCognitionTest bool
+	// CognitionDegraded atomically patches only extra.cognition_degraded (internal test result).
+	CognitionDegraded       *bool
 	PlanType                *string
 	AutomaticCredentials    bool
 	Name                    *string
@@ -360,12 +363,14 @@ type StatsResult struct {
 
 // ConnectivityTestTiming 连通性测试的首事件和总耗时。
 type ConnectivityTestTiming struct {
-	FirstEventMs int64
-	DurationMs   int64
+	CognitionDegraded *bool
+	FirstEventMs      int64
+	DurationMs        int64
 }
 
 // ConnectivityTest 账号连通性测试计划。
 type ConnectivityTest struct {
+	Prompt      string
 	AccountName string
 	AccountType string
 	ModelID     string

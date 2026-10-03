@@ -145,10 +145,10 @@ export function AccountTestModal({
         modelId: selectedModel,
         signal: controller.signal,
         handlers: {
-          onStart: (model) => {
+          onStart: (model, prompt) => {
             addLine(t('accounts.test_connected'), 'text-green-400');
             addLine(t('accounts.test_model_used', { model }), 'text-cyan-400');
-            addLine(t('accounts.test_sending'), 'text-gray-400');
+            if (prompt) addLine(t('accounts.test_sending_prompt', { prompt }), 'text-gray-400');
             addLine(t('accounts.test_response'), 'text-yellow-400');
             setStatus('streaming');
           },
@@ -167,6 +167,7 @@ export function AccountTestModal({
         setStreamingContent('');
       }
       if (result.success) {
+        if (result.cognitionDegraded === false) addLine('降智检测：正常，回复命中正则', 'text-green-300');
         setTiming({
           firstEventMs: result.firstEventMs ?? null,
           durationMs: result.durationMs ?? 0,
@@ -288,7 +289,7 @@ export function AccountTestModal({
                 <div className="relative group">
                   <div
                     ref={terminalRef}
-                    className="bg-gray-900 rounded-lg border border-gray-700 p-4 font-mono text-xs leading-relaxed overflow-y-auto"
+                    className="bg-gray-900 rounded-lg border border-gray-700 p-4 pr-12 font-mono text-xs leading-relaxed overflow-y-auto whitespace-pre-wrap break-words text-gray-300"
                     style={{ minHeight: 120, maxHeight: 240 }}
                   >
                     {status === 'idle' && outputLines.length === 0 ? (

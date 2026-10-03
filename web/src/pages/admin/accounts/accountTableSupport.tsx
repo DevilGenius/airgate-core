@@ -192,6 +192,7 @@ export function accountTableCellRowsEqual(columnKey: string, left: AccountResp, 
         && left.max_concurrency === right.max_concurrency;
     case 'status':
       return left.state === right.state
+        && left.extra?.cognition_degraded === right.extra?.cognition_degraded
         && left.state_until === right.state_until
         && left.error_msg === right.error_msg
         && left.family_cooldowns === right.family_cooldowns;

@@ -5,6 +5,7 @@ import { getAdminServerNowMs } from '../../../shared/api/adminEvents';
 import type { AccountResp, FamilyCooldownDTO } from '../../../shared/types';
 import { AccountCapacityStore } from './accountRuntimeStores';
 import { NativeSoftChip } from './accountNativeChip';
+import cognitionStyles from './AccountCognitionTag.module.css';
 
 function StatusPill({
   icon,
@@ -284,13 +285,22 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
     });
   }
 
+  const cognitionDegraded = row.extra?.cognition_degraded;
+  const mainBadges = [{ key: 'main', badge: mainBadge }];
+  if (typeof cognitionDegraded === 'boolean') {
+    modelStatusBadges.push({ key: 'cognition', badge: (
+      <span className={cognitionStyles.tag} data-degraded={String(cognitionDegraded)} title="账号降智检测结果">
+        {cognitionDegraded ? '降智' : '正常'}
+      </span>
+    ) });
+  }
   const statusRows = [
-    { key: 'main', badges: [{ key: 'main', badge: mainBadge }] },
+    { key: 'main', badges: mainBadges },
     { key: 'model', badges: modelStatusBadges },
     { key: 'transient', badges: transientStatusBadges },
   ].filter((row) => row.badges.length > 0);
 
-  if (statusRows.length === 1) {
+  if (statusRows.length === 1 && mainBadges.length === 1) {
     if (!freezeCooldownHoverProps) return mainBadge;
     return (
       <div className="flex w-full max-w-full flex-col items-center gap-0.5 text-center" {...freezeCooldownHoverProps}>

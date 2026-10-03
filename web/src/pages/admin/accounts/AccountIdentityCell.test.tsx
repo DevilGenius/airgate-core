@@ -5,10 +5,24 @@ import { accountIdentityDisplay, AccountIdentityCell } from './AccountIdentityCe
 import { AccountPlatformTypeIcons } from './AccountPlatformTypeIcons';
 
 afterEach(cleanup);
-const account = { platform: 'openai', type: 'oauth', credentials: {} } satisfies Pick<AccountResp, 'platform' | 'type' | 'credentials'>;
+const account: AccountResp = {
+  id: 1, name: 'test-account', email: null,
+  platform: 'openai', type: 'oauth', credentials: {}, model_policy: {},
+  state: 'active', priority: 0, max_concurrency: 4, current_concurrency: 0,
+  rate_multiplier: 1, upstream_is_pool: false, group_ids: [],
+  created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z',
+};
 const now = Date.parse('2026-10-01T00:00:00Z');
 
 describe('core account identity', () => {
+  it('does not display cognition status in the identity column', () => {
+    const glyph = () => <svg />;
+    const row: AccountResp = { ...account, extra: { cognition_degraded: true } };
+    const { rerender } = render(<AccountIdentityCell row={row} platformLabel="OpenAI" PlatformGlyph={glyph} />);
+    expect(screen.queryByText('降智')).not.toBeInTheDocument();
+    rerender(<AccountIdentityCell row={{ ...row, extra: { cognition_degraded: false } }} platformLabel="OpenAI" PlatformGlyph={glyph} />);
+    expect(screen.queryByText('降智')).not.toBeInTheDocument();
+  });
   it('reuses modal icons during output updates and handles a replaced platform glyph', () => {
     const glyph = vi.fn(() => <svg />);
     const { rerender } = render(<AccountPlatformTypeIcons PlatformGlyph={glyph} platformLabel="OpenAI" type="api_key" />);

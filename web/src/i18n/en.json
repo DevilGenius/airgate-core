@@ -527,7 +527,7 @@
     "test_connecting": "Connecting to API...",
     "test_connected": "Connected to API",
     "test_model_used": "Using model: {{model}}",
-    "test_sending": "Sending test message: \"hi\"",
+    "test_sending_prompt": "Sending test message:\n{{prompt}}",
     "test_response": "Response:",
     "test_done": "Test complete!",
     "test_timing": "Response time: {{firstEvent}} Duration: {{duration}}",

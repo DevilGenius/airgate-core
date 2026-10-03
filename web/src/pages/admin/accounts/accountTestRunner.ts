@@ -3,6 +3,7 @@ import { getToken } from '../../../shared/api/client';
 import type { ModelInfo } from '../../../shared/types';
 
 export interface AccountTestRunResult {
+  cognitionDegraded?: boolean;
   success: boolean;
   error?: string;
   firstEventMs?: number;
@@ -10,7 +11,7 @@ export interface AccountTestRunResult {
 }
 
 export interface AccountTestStreamHandlers {
-  onStart?: (model: string) => void;
+  onStart?: (model: string, prompt: string) => void;
   onTextDelta?: (text: string) => void;
   onRawError?: (message: string) => void;
 }
@@ -93,11 +94,12 @@ export async function runAccountConnectivityTest({
       try {
         const event = JSON.parse(payload);
         if (event.type === 'test_start') {
-          handlers?.onStart?.(event.model ?? modelId);
+          handlers?.onStart?.(event.model ?? modelId, typeof event.prompt === 'string' ? event.prompt : '');
           continue;
         }
         if (event.type === 'test_complete') {
           const timing = {
+            ...(typeof event.cognition_degraded === 'boolean' ? { cognitionDegraded: event.cognition_degraded as boolean } : {}),
             ...(Number.isFinite(event.first_event_ms) ? { firstEventMs: event.first_event_ms as number } : {}),
             ...(Number.isFinite(event.duration_ms) ? { durationMs: event.duration_ms as number } : {}),
           };

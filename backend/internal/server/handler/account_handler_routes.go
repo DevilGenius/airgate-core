@@ -373,6 +373,11 @@ func (h *AccountHandler) BulkClearFamilyCooldowns(c *gin.Context) {
 
 	result := appaccount.BulkResult{Results: make([]appaccount.BulkResultItem, 0, len(req.AccountIDs))}
 	for _, id := range req.AccountIDs {
+		if err := h.service.ClearCognitionTest(c.Request.Context(), id); err != nil {
+			result.Failed++
+			result.Results = append(result.Results, appaccount.BulkResultItem{ID: id, Success: false, Error: err.Error()})
+			continue
+		}
 		h.scheduler.ClearRateLimitMarkers(c.Request.Context(), id)
 		result.Success++
 		result.SuccessIDs = append(result.SuccessIDs, id)
@@ -519,6 +524,7 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 
 	sendSSEEvent(c.Writer, map[string]any{
 		"type":         "test_start",
+		"prompt":       testPlan.Prompt,
 		"account":      testPlan.AccountName,
 		"model":        testPlan.ModelID,
 		"account_type": testPlan.AccountType,
@@ -527,20 +533,22 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 	timing, err := testPlan.RunWithTiming(c.Request.Context(), c.Writer)
 	if err != nil {
 		sendSSEEvent(c.Writer, map[string]any{
-			"type":           "test_complete",
-			"success":        false,
-			"error":          err.Error(),
-			"first_event_ms": timing.FirstEventMs,
-			"duration_ms":    timing.DurationMs,
+			"type":               "test_complete",
+			"success":            false,
+			"cognition_degraded": timing.CognitionDegraded,
+			"error":              err.Error(),
+			"first_event_ms":     timing.FirstEventMs,
+			"duration_ms":        timing.DurationMs,
 		})
 		return
 	}
 
 	sendSSEEvent(c.Writer, map[string]any{
-		"type":           "test_complete",
-		"success":        true,
-		"first_event_ms": timing.FirstEventMs,
-		"duration_ms":    timing.DurationMs,
+		"type":               "test_complete",
+		"success":            true,
+		"cognition_degraded": timing.CognitionDegraded,
+		"first_event_ms":     timing.FirstEventMs,
+		"duration_ms":        timing.DurationMs,
 	})
 }
 
@@ -618,6 +626,11 @@ func (h *AccountHandler) ClearFamilyCooldowns(c *gin.Context) {
 	}
 	if h.scheduler == nil {
 		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "调度器不可用")
+		return
+	}
+	if err := h.service.ClearCognitionTest(c.Request.Context(), id); err != nil {
+		httpCode, message := h.handleError("清除检测标记失败", "清除失败", err)
+		response.Error(c, httpCode, httpCode, message)
 		return
 	}
 	cleared := h.scheduler.ClearRateLimitMarkers(c.Request.Context(), id)
