@@ -191,8 +191,16 @@ func TestTrendCacheKeyBucketsMovingEndTime(t *testing.T) {
 	if key1 != key2 {
 		t.Fatalf("same cache bucket keys differ: %q vs %q", key1, key2)
 	}
-	if key1 == key3 {
-		t.Fatalf("different cache bucket keys unexpectedly match: %q", key1)
+	if key1 != key3 {
+		t.Fatalf("same hourly query should reuse a still-fresh cache entry: %q vs %q", key1, key3)
+	}
+	for _, end := range []time.Time{
+		time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC),
+		time.Date(2026, 5, 27, 13, 0, 1, 0, time.UTC),
+	} {
+		if key1 == trendCacheKey(query, time.UTC, start, end) {
+			t.Fatal("different hourly bucket coverage must not share a cache entry")
+		}
 	}
 
 	otherUser := query
@@ -649,7 +657,7 @@ func (s dashboardStubRepository) ListTrendLogs(ctx context.Context, startTime, e
 	return s.listTrendLogs(ctx, startTime, endTime)
 }
 
-func (s dashboardStubRepository) ListAPIKeyTrendLogs(ctx context.Context, startTime, endTime time.Time, _ int) ([]APIKeyTrendLog, error) {
+func (s dashboardStubRepository) ListAPIKeyTrendLogs(ctx context.Context, startTime, endTime time.Time, _ int, _ string, _ *time.Location) ([]APIKeyTrendLog, error) {
 	if s.listAPIKeyTrendLogs == nil {
 		return nil, nil
 	}

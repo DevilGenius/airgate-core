@@ -48,10 +48,11 @@
   line-height: var(--ag-usage-toolbar-line-height);
 }
 
-/* Keep the usage actions aligned to one metric-card column. */
+/* Split one metric-card column equally between the two usage actions. */
 .ag-usage-page .ag-usage-toolbar-actions {
+  --ag-toolbar-button-min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 0.5rem;
   width: 100%;
@@ -60,9 +61,17 @@
 }
 
 .ag-usage-page .ag-usage-toolbar-actions > .ag-auto-refresh-menu,
-.ag-usage-page .ag-usage-toolbar-actions > .ag-auto-refresh-menu .ag-auto-refresh-trigger {
+.ag-usage-page .ag-usage-toolbar-actions > .ag-column-visibility-menu {
   width: 100%;
-  min-width: 0 !important;
+  min-width: 0;
+}
+
+.ag-usage-page .ag-usage-toolbar-actions > .ag-toolbar-menu > .ag-toolbar-menu-trigger {
+  width: 100%;
+}
+
+.ag-usage-page .ag-usage-toolbar-actions .ag-auto-refresh-trigger {
+  --ag-auto-refresh-trigger-width: 0;
 }
 
 .ag-usage-page .ag-usage-toolbar-actions .ag-page-toolbar-button {

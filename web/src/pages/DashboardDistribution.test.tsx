@@ -61,4 +61,32 @@ describe('dashboard distribution dimensions', () => {
       expect(within(screen.getByRole('table', { name: title })).getByText('common.no_data')).toBeInTheDocument();
     }
   });
+
+  it('windows thousands of credentials while preserving ranks, the last row and tab resets', () => {
+    const accounts = Array.from({ length: 3578 }, (_, index) => ({ id: index + 1, name: `credential-${index + 1}`, ...totals }));
+    const { rerender } = render(<ModelDistributionCard trend={{ ...trend, account_distribution: accounts }} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'dashboard.by_account' }));
+    const table = screen.getByRole('table', { name: 'dashboard.by_account' });
+    const scroller = table.parentElement!;
+    expect(table).toHaveAttribute('aria-rowcount', '3579');
+    expect(table.querySelectorAll('tbody tr[data-key]').length).toBeLessThan(40);
+    expect(within(table).getByText('credential-1')).toBeInTheDocument();
+    expect(within(table).queryByText('credential-3578')).not.toBeInTheDocument();
+
+    fireEvent.scroll(scroller, { target: { scrollTop: 16018 } });
+    expect(within(table).getByText('credential-1001')).toBeInTheDocument();
+    expect(within(table).getByText('#1001')).toBeInTheDocument();
+    expect(table.querySelector('tr[data-key="account:1001"]')).toHaveAttribute('aria-rowindex', '1002');
+    expect(table.querySelectorAll('tbody tr[data-key]').length).toBeLessThan(40);
+
+    fireEvent.scroll(scroller, { target: { scrollTop: 3578 * 16 } });
+    expect(within(table).getByText('credential-3578')).toBeInTheDocument();
+    expect(within(table).getByText('#3578')).toBeInTheDocument();
+
+    rerender(<ModelDistributionCard trend={{ ...trend, account_distribution: accounts.slice(0, 60) }} />);
+    expect(within(table).getByText('credential-60')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'dashboard.by_group' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'dashboard.by_account' }));
+    expect(within(screen.getByRole('table', { name: 'dashboard.by_account' })).getByText('credential-1')).toBeInTheDocument();
+  });
 });

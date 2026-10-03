@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/DevilGenius/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
@@ -16,9 +18,10 @@ import (
 
 // Service 提供仪表盘用例编排。
 type Service struct {
-	repo Repository
-	rdb  *redis.Client
-	now  func() time.Time
+	repo        Repository
+	rdb         *redis.Client
+	now         func() time.Time
+	trendFlight singleflight.Group
 }
 
 // NewService 创建仪表盘服务。
@@ -39,7 +42,7 @@ const (
 	trendLockTTL  = 5 * time.Second
 	trendLockWait = 1 * time.Second
 	// 缓存键版本随 payload 结构变化递增，避免旧缓存缺少新增字段（如 Key Top 12 的 billed_cost）。
-	trendCacheKeyPrefix = "ag:dashboard:trend:v4"
+	trendCacheKeyPrefix = "ag:dashboard:trend:v5"
 	// tpmPerRPMBaseline is the reference workload of 1 RPM and 100k TPM.
 	tpmPerRPMBaseline = 100000.0
 )
@@ -137,6 +140,25 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 	now := s.now().In(loc)
 	startTime, endTime := resolveTrendTimeRange(query, now)
 	cacheKey := trendCacheKey(query, loc, startTime, endTime)
+	result := s.trendFlight.DoChan(cacheKey, func() (any, error) {
+		// A cancelled tab must not cancel another caller sharing the same query.
+		// Bound shared work even if every waiting caller disconnects.
+		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		return s.loadTrendWithCache(loadCtx, query, loc, startTime, endTime, cacheKey)
+	})
+	select {
+	case <-ctx.Done():
+		return Trend{}, ctx.Err()
+	case loaded := <-result:
+		if loaded.Err != nil {
+			return Trend{}, loaded.Err
+		}
+		return loaded.Val.(Trend), nil
+	}
+}
+
+func (s *Service) loadTrendWithCache(ctx context.Context, query TrendQuery, loc *time.Location, startTime, endTime time.Time, cacheKey string) (Trend, error) {
 	if trend, ok := s.loadTrendCache(ctx, cacheKey); ok {
 		return trend, nil
 	}
@@ -179,16 +201,26 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 }
 
 func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *time.Location, startTime, endTime time.Time) (Trend, error) {
-	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID)
-	if err != nil {
-		return Trend{}, err
-	}
-	apiKeyLogs, err := s.repo.ListAPIKeyTrendLogs(ctx, startTime, endTime, query.UserID)
-	if err != nil {
-		return Trend{}, err
-	}
-	distribution, err := s.repo.LoadDistributionStats(ctx, startTime, endTime, query.UserID)
-	if err != nil {
+	var logs []TrendLog
+	var apiKeyLogs []APIKeyTrendLog
+	var distribution DistributionSnapshot
+	queries, queryCtx := errgroup.WithContext(ctx)
+	queries.Go(func() error {
+		var err error
+		logs, err = s.repo.ListTrendLogs(queryCtx, startTime, endTime, query.UserID)
+		return err
+	})
+	queries.Go(func() error {
+		var err error
+		apiKeyLogs, err = s.repo.ListAPIKeyTrendLogs(queryCtx, startTime, endTime, query.UserID, query.Granularity, loc)
+		return err
+	})
+	queries.Go(func() error {
+		var err error
+		distribution, err = s.repo.LoadDistributionStats(queryCtx, startTime, endTime, query.UserID)
+		return err
+	})
+	if err := queries.Wait(); err != nil {
 		return Trend{}, err
 	}
 
@@ -204,15 +236,20 @@ func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *tim
 }
 
 func trendCacheKey(query TrendQuery, loc *time.Location, startTime, endTime time.Time) string {
-	const trendBucketSeconds = 15
-	return fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d:%s:%s:%s",
+	// Queries read whole hourly rollup buckets. Keep the key stable for the same
+	// bucket range; the TTL controls freshness, not a moving 15-second key that
+	// discards a still-fresh result at every wall-clock boundary.
+	endBucket := endTime.UTC().Truncate(time.Hour)
+	if endBucket.Before(endTime) {
+		endBucket = endBucket.Add(time.Hour)
+	}
+	return fmt.Sprintf("%s:%s:%s:%d:%d:%d:%s:%s:%s",
 		trendCacheKeyPrefix,
 		loc.String(),
 		query.Range,
 		query.UserID,
 		startTime.UTC().Unix(),
-		endTime.UTC().Unix()/trendBucketSeconds,
-		trendBucketSeconds,
+		endBucket.Unix(),
 		query.Granularity,
 		query.StartDate,
 		query.EndDate,

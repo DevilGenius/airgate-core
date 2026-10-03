@@ -9,7 +9,7 @@ import (
 type Repository interface {
 	LoadStatsSnapshot(ctx context.Context, todayStart, oneMinAgo, tenMinAgo time.Time, userID int) (StatsSnapshot, error)
 	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]TrendLog, error)
-	ListAPIKeyTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]APIKeyTrendLog, error)
+	ListAPIKeyTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int, granularity string, loc *time.Location) ([]APIKeyTrendLog, error)
 	LoadDistributionStats(ctx context.Context, startTime, endTime time.Time, userID int) (DistributionSnapshot, error)
 }
 

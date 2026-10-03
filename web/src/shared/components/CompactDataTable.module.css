@@ -1,0 +1,9 @@
+.virtualViewport {
+  overflow-anchor: none;
+}
+
+.spacer > td {
+  padding: 0;
+  border: 0;
+  line-height: 0;
+}

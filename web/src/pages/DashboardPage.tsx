@@ -553,6 +553,8 @@ export function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) 
     <Panel title={activeTitle} extra={distributionTabs}>
       <div className="ag-distribution-table-scroll ag-dashboard-distribution-scroll">
         <CompactDataTable
+          key={tab}
+          virtualize
           ariaLabel={activeTitle}
           className="ag-compact-data-table--dense ag-dashboard-distribution-table"
           emptyText={t('common.no_data')}
