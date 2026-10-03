@@ -14,6 +14,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
+
 	"github.com/DevilGenius/airgate-core/ent"
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 	"github.com/DevilGenius/airgate-core/internal/auth"

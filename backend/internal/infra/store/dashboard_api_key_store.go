@@ -5,6 +5,7 @@ import (
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
+
 	appdashboard "github.com/DevilGenius/airgate-core/internal/app/dashboard"
 )
 
