@@ -112,6 +112,7 @@ type AccountRowRenderMeta = {
 
 const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
   currency,
+  hideLabelOnMobile,
   label,
   labelSecondary,
   mutedLabel,
@@ -121,6 +122,7 @@ const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
   valueSecondary,
 }: {
   currency?: boolean;
+  hideLabelOnMobile?: boolean;
   label: string;
   labelSecondary?: string;
   mutedLabel?: boolean;
@@ -136,7 +138,12 @@ const AccountUsageMetricChip = memo(function AccountUsageMetricChip({
     : 'ag-account-usage-metric-label';
 
   return (
-    <span className="ag-account-usage-metric" data-tone={tone} title={title}>
+    <span
+      className={`ag-account-usage-metric${hideLabelOnMobile ? ' ag-account-usage-metric--counts' : ''}`}
+      data-tone={tone}
+      title={title}
+      aria-label={hideLabelOnMobile ? `${label}${hasLabelSecondary ? `/${labelSecondary}` : ''}: ${value}${hasValueSecondary ? `/${valueSecondary}` : ''}` : undefined}
+    >
       <span className={labelClassName}>
         {hasLabelSecondary ? <span className="ag-account-usage-metric-segment">{label}</span> : label}
         {hasLabelSecondary ? (
@@ -182,6 +189,7 @@ const AccountUsageTodayMetricChips = memo(function AccountUsageTodayMetricChips(
   return (
     <div className="ag-account-usage-metrics" title={labels.todayStatsTooltip}>
       <AccountUsageMetricChip
+        hideLabelOnMobile
         label={showImageCount ? labels.imageCountInlineLabel : labels.todayAccessCount}
         labelSecondary={showImageCount ? labels.todayAccessCount : undefined}
         mutedLabel

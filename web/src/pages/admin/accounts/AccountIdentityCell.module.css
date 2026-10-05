@@ -10,6 +10,12 @@
   min-width: 0;
 }
 
+@media (max-width: 767px) {
+  .cell {
+    justify-content: start;
+  }
+}
+
 
 .icons {
   display: inline-flex;

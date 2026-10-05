@@ -249,3 +249,13 @@
 .ag-accounts-table .ag-account-usage-metric[data-tone="success"] .ag-account-usage-metric-currency {
   color: var(--ag-success);
 }
+
+@media (max-width: 767px) {
+  .ag-accounts-table .ag-account-usage-metric--counts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ag-accounts-table .ag-account-usage-metric--counts .ag-account-usage-metric-label {
+    display: none;
+  }
+}
