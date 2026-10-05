@@ -1,6 +1,7 @@
 package adminevents
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -8,7 +9,7 @@ import (
 
 func TestAccountPatchCoalescesIndependentFieldsAndExplicitClear(t *testing.T) {
 	hub := NewHub(8)
-	ch, cancel := hub.Subscribe(nil)
+	ch, cancel := hub.Subscribe(context.Background())
 	defer cancel()
 	publisher := NewAccountChangePublisher(hub)
 	priority, weight, degraded := 50, 0, true

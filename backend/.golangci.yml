@@ -1,6 +1,14 @@
 version: "2"
 
 linters:
+  exclusions:
+    generated: strict
+    paths:
+      # Scratch Go programs under backend/tmp are gitignored, but golangci-lint
+      # does not honor .gitignore, so they would otherwise fail lint on a clean
+      # checkout that happens to contain them. Paths here are relative to this
+      # config file's directory (backend/), not the repository root.
+      - ^tmp/
   enable:
     - errcheck
     - govet
@@ -10,6 +18,8 @@ linters:
     - misspell
 
 formatters:
+  exclusions:
+    generated: strict
   enable:
     - gofmt
     - goimports
@@ -17,10 +27,6 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/DevilGenius
-
-run:
-  exclude-dirs:
-    - ent
 
 issues:
   max-issues-per-linter: 0

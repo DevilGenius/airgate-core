@@ -1,6 +1,7 @@
 package adminevents
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -8,7 +9,7 @@ import (
 
 func TestServiceKeepsAccountFieldsWithoutModelStatistics(t *testing.T) {
 	service := NewService(8)
-	ch, cancel, _ := service.SubscribeWithSequence(nil)
+	ch, cancel, _ := service.SubscribeWithSequence(context.Background())
 	defer cancel()
 	zero := 0
 	no := false
