@@ -1,3 +1,4 @@
+import styles from './ImportConfigModal.module.css';
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,7 +9,6 @@ import {
 } from 'lucide-react';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeCheckbox } from '../../../shared/components/NativeCheckbox';
-import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
 import { DropdownIndicator } from '../../../shared/components/DropdownIndicator';
 import { ToolbarMenuItem } from '../../../shared/components/ToolbarMenu';
@@ -29,6 +29,7 @@ import {
   type ImportRule,
 } from './importConfigDsl';
 import {
+  DEFAULT_SCHEDULING_WEIGHT,
   MAX_SCHEDULING_WEIGHT,
   parseSchedulingWeightInput,
   parseModelDowngradeThresholdInput
@@ -84,6 +85,7 @@ function examplePlanRule(
     ],
     set: {
       max_concurrency: maxConcurrency,
+      scheduling_weight: DEFAULT_SCHEDULING_WEIGHT,
       priority,
       group_ids: [],
       model_downgrade_threshold: 0,
@@ -434,12 +436,8 @@ export function ImportConfigModal({
 
   return (
     <CommonModal
-      className="ag-account-page-modal ag-import-config-modal"
+      className={['ag-account-page-modal', styles.modal].join(' ')}
       description={t('accounts.import_config_description')}
-      dialogStyle={{
-        maxWidth: '980px',
-        width: 'min(100%, calc(100vw - 2rem))',
-      }}
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={onClose} isDisabled={loading}>
@@ -461,8 +459,8 @@ export function ImportConfigModal({
       surface={false}
       title={t('accounts.import_config_title')}
     >
-      <div className="ag-import-config">
-        <div className="ag-import-config-toolbar">
+      <div className={styles.root}>
+        <div className={styles.toolbar}>
           <Tabs
             className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto"
             isDisabled={loading}
@@ -498,11 +496,11 @@ export function ImportConfigModal({
         </div>
 
         {view === 'dsl' ? (
-          <div className="ag-import-config-dsl">
+          <div className={styles.dsl}>
             <HeroTextField fullWidth isInvalid={dslError !== ''}>
               <Label>{t('accounts.import_config_dsl')}</Label>
               <TextArea
-                className="ag-import-config-dsl-input font-mono text-xs leading-5"
+                className={[styles.dslInput, 'font-mono', 'text-xs', 'leading-5'].join(' ')}
                 wrap="off"
                 value={dslValue}
                 disabled={loading}
@@ -520,17 +518,17 @@ export function ImportConfigModal({
             {dslError ? <p className="text-sm text-danger">{dslError}</p> : null}
           </div>
         ) : (
-          <div className="ag-import-config-body">
-            <aside className="ag-import-config-sidebar">
-              <div className="ag-import-config-sidebar-header">
+          <div className={styles.body}>
+            <aside className={styles.sidebar}>
+              <div className={styles.sidebarHeader}>
                 <span className="text-xs font-medium text-text-secondary">{t('accounts.import_config_rules')}</span>
                 <span className="text-[11px] text-text-tertiary">{t('accounts.import_config_first_match')}</span>
               </div>
-              <div className="ag-import-config-rule-list ag-simple-multi-select">
+              <div className={[styles.ruleList, 'ag-simple-multi-select'].join(' ')}>
                 {config.rules.map((rule, index) => (
                   <div
                     key={`${rule.name}-${index}`}
-                    className="ag-import-config-rule"
+                    className={styles.rule}
                     data-dragging={draggingIndex === index ? 'true' : undefined}
                     data-drop-position={
                       dropIndicator?.index === index ? dropIndicator.position : undefined
@@ -541,7 +539,7 @@ export function ImportConfigModal({
                     onDragStart={handleRuleDragStart(index)}
                     onDrop={handleRuleDrop(index)}
                   >
-                    <span className="ag-import-config-rule-grip" aria-hidden="true">
+                    <span className={styles.ruleGrip} aria-hidden="true">
                       <GripVertical className="h-3.5 w-3.5" />
                     </span>
                     <ToolbarMenuItem
@@ -566,7 +564,7 @@ export function ImportConfigModal({
                   </p>
                 ) : null}
               </div>
-              <div className="ag-import-config-sidebar-footer">
+              <div className={styles.sidebarFooter}>
                 <Button className="w-full" variant="secondary" onPress={addRule} isDisabled={loading}>
                   <Plus className="h-4 w-4" />
                   {t('accounts.import_config_add_rule')}
@@ -574,42 +572,52 @@ export function ImportConfigModal({
               </div>
             </aside>
 
-            <div className="ag-import-config-editor">
-              <div className="space-y-4 pb-1">
+            <div className={styles.editor}>
+              <div className={styles.editorContent} data-rule-disabled={selectedRule?.enabled === false || undefined}>
               {selectedRule ? (
                 <>
-                  <div className="ag-import-config-rule-header">
-                    <div className="ag-import-config-rule-name min-w-[220px]">
-                      <HeroTextField fullWidth>
-                        <Label className="ag-import-config-rule-name-label">{t('accounts.import_config_rule_name')}</Label>
+                  <div className={styles.ruleHeader}>
+                    <NativeCheckbox
+                      className={styles.ruleEnabled}
+                      isSelected={selectedRule.enabled !== false}
+                      onChange={(enabled) => updateSelectedRule((rule) => { rule.enabled = enabled; })}
+                    >
+                      {t('accounts.import_config_rule_enabled')}
+                    </NativeCheckbox>
+                    <div className={styles.ruleName}>
+                      <HeroTextField fullWidth isDisabled={selectedRule.enabled === false}>
                         <Input
+                          aria-label={t('accounts.import_config_rule_name')}
+                          disabled={selectedRule.enabled === false}
                           value={selectedRule.name}
                           onChange={(event) => updateSelectedRule((rule) => { rule.name = event.target.value; })}
                         />
                       </HeroTextField>
                     </div>
-                    <div className="ag-import-config-rule-actions flex flex-wrap items-center gap-1 pb-0.5">
-                      <NativeSwitch
-                        isSelected={selectedRule.enabled !== false}
-                        label={t('accounts.import_config_rule_enabled')}
-                        onChange={(enabled) => updateSelectedRule((rule) => { rule.enabled = enabled; })}
-                      />
-                      <Button isIconOnly variant="ghost" aria-label={t('accounts.import_config_duplicate_rule')} onPress={duplicateRule}>
-                        <CopyPlus className="h-4 w-4" />
-                      </Button>
-                      <Button isIconOnly variant="ghost" aria-label={t('accounts.import_config_delete_rule')} onPress={deleteRule}>
-                        <Trash2 className="h-4 w-4 text-danger" />
-                      </Button>
-                    </div>
+                    <Button className={styles.ruleAction} variant="secondary" isDisabled={selectedRule.enabled === false} onPress={duplicateRule}>
+                      <CopyPlus className="h-4 w-4" />
+                      {t('accounts.import_config_duplicate_rule')}
+                    </Button>
+                    <Button className={styles.ruleAction} variant="secondary" isDisabled={selectedRule.enabled === false} onPress={deleteRule}>
+                      <Trash2 className="h-4 w-4 text-danger" />
+                      {t('accounts.import_config_delete_rule')}
+                    </Button>
                   </div>
 
-                  <section className="space-y-1.5 border-t border-border pt-3">
-                    <div className="ag-import-config-conditions-header flex items-center justify-between gap-2">
-                      <div>
+                  <fieldset
+                    className={styles.ruleFields}
+                    disabled={selectedRule.enabled === false}
+                    inert={selectedRule.enabled === false}
+                    aria-disabled={selectedRule.enabled === false}
+                  >
+                  <section className={styles.section}>
+                    <div className={styles.conditionsHeader}>
+                      <div className={styles.conditionsTitle}>
                         <h3 className="text-sm font-semibold text-text">{t('accounts.import_config_conditions')}</h3>
                         <p className="text-xs text-text-tertiary">{t('accounts.import_config_conditions_hint')}</p>
                       </div>
                       <Button
+                        className={styles.ruleAction}
                         variant="secondary"
                         onPress={() => updateSelectedRule((rule) => {
                           rule.when.push({ field: 'credentials.plan_type', op: 'eq', value: '' });
@@ -622,7 +630,7 @@ export function ImportConfigModal({
                     {selectedRule.when.map((condition, conditionIndex) => {
                       const operator = CONDITION_OPERATORS.find((item) => item.key === condition.op);
                       return (
-                        <div key={conditionIndex} className="ag-import-config-condition grid items-center gap-2 rounded-md bg-surface px-2.5 py-1.5 sm:grid-cols-[1fr_1fr_1fr_auto]">
+                        <div key={conditionIndex} className={styles.condition}>
                           <ComboBox
                             fullWidth
                             allowsCustomValue
@@ -642,7 +650,7 @@ export function ImportConfigModal({
                               <Input placeholder={t('accounts.import_config_field')} />
                               <ComboBox.Trigger><DropdownIndicator slot="combo-box-trigger-default-icon" /></ComboBox.Trigger>
                             </ComboBox.InputGroup>
-                            <ComboBox.Popover className="ag-import-config-field-popover">
+                            <ComboBox.Popover className={styles.fieldPopover}>
                               <ListBox>
                                 {CONDITION_FIELD_SUGGESTIONS.map((field) => (
                                   <ListBox.Item key={field} id={field} textValue={field}>
@@ -681,74 +689,62 @@ export function ImportConfigModal({
                             aria-label={t('accounts.import_config_delete_condition')}
                             onPress={() => updateSelectedRule((rule) => { rule.when.splice(conditionIndex, 1); })}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 text-danger" />
                           </Button>
                         </div>
                       );
                     })}
                   </section>
 
-                  <section className="space-y-4 border-t border-border pt-4">
-                    <h3 className="ag-import-config-section-title text-sm font-semibold text-text">{t('accounts.import_config_assignments')}</h3>
+                  <section className={styles.section}>
+                    <h3 className="text-sm font-semibold text-text">{t('accounts.import_config_assignments')}</h3>
 
-                    <div className="grid gap-x-2 gap-y-3 rounded-md bg-surface px-2.5 py-3 sm:grid-cols-[1fr_1fr_1fr_1fr]">
-                      <SimpleSelect
-                        ariaLabel={t('accounts.import_config_priority')}
-                        fullWidth
-                        items={[
-                          { key: 'fixed', label: t('accounts.import_config_priority_fixed') },
-                          { key: 'sequence', label: t('accounts.priority_sequence') },
-                        ]}
-                        selectedKey={displayedPriority.mode}
-                        onSelectionChange={(key) => {
-                          setPriorityMode(key as 'fixed' | 'sequence');
-                        }}
-                      />
-                      <Input
-                        aria-label={t('accounts.priority')}
-                        className="w-full"
-                        type="number"
-                        min={IMPORT_PRIORITY_MIN}
-                        max={IMPORT_PRIORITY_MAX}
-                        disabled={displayedPriority.mode !== 'fixed'}
-                        placeholder={t('accounts.import_config_priority_placeholder')}
-                        value={selectedRule.set.priority?.mode === 'fixed'
-                          ? String(selectedRule.set.priority.value)
-                          : ''}
-                        onChange={(event) => {
-                          const raw = event.target.value.trim();
-                          updateSelectedRule((rule) => {
-                            if (rule.set.priority?.mode !== 'fixed') {
-                              rule.set.priority = { mode: 'fixed', value: 50 };
-                            }
-                            if (raw === '') {
-                              delete rule.set.priority;
-                              return;
-                            }
-                            rule.set.priority.value = parseNumber(raw, 0);
-                          });
-                        }}
-                      />
-                      <Input
-                        aria-label={t('accounts.import_config_capacity')}
-                        className="w-full"
-                        type="number"
-                        min={0}
-                        placeholder={t('accounts.import_config_capacity_placeholder')}
-                        value={selectedRule.set.max_concurrency != null
-                          ? String(selectedRule.set.max_concurrency)
-                          : ''}
-                        onChange={(event) => {
-                          const raw = event.target.value.trim();
-                          updateSelectedRule((rule) => {
-                            if (raw === '') {
-                              delete rule.set.max_concurrency;
-                              return;
-                            }
-                            rule.set.max_concurrency = Math.max(0, parseNumber(raw, 0));
-                          });
-                        }}
-                      />
+                    <div className={styles.assignments}>
+                      <div className={styles.priority}>
+                        <div className={styles.labeledControl}>
+                          <Label>{t('accounts.import_config_priority')}</Label>
+                          <SimpleSelect
+                            ariaLabel={t('accounts.import_config_priority')}
+                            fullWidth
+                            items={[
+                              { key: 'fixed', label: t('accounts.import_config_priority_fixed') },
+                              { key: 'sequence', label: t('accounts.priority_sequence') },
+                            ]}
+                            selectedKey={displayedPriority.mode}
+                            onSelectionChange={(key) => {
+                              setPriorityMode(key as 'fixed' | 'sequence');
+                            }}
+                          />
+                        </div>
+                        <HeroTextField fullWidth>
+                          <Label>{t('accounts.priority')}</Label>
+                          <Input
+                            aria-label={t('accounts.priority')}
+                            className="w-full"
+                            type="number"
+                            min={IMPORT_PRIORITY_MIN}
+                            max={IMPORT_PRIORITY_MAX}
+                            disabled={displayedPriority.mode !== 'fixed'}
+                            placeholder={t('accounts.import_config_priority_placeholder')}
+                            value={selectedRule.set.priority?.mode === 'fixed'
+                              ? String(selectedRule.set.priority.value)
+                              : ''}
+                            onChange={(event) => {
+                              const raw = event.target.value.trim();
+                              updateSelectedRule((rule) => {
+                                if (rule.set.priority?.mode !== 'fixed') {
+                                  rule.set.priority = { mode: 'fixed', value: 50 };
+                                }
+                                if (raw === '') {
+                                  delete rule.set.priority;
+                                  return;
+                                }
+                                rule.set.priority.value = parseNumber(raw, 0);
+                              });
+                            }}
+                          />
+                        </HeroTextField>
+                      </div>
                       <HeroTextField fullWidth isInvalid={!schedulingWeightValid}>
                         <Label>{t('accounts.scheduling_weight')}</Label>
                         <Input aria-label={t('accounts.scheduling_weight')} type="number" min={0} max={MAX_SCHEDULING_WEIGHT} step={1}
@@ -764,24 +760,48 @@ export function ImportConfigModal({
                           }} />
                         {!schedulingWeightValid && <p className="mt-1 text-[11px] leading-4 text-danger">{t('accounts.scheduling_weight_invalid')}</p>}
                       </HeroTextField>
-                      <HeroTextField fullWidth isInvalid={!modelDowngradeThresholdValid}>
+                      <HeroTextField fullWidth>
+                        <Label>{t('accounts.concurrency')}</Label>
                         <Input
-                          aria-label={t('accounts.model_downgrade_threshold')}
+                          aria-label={t('accounts.import_config_capacity')}
                           className="w-full"
-                          type="text"
-                          inputMode="decimal"
-                          placeholder={t('accounts.import_config_threshold_placeholder')}
-                          value={modelDowngradeThresholdInput}
+                          type="number"
+                          min={0}
+                          placeholder={t('accounts.import_config_capacity_placeholder')}
+                          value={selectedRule.set.max_concurrency != null
+                            ? String(selectedRule.set.max_concurrency)
+                            : ''}
                           onChange={(event) => {
-                            const raw = event.target.value;
-                            setModelDowngradeThresholdInput(raw);
-                            const parsed = parseModelDowngradeThresholdInput(raw);
-                            if (parsed == null) return;
+                            const raw = event.target.value.trim();
                             updateSelectedRule((rule) => {
-                              rule.set.model_downgrade_threshold = parsed;
+                              if (raw === '') {
+                                delete rule.set.max_concurrency;
+                                return;
+                              }
+                              rule.set.max_concurrency = Math.max(0, parseNumber(raw, 0));
                             });
                           }}
                         />
+                      </HeroTextField>
+                      <HeroTextField fullWidth isInvalid={!modelDowngradeThresholdValid}>
+                        <Label>{t('accounts.model_downgrade_threshold')}</Label>
+                          <Input
+                            aria-label={t('accounts.model_downgrade_threshold')}
+                            className="w-full"
+                            type="text"
+                            inputMode="decimal"
+                            placeholder={t('accounts.import_config_threshold_placeholder')}
+                            value={modelDowngradeThresholdInput}
+                            onChange={(event) => {
+                              const raw = event.target.value;
+                              setModelDowngradeThresholdInput(raw);
+                              const parsed = parseModelDowngradeThresholdInput(raw);
+                              if (parsed == null) return;
+                              updateSelectedRule((rule) => {
+                                rule.set.model_downgrade_threshold = parsed;
+                              });
+                            }}
+                          />
                         {!modelDowngradeThresholdValid ? (
                           <p className="mt-1 text-[11px] leading-4 text-danger">
                             {t('accounts.model_downgrade_threshold_invalid')}
@@ -789,7 +809,7 @@ export function ImportConfigModal({
                         ) : null}
                       </HeroTextField>
                       {displayedPriority.mode === 'sequence' ? (
-                        <div className="ag-import-config-sequence-fields grid gap-2 sm:col-span-4 sm:grid-cols-5">
+                        <div className={styles.sequenceFields}>
                           <HeroTextField fullWidth>
                             <Label>{t('accounts.priority_sequence_initial')}</Label>
                             <Input type="number" value={String(displayedPriority.initial)} onChange={(event) => setSequenceValue('initial', parseNumber(event.target.value, 0))} />
@@ -814,7 +834,7 @@ export function ImportConfigModal({
                       ) : null}
                     </div>
 
-                    <div className="rounded-md border-t border-border bg-surface px-2.5 py-3">
+                    <div className={styles.fieldGroup}>
                       <ProxyBindingFields
                         emptyLabel={t('accounts.no_proxy')}
                         onProxyChange={handleProxyChange}
@@ -825,11 +845,11 @@ export function ImportConfigModal({
                       />
                     </div>
 
-                    <div className="space-y-2 rounded-md border-t border-border bg-surface px-2.5 py-3">
+                    <div className={styles.fieldGroup}>
                       <p className="text-sm font-semibold text-text">
                         {t('accounts.import_config_groups_assignment')}
                       </p>
-                      <div className="grid max-h-44 gap-x-3 gap-y-2 overflow-y-auto sm:grid-cols-2">
+                      <div className={styles.groups}>
                         {visibleGroups.map((group) => (
                           <NativeCheckbox
                             key={group.id}
@@ -858,6 +878,7 @@ export function ImportConfigModal({
                   {validationError ? (
                     <p className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{validationError}</p>
                   ) : null}
+                  </fieldset>
                 </>
               ) : (
                 <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-text-tertiary">

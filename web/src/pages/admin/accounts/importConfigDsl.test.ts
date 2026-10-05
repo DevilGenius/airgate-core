@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createImportRule,
   parseImportConfigDSL,
   prioritySequencePreview,
   serializeImportConfigDSL,
 } from './importConfigDsl';
+import { ACCOUNT_IMPORT_DSL_EXAMPLE } from './ImportConfigModal';
 
 describe('importConfigDsl', () => {
   it('round trips fixed and bounded sequence rules', () => {
@@ -83,6 +85,12 @@ describe('importConfigDsl', () => {
 
 
 describe('import scheduling weights', () => {
+  it('includes the standard weight in new rules and example rules', () => {
+    expect(createImportRule(1).set.scheduling_weight).toBe(100);
+    const example = parseImportConfigDSL(ACCOUNT_IMPORT_DSL_EXAMPLE);
+    expect(example.rules.length).toBeGreaterThan(0);
+    for (const rule of example.rules) expect(rule.set.scheduling_weight).toBe(100);
+  });
   const dsl = (weight: unknown) => JSON.stringify({ version: 1, rules: [{ name: 'weighted', when: [], set: { scheduling_weight: weight, model_downgrade_threshold: 0 } }] });
   it('preserves a configured weight when parsing and serializing', () => {
     const config = parseImportConfigDSL(dsl(0));

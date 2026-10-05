@@ -432,7 +432,7 @@
     "import_config_no_rules": "尚未配置导入规则",
     "import_config_add_rule": "添加规则",
     "import_config_rule_name": "规则名称",
-    "import_config_rule_enabled": "启用规则",
+    "import_config_rule_enabled": "规则启用",
     "import_config_duplicate_rule": "复制规则",
     "import_config_delete_rule": "删除规则",
     "import_config_conditions": "匹配条件",

@@ -1,4 +1,4 @@
-import { parseSchedulingWeightInput } from './accountDefaults';
+import { DEFAULT_SCHEDULING_WEIGHT, parseSchedulingWeightInput } from './accountDefaults';
 export const IMPORT_PRIORITY_MIN = -99999;
 export const IMPORT_PRIORITY_MAX = 99999;
 
@@ -64,6 +64,7 @@ export function createImportRule(index: number): ImportRule {
     when: [{ field: 'type', op: 'eq', value: 'oauth' }],
     set: {
       max_concurrency: 10,
+      scheduling_weight: DEFAULT_SCHEDULING_WEIGHT,
       priority: { mode: 'fixed', value: 50 },
       group_ids: [],
       model_downgrade_threshold: 0,

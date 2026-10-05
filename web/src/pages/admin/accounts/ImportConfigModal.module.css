@@ -1,0 +1,365 @@
+/* Admin accounts: 导入配置弹窗布局 */
+
+:global(.ag-elevation-modal):global(.modal__dialog--lg).modal {
+  --ag-modal-width: var(--ag-modal-lg-width);
+  height: min(57.5rem, calc(100dvh - 2rem));
+  max-height: calc(100dvh - 2rem);
+}
+
+:global(.ag-elevation-modal).modal :global(.modal__body) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding-block: 0.75rem 1rem;
+}
+
+.root {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-inline: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.body {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.sidebar {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: var(--field-radius);
+  background: color-mix(in oklab, var(--surface-secondary) 60%, var(--background));
+}
+
+.sidebarHeader {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--separator) 76%, transparent);
+  padding: 0.625rem 0.75rem;
+}
+
+.ruleList {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.5rem;
+}
+
+.rule {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0.125rem;
+  border-radius: calc(var(--field-radius) - 0.125rem);
+}
+
+.rule[data-dragging="true"] {
+  opacity: 0.55;
+}
+
+.rule[data-drop-position]::before {
+  position: absolute;
+  z-index: 1;
+  right: 0.25rem;
+  left: 0.25rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  content: "";
+  pointer-events: none;
+}
+
+.rule[data-drop-position="before"]::before {
+  top: -0.1875rem;
+}
+
+.rule[data-drop-position="after"]::before {
+  bottom: -0.1875rem;
+}
+
+.rule :global(.ag-toolbar-menu-item) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ruleGrip {
+  display: inline-flex;
+  flex: none;
+  width: 1rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--field-radius) - 0.25rem);
+  color: var(--muted);
+  cursor: grab;
+  opacity: 0.5;
+}
+
+.rule:hover .ruleGrip,
+.rule[data-dragging="true"] .ruleGrip {
+  opacity: 1;
+}
+
+.ruleGrip:active {
+  cursor: grabbing;
+}
+
+.sidebarFooter {
+  flex: none;
+  border-top: 1px solid color-mix(in oklab, var(--separator) 76%, transparent);
+  padding: 0.5rem;
+}
+
+.editor {
+  --ag-import-config-row-action-size: 2.25rem;
+  --ag-import-config-row-gap: 0.5rem;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.25rem;
+}
+
+.ruleHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.75rem;
+  border: 1px solid var(--separator);
+  border-radius: var(--field-radius);
+  padding: var(--editor-section-padding);
+}
+
+.ruleName,
+.ruleName :global(.textfield) {
+  min-width: 0;
+}
+
+.ruleEnabled {
+  grid-column: 1 / -1;
+  justify-self: start;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+
+.editorContent .ruleAction {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ag-dropdown-control-height, 2.5rem);
+}
+
+.conditionsHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.conditionsTitle {
+  grid-column: span 2;
+  min-width: 0;
+}
+
+.ruleName input:disabled {
+  background: var(--surface-secondary);
+  color: var(--ag-text-tertiary);
+}
+
+.sequenceFields :global(.label) {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.dsl {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dsl :global(.textfield) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.dsl .dslInput {
+  flex: 1 1 auto;
+  min-height: 10rem;
+  resize: none;
+}
+
+.fieldPopover {
+  z-index: 220;
+}
+
+/* 导入配置弹窗：输入控件高度统一 */
+
+.root :global(.input),
+.root :global(.ag-simple-select-trigger) {
+  box-sizing: border-box;
+  height: var(--ag-dropdown-control-height, 2.5rem);
+  min-height: var(--ag-dropdown-control-height, 2.5rem);
+  padding-block: 0;
+}
+
+/* 字段 combo 触发器与比较符下拉样式统一：不渲染独立框体 */
+
+.root :global(.combo-box__trigger),
+.root :global(.combo-box__trigger):hover,
+.root :global(.combo-box__trigger)[data-hovered="true"],
+.root :global(.combo-box__trigger)[data-open="true"] {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.root :global(.combo-box__trigger):focus-visible,
+.root :global(.combo-box__trigger)[data-focus-visible="true"] {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+@media (max-width: 767px) {
+  .editor {
+    --ag-import-config-row-action-size: 2.5rem;
+  }
+
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .ruleList {
+    max-height: 10rem;
+  }
+}
+
+
+.editorContent {
+  --editor-section-padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.ruleFields {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 0.75rem;
+}
+
+.editorContent[data-rule-disabled] .ruleFields,
+.editorContent[data-rule-disabled] .ruleName,
+.editorContent[data-rule-disabled] .ruleAction {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.editorContent[data-rule-disabled] .section,
+.editorContent[data-rule-disabled] .ruleHeader {
+  background: var(--surface-secondary);
+}
+
+.section {
+  display: grid;
+  gap: 0.625rem;
+  border: 1px solid var(--separator);
+  border-radius: var(--field-radius);
+  padding: var(--editor-section-padding);
+}
+
+.condition {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.fieldGroup {
+  display: grid;
+  min-width: 0;
+  gap: 0.625rem;
+}
+
+.assignments {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.625rem;
+  align-items: start;
+}
+
+.priority {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.625rem;
+}
+
+.sequenceFields {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.assignments input {
+  width: 100%;
+  min-width: 0;
+}
+
+.labeledControl {
+  display: grid;
+  min-width: 0;
+  gap: 0.375rem;
+}
+
+.groups {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+@media (max-width: 767px) {
+  .assignments { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .condition { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .sequenceFields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
