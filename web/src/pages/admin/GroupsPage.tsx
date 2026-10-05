@@ -10,7 +10,6 @@ import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { PlatformIcon } from '../../shared/ui/display/PlatformIcon';
-import { useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
@@ -85,7 +84,7 @@ export default function GroupsPage() {
   ];
   // 筛选状态
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.groups');
-  const [platformFilter, setPlatformFilter] = useUrlQueryParam('platform');
+  const [platformFilter, setPlatformFilter] = useState('');
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);

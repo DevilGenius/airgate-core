@@ -22,7 +22,7 @@ it('persists all structured filter dimensions and restores them without a URL', 
   const first = renderHook(useAccountFilters);
   act(() => first.result.current.updateFilters(expected));
   expect(JSON.parse(window.localStorage.getItem(storageKey)!)).toEqual(expected);
-  expect(JSON.parse(new URLSearchParams(window.location.search).get('filters')!)).toEqual(expected);
+  expect(window.location.pathname + window.location.search + window.location.hash).toBe('/admin/accounts');
   first.unmount();
   window.history.replaceState(null, '', '/admin/accounts');
   const second = renderHook(useAccountFilters);
@@ -45,26 +45,25 @@ it('atomically merges rapid independent changes and persists explicit clearing',
   expect(accountFiltersToQuery(restored.result.current.filters)).toMatchObject({ account_type: NO_ACCOUNT_FILTER, platform: NO_ACCOUNT_FILTER });
 });
 
-it('migrates existing per-field selections without turning a plan into an OAuth selection', () => {
+it('ignores URL filters and per-field storage', () => {
   window.localStorage.setItem(`${storageKey}:type`, 'oauth_plan:openai:plus,apikey');
   window.localStorage.setItem(`${storageKey}:group`, '3,__ungrouped__');
   window.history.replaceState(null, '', '/admin/accounts?q=alice&platform=openai&state=active&proxy=7');
   const { result } = renderHook(useAccountFilters);
-  expect(result.current.filters).toMatchObject({ keyword: 'alice', platforms: ['openai'], accountTypes: ['apikey'],
-    plans: [{ platform: 'openai', key: 'plus' }], groupIds: [3], ungrouped: true, states: ['active'], proxyIds: [7] });
-  expect(window.localStorage.getItem(`${storageKey}:type`)).toBeNull();
-  expect(new URLSearchParams(window.location.search).has('type')).toBe(false);
+  expect(result.current.filters).toEqual(normalizeAccountFilters({}));
 });
 
-it('restores browser history as one object without losing unrelated filters', () => {
+it('keeps local filters unchanged by browser history', () => {
   const { result } = renderHook(useAccountFilters);
+  act(() => result.current.updateFilters({ keyword: 'local' }));
   const saved = normalizeAccountFilters({ accountTypes: ['apikey'], platforms: ['kiro'], proxyIds: [3] });
   act(() => {
     window.history.replaceState(null, '', `/admin/accounts?filters=${encodeURIComponent(JSON.stringify(saved))}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
-  expect(result.current.filters).toEqual(saved);
-  expect(JSON.parse(window.localStorage.getItem(storageKey)!)).toEqual(saved);
+  const expected = normalizeAccountFilters({ keyword: 'local' });
+  expect(result.current.filters).toEqual(expected);
+  expect(JSON.parse(window.localStorage.getItem(storageKey)!)).toEqual(expected);
 });
 
 it('keeps filters operational if browser storage is unavailable', () => {

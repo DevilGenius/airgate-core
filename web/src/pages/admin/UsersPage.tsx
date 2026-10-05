@@ -5,7 +5,6 @@ import { AlertDialog, Button, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { usersApi } from '../../shared/api/users';
 import { settingsApi } from '../../shared/api/settings';
-import { useUrlQueryParam } from '../../shared/hooks/useUrlTableState';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
@@ -101,8 +100,8 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.users');
-  const [keyword, setKeyword] = useUrlQueryParam('q');
-  const [statusFilter, setStatusFilter] = useUrlQueryParam('status');
+  const [keyword, setKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserResp | null>(null);
