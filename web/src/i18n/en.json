@@ -33,6 +33,7 @@
   },
 
   "common": {
+    "manual_update": "Manual update",
     "login": "Login",
     "register": "Register",
     "logout": "Logout",

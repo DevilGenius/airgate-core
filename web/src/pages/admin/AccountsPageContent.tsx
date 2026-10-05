@@ -33,7 +33,7 @@ import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS, REMOTE_SEARCH_DEBOUNCE_MS } from '
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
-import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { RefreshControl } from '../../shared/components/RefreshControl';
 import { SimpleMultiSelect } from '../../shared/components/SimpleMultiSelect';
 import { AccountFilterIcons } from './accounts/AccountFilterIcons';
 import type { SimpleSelectOption } from '../../shared/components/SimpleSelect';
@@ -336,8 +336,6 @@ export default function AccountsPageContent() {
 
   // 自动刷新
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, 0, ACCOUNT_AUTO_REFRESH_OPTIONS); // 秒，0=关闭
-  const autoRefreshLabel = t('accounts.auto_refresh');
-  const autoRefreshOffLabel = t('accounts.auto_refresh_off');
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -1482,13 +1480,9 @@ export default function AccountsPageContent() {
 
   const actionsNode = useMemo(() => (
     <>
-      <AutoRefreshControl
+      <RefreshControl
         value={autoRefresh}
         options={ACCOUNT_AUTO_REFRESH_OPTIONS}
-        label={autoRefreshLabel}
-        offLabel={autoRefreshOffLabel}
-        refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
-        triggerClassName="ag-auto-refresh-trigger--account-fixed"
         ariaLabel={t('accounts.auto_refresh')}
         refreshAriaLabel={t('common.refresh')}
         onChange={setAutoRefresh}
@@ -1545,8 +1539,6 @@ export default function AccountsPageContent() {
     </>
   ), [
     autoRefresh,
-    autoRefreshLabel,
-    autoRefreshOffLabel,
     handleCreateAccount,
     handleToolbarMenuOpenChange,
     isAccountsFetching,

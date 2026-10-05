@@ -1,21 +1,17 @@
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button } from '@heroui/react';
+import { useTranslation } from 'react-i18next';
+import styles from './RefreshControl.module.css';
 import { RefreshCw } from 'lucide-react';
 import { normalizeAutoRefresh, type AutoRefreshOptions } from '../hooks/usePersistentAutoRefresh';
 import { ToolbarMenu, ToolbarMenuItem } from './ToolbarMenu';
 
-interface AutoRefreshControlProps {
+interface RefreshControlProps {
   value: number;
   options: AutoRefreshOptions;
-  label: string;
-  offLabel: string;
   fastLabel?: string;
   beforeRefresh?: ReactNode;
   afterRefresh?: ReactNode;
   afterAutoRefresh?: ReactNode;
-  refreshButtonClassName?: string;
-  showRefreshButton?: boolean;
-  triggerClassName?: string;
   ariaLabel: string;
   refreshAriaLabel: string;
   onChange: (value: number) => void;
@@ -156,18 +152,13 @@ function formatAutoRefreshOption(label: string, seconds: number, fastLabel?: str
   return `${formatAutoRefreshTitle(label)} ${formatAutoRefreshValue(seconds, fastLabel)}`;
 }
 
-export const AutoRefreshControl = memo(function AutoRefreshControl({
+export const RefreshControl = memo(function RefreshControl({
   value,
   options,
-  label,
-  offLabel,
   fastLabel,
   beforeRefresh,
   afterRefresh,
   afterAutoRefresh,
-  refreshButtonClassName,
-  showRefreshButton = true,
-  triggerClassName,
   ariaLabel,
   refreshAriaLabel,
   onChange,
@@ -178,23 +169,26 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   isAutoRefreshDisabled = false,
   isRefreshing = false,
   isDisabled = false,
-}: AutoRefreshControlProps) {
+}: RefreshControlProps) {
+  const { t } = useTranslation();
+  const label = t('usage.auto_update');
+  const offLabel = t('common.manual_update');
   const enabled = value > 0;
   const autoRefreshEnabled = enabled && !isAutoRefreshDisabled;
   const [manualRefreshVersion, setManualRefreshVersion] = useState(0);
   const autoRefreshHandler = onAutoRefresh ?? onRefresh;
   const labelTitleRef = useRef<HTMLSpanElement | null>(null);
   const labelValueRef = useRef<HTMLSpanElement | null>(null);
-  const currentLabelTitle = formatAutoRefreshTitle(label);
-  const currentLabelValue = autoRefreshEnabled ? formatAutoRefreshValue(value, fastLabel) : offLabel;
+  const currentLabelTitle = autoRefreshEnabled ? formatAutoRefreshTitle(label) : offLabel;
+  const currentLabelValue = autoRefreshEnabled ? formatAutoRefreshValue(value, fastLabel) : '';
   const updateDisplayLabel = useCallback((displaySeconds: number) => {
     const titleElement = labelTitleRef.current;
     const valueElement = labelValueRef.current;
     if (titleElement) {
-      titleElement.textContent = formatAutoRefreshTitle(label);
+      titleElement.textContent = autoRefreshEnabled ? formatAutoRefreshTitle(label) : offLabel;
     }
     if (valueElement) {
-      valueElement.textContent = autoRefreshEnabled ? formatAutoRefreshValue(displaySeconds, fastLabel) : offLabel;
+      valueElement.textContent = autoRefreshEnabled ? formatAutoRefreshValue(displaySeconds, fastLabel) : '';
     }
   }, [autoRefreshEnabled, fastLabel, label, offLabel]);
   const setLabelTitleElement = useCallback((element: HTMLSpanElement | null) => {
@@ -238,58 +232,54 @@ export const AutoRefreshControl = memo(function AutoRefreshControl({
   return (
     <>
       {beforeRefresh}
-      {showRefreshButton ? (
-        <Button
-          isIconOnly
+      <div className={styles.control} role="group" aria-label={ariaLabel}>
+        <button
+          type="button"
           aria-label={refreshAriaLabel}
-          isDisabled={isDisabled || isRefreshing}
-          size="sm"
-          variant="ghost"
-          className={['h-8 w-8 min-w-8', refreshButtonClassName].filter(Boolean).join(' ')}
-          onPress={handleRefresh}
+          aria-busy={isRefreshing}
+          disabled={isDisabled || isRefreshing}
+          className={styles.refresh}
+          onClick={handleRefresh}
         >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
-      ) : null}
-      {afterRefresh}
-      <ToolbarMenu
-        ariaLabel={ariaLabel}
-        rootClassName="ag-auto-refresh-menu"
-        label={(
-          <span className="ag-auto-refresh-label" data-enabled={currentLabelValue ? 'true' : 'false'}>
-            <span ref={setLabelTitleElement} className="ag-auto-refresh-label-title" />
-            <span ref={setLabelValueElement} className="ag-auto-refresh-label-value" />
+          <RefreshCw className={`h-4 w-4 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className={styles.label}>
+            <span aria-hidden="true" className={styles.labelSizer}>{offLabel}</span>
+            <span aria-hidden="true" className={styles.labelSizer}>{formatAutoRefreshTitle(label)}</span>
+            <span ref={setLabelTitleElement} />
           </span>
-        )}
-        className={[
-          'ag-auto-refresh-trigger button button--sm h-8 min-w-[7.5rem] whitespace-nowrap px-3',
-          autoRefreshEnabled ? 'button--secondary' : 'button--ghost',
-          triggerClassName,
-        ].filter(Boolean).join(' ')}
-        disabled={isDisabled || isAutoRefreshDisabled}
-        onOpenChange={onMenuOpenChange}
-      >
-        {(close) => (
-          <>
-            {options.map((seconds) => {
-              const itemLabel = optionLabel(seconds);
-              return (
-                <ToolbarMenuItem
-                  key={`auto_${seconds}`}
-                  isSelected={value === seconds}
-                  role="menuitemradio"
-                  onSelect={() => {
-                    onChange(normalizeAutoRefresh(seconds, options));
-                    close();
-                  }}
-                >
-                  {itemLabel}
-                </ToolbarMenuItem>
-              );
-            })}
-          </>
-        )}
-      </ToolbarMenu>
+          <span ref={setLabelValueElement} className={styles.value} />
+        </button>
+        <ToolbarMenu
+          ariaLabel={ariaLabel}
+          rootClassName={styles.menu}
+          label={null}
+          className={styles.arrow}
+          disabled={isDisabled || isAutoRefreshDisabled}
+          onOpenChange={onMenuOpenChange}
+        >
+          {(close) => (
+            <>
+              {options.map((seconds) => {
+                const itemLabel = optionLabel(seconds);
+                return (
+                  <ToolbarMenuItem
+                    key={`auto_${seconds}`}
+                    isSelected={value === seconds}
+                    role="menuitemradio"
+                    onSelect={() => {
+                      onChange(normalizeAutoRefresh(seconds, options));
+                      close();
+                    }}
+                  >
+                    {itemLabel}
+                  </ToolbarMenuItem>
+                );
+              })}
+            </>
+          )}
+        </ToolbarMenu>
+      </div>
+      {afterRefresh}
       {afterAutoRefresh}
     </>
   );

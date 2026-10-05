@@ -23,7 +23,7 @@ import {
 } from '../../shared/components/UserOrAPIKeySearchFilterComboBox';
 import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
-import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { RefreshControl } from '../../shared/components/RefreshControl';
 import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
@@ -106,9 +106,14 @@ const ColumnVisibilityMenu = memo(function ColumnVisibilityMenu({
   return (
     <ToolbarMenu
       ariaLabel={label}
-      className="ag-page-toolbar-button button button--sm button--secondary inline-flex min-w-0 items-center justify-center gap-2 whitespace-nowrap px-3"
+      className="ag-page-toolbar-button button button--sm button--secondary inline-flex min-w-0 items-center justify-start gap-2 whitespace-nowrap px-3"
       icon={<Columns3 className="h-4 w-4 shrink-0" aria-hidden="true" />}
-      label={`${label} ${selectedCount}/${options.length}`}
+      label={(
+        <>
+          <span className="ag-column-visibility-label">{label}</span>
+          <span className="ag-column-visibility-count">{selectedCount}/{options.length}</span>
+        </>
+      )}
       rootClassName="ag-column-visibility-menu"
     >
       {() => (
@@ -291,8 +296,6 @@ export default function UsagePage() {
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
   const { platforms, platformName } = usePlatforms();
   const autoRefreshEnabled = autoRefresh > 0;
-  const autoRefreshLabel = `${t('usage.auto_update')} `;
-  const autoRefreshOffLabel = t('usage.auto_update_off');
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
@@ -753,14 +756,9 @@ export default function UsagePage() {
           </div>
         </div>
         <div className="ag-page-toolbar-actions ag-usage-toolbar-actions">
-          <AutoRefreshControl
+          <RefreshControl
             value={autoRefresh}
             options={ADMIN_AUTO_REFRESH_OPTIONS}
-            label={autoRefreshLabel}
-            offLabel={autoRefreshOffLabel}
-            refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
-            showRefreshButton={false}
-            triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
             ariaLabel={t('usage.auto_update')}
             refreshAriaLabel={t('common.refresh', 'Refresh')}
             onChange={setAutoRefresh}

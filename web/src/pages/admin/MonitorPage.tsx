@@ -13,7 +13,7 @@ import {
   UserOrAPIKeySearchFilterComboBox,
   type UserOrAPIKeySearchSelection,
 } from '../../shared/components/UserOrAPIKeySearchFilterComboBox';
-import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { RefreshControl } from '../../shared/components/RefreshControl';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { RecordsTable } from '../../shared/components/RecordsTable';
 import { RemoteSearchFilterComboBox } from '../../shared/components/RemoteSearchFilterComboBox';
@@ -57,7 +57,7 @@ const MONITOR_EVENTS_PAGE_SIZE_SCOPE = 'admin.monitor.events';
 const MONITOR_REQUESTS_PAGE_SIZE_SCOPE = 'admin.monitor.requests';
 const MONITOR_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.adminMonitorFilters;
 const MONITOR_AUTO_REFRESH_STORAGE_KEY = STORAGE_KEYS.ui.adminMonitorAutoRefresh;
-const MONITOR_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30, 60] as const;
+const MONITOR_AUTO_REFRESH_OPTIONS = [0, 5, 15, 30] as const;
 const MONITOR_REQUEST_TYPE_IDS = [
   'api_request_error',
   'plugin_route_error',
@@ -262,10 +262,8 @@ export default function MonitorPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(MONITOR_AUTO_REFRESH_STORAGE_KEY, 15, MONITOR_AUTO_REFRESH_OPTIONS);
+  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(MONITOR_AUTO_REFRESH_STORAGE_KEY, 0, MONITOR_AUTO_REFRESH_OPTIONS);
   const autoRefreshEnabled = autoRefresh > 0;
-  const autoRefreshLabel = `${t('monitor.auto_update')} `;
-  const autoRefreshOffLabel = t('monitor.auto_update_off');
   const [initialMonitorState] = useState(readInitialMonitorState);
   const [activeTable, setActiveTableState] = useState<MonitorTableKey>(initialMonitorState.activeTable);
   const {
@@ -1095,7 +1093,7 @@ export default function MonitorPage() {
             </div>
           </div>
           <div className="ag-page-toolbar-actions">
-            <AutoRefreshControl
+            <RefreshControl
               beforeRefresh={!isRequestTable ? (
                 <div className="flex items-center gap-2">
                   <NativeSwitch
@@ -1126,10 +1124,10 @@ export default function MonitorPage() {
               ) : null}
               value={autoRefresh}
               options={MONITOR_AUTO_REFRESH_OPTIONS}
-              label={autoRefreshLabel}
-              offLabel={autoRefreshOffLabel}
-              refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
-              triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
+
+
+
+
               ariaLabel={t('monitor.auto_update')}
               refreshAriaLabel={t('common.refresh', 'Refresh')}
               onChange={setAutoRefresh}

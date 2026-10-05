@@ -806,13 +806,14 @@
   min-width: 0;
 }
 
-.ag-dashboard-toolbar-auto-refresh {
+.ag-dashboard-toolbar-refresh {
+  display: grid;
   width: 100%;
   min-width: 0;
 }
 
 @media (min-width: 640px) {
-  .ag-dashboard-toolbar-auto-refresh {
+  .ag-dashboard-toolbar-refresh {
     width: var(--ag-dashboard-control-paired-width, 9.5rem);
     flex-shrink: 0;
   }
@@ -829,6 +830,50 @@
 .ag-dashboard-toolbar-control {
   width: 100%;
   min-width: 0;
+}
+
+/* 在窄屏把三个主要筛选控件保持在同一行。 */
+@container ag-dashboard-shell (max-width: 63.99rem) {
+  .ag-dashboard-page .ag-dashboard-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-1 {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-3 {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-refresh {
+    width: 100%;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-4 {
+    display: contents;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-4 > .ag-dashboard-toolbar-control {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-4 > .ag-dashboard-toolbar-control:nth-child(1) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .ag-dashboard-page .ag-dashboard-toolbar-col-4 > .ag-dashboard-toolbar-control:nth-child(2) {
+    grid-column: 3;
+    grid-row: 2;
+  }
 }
 
 .ag-dashboard-toolbar :where(.ag-auto-refresh-trigger,
@@ -1069,7 +1114,7 @@
     margin-left: 0;
   }
 
-  .ag-dashboard-page .ag-dashboard-toolbar-auto-refresh {
+  .ag-dashboard-page .ag-dashboard-toolbar-refresh {
     width: calc((100% - 0.75rem) / 2);
     flex-shrink: 0;
     min-width: 0;

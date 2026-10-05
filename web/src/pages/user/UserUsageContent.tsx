@@ -23,7 +23,7 @@ import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilt
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { APIKeySearchFilterComboBox } from '../../shared/components/APIKeySearchFilterComboBox';
 import { CostValue } from '../../shared/components/CostValue';
-import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { RefreshControl } from '../../shared/components/RefreshControl';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import { PAGE_SIZE_OPTIONS } from '../../shared/constants';
 import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
@@ -279,8 +279,6 @@ export default function UserUsageContent() {
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState(initialFilterState.apiKeyLabel);
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(USER_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, USER_AUTO_REFRESH_OPTIONS);
   const autoRefreshEnabled = autoRefresh > 0;
-  const autoRefreshLabel = `${t('usage.auto_update')} `;
-  const autoRefreshOffLabel = t('usage.auto_update_off');
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
@@ -581,14 +579,9 @@ export default function UserUsageContent() {
           </div>
         </div>
         <div className="ag-page-toolbar-actions">
-          <AutoRefreshControl
+          <RefreshControl
             value={autoRefresh}
             options={USER_AUTO_REFRESH_OPTIONS}
-            label={autoRefreshLabel}
-            offLabel={autoRefreshOffLabel}
-            refreshButtonClassName="ag-auto-refresh-refresh--toolbar"
-            showRefreshButton={false}
-            triggerClassName="ag-auto-refresh-trigger--toolbar-fixed"
             ariaLabel={t('usage.auto_update')}
             refreshAriaLabel={t('common.refresh', 'Refresh')}
             onChange={setAutoRefresh}

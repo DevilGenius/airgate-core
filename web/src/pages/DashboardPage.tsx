@@ -6,7 +6,7 @@ import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../shared/components/Card';
-import { Alert, Button, Skeleton, Tabs } from '@heroui/react';
+import { Alert, Skeleton, Tabs } from '@heroui/react';
 import {
   Activity,
   Astroid,
@@ -18,14 +18,13 @@ import {
   MoveDown,
   MoveRight,
   MoveUp,
-  RefreshCw,
   ToggleRight,
   Zap,
 } from 'lucide-react';
 import { dashboardApi } from '../shared/api/dashboard';
 import { queryKeys } from '../shared/queryKeys';
 import { DISTRIBUTION_COLORS } from '../shared/constants';
-import { AutoRefreshControl } from '../shared/components/AutoRefreshControl';
+import { RefreshControl } from '../shared/components/RefreshControl';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
 import { CostPair, CostValue } from '../shared/components/CostValue';
 import { SimpleSelect } from '../shared/components/SimpleSelect';
@@ -722,25 +721,10 @@ export default function DashboardPage() {
         </div>
 
         <div className="ag-dashboard-toolbar-col-3">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
-            isDisabled={isDashboardRefreshing}
-            size="sm"
-            variant="ghost"
-            className="ag-auto-refresh-refresh--dashboard-compact shrink-0"
-            onPress={refresh}
-          >
-            <RefreshCw className={`h-4 w-4 ${isDashboardRefreshing ? 'animate-spin' : ''}`} />
-          </Button>
-          <div className="ag-dashboard-toolbar-auto-refresh">
-            <AutoRefreshControl
+          <div className="ag-dashboard-toolbar-refresh">
+            <RefreshControl
               value={autoRefresh}
               options={DASHBOARD_AUTO_REFRESH_OPTIONS}
-              label={t('dashboard.auto_refresh')}
-              offLabel={t('dashboard.auto_refresh_off')}
-              showRefreshButton={false}
-              triggerClassName="ag-auto-refresh-trigger--dashboard-compact w-full"
               ariaLabel={t('dashboard.auto_refresh')}
               refreshAriaLabel={t('common.refresh', 'Refresh')}
               onChange={setAutoRefresh}

@@ -40,8 +40,8 @@ vi.mock('../../shared/components/UsageModelFilterInput', () => ({ UsageModelFilt
 vi.mock('../../shared/components/UserOrAPIKeySearchFilterComboBox', () => ({
   UserOrAPIKeySearchFilterComboBox: () => <span>user-key-filter</span>,
 }));
-vi.mock('../../shared/components/AutoRefreshControl', () => ({
-  AutoRefreshControl: ({ onRefresh }: { onRefresh: () => void }) => <button onClick={onRefresh}>refresh-usage</button>,
+vi.mock('../../shared/components/RefreshControl', () => ({
+  RefreshControl: ({ onRefresh }: { onRefresh: () => void }) => <button onClick={onRefresh}>refresh-usage</button>,
 }));
 
 beforeEach(() => {

@@ -1,0 +1,96 @@
+.control {
+  display: inline-flex;
+  align-items: stretch;
+  width: auto;
+  min-width: 0;
+  height: var(--ag-dropdown-control-height, 2.5rem);
+  border: 1px solid var(--border);
+  border-radius: var(--ag-control-radius);
+  background: var(--surface-secondary);
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+
+.control .refresh {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1 1 auto;
+  gap: 0.375rem;
+  min-width: 0;
+  padding: 0 0.625rem;
+  border: 0;
+  border-radius: var(--ag-control-radius) 0 0 var(--ag-control-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.control .menu {
+  flex: 0 0 var(--ag-dropdown-arrow-width, 2.25rem);
+  border-inline-start: 1px solid var(--border);
+}
+
+.control .menu button.arrow {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0 var(--ag-control-radius) var(--ag-control-radius) 0;
+  background: transparent;
+  color: inherit;
+}
+
+.control .refresh:hover:not(:disabled),
+.control .menu .arrow:hover:not(:disabled),
+.control .menu .arrow[data-open="true"] {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-secondary));
+  color: var(--accent);
+}
+
+.control button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.control button:disabled {
+  cursor: not-allowed;
+  opacity: var(--disabled-opacity, 0.5);
+}
+
+.label {
+  display: grid;
+  text-align: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label > span {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.labelSizer {
+  visibility: hidden;
+}
+
+.value {
+  flex: 0 0 3ch;
+  margin-inline-start: auto;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.value:empty {
+  visibility: hidden;
+}
+
+.control .menu :global(.ag-toolbar-menu-popover) {
+  width: max-content;
+  min-width: 12rem;
+  max-width: min(16rem, calc(100vw - 2rem));
+}
