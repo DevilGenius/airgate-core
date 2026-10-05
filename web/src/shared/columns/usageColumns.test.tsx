@@ -34,7 +34,7 @@ describe('shared usage client column', () => {
 
   it('keeps the metadata the admin and the user usage table share', () => {
     expect([column.key, column.title, column.width, column.hideOnMobile])
-      .toEqual(['client', 'usage.client', '152px', true]);
+      .toEqual(['client', 'usage.client', '168px', true]);
   });
 
   it('stacks the IP above the trimmed user agent and keeps the raw UA in the tooltip', () => {
