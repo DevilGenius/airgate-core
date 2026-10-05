@@ -88,8 +88,22 @@ describe('import scheduling weights', () => {
   it('includes the standard weight in new rules and example rules', () => {
     expect(createImportRule(1).set.scheduling_weight).toBe(100);
     const example = parseImportConfigDSL(ACCOUNT_IMPORT_DSL_EXAMPLE);
-    expect(example.rules.length).toBeGreaterThan(0);
-    for (const rule of example.rules) expect(rule.set.scheduling_weight).toBe(100);
+    expect(example.rules).toEqual([{
+      name: 'OpenAI-Plus',
+      enabled: true,
+      when: [
+        { field: 'platform', op: 'eq', value: 'openai' },
+        { field: 'type', op: 'eq', value: 'oauth' },
+        { field: 'credentials.plan_type', op: 'in', values: ['plus'] },
+      ],
+      set: {
+        scheduling_weight: 100,
+        max_concurrency: 15,
+        priority: { mode: 'fixed', value: 5000 },
+        group_ids: [],
+        model_downgrade_threshold: 0,
+      },
+    }]);
   });
   const dsl = (weight: unknown) => JSON.stringify({ version: 1, rules: [{ name: 'weighted', when: [], set: { scheduling_weight: weight, model_downgrade_threshold: 0 } }] });
   it('preserves a configured weight when parsing and serializing', () => {

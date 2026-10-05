@@ -57,41 +57,23 @@ const CONDITION_OPERATORS: Array<{ key: ImportConditionOp; labelKey: string }> =
 
 export const ACCOUNT_IMPORT_DSL_EXAMPLE = serializeImportConfigDSL({
   version: 1,
-  rules: [
-    examplePlanRule('OpenAI OAuth Free', ['free'], 5, { mode: 'fixed', value: 50 }),
-    examplePlanRule('OpenAI OAuth Plus', ['plus'], 20, {
-      mode: 'sequence', initial: 1000, step: -10, group_size: 5, min: 800, max: 1000,
-    }),
-    examplePlanRule('OpenAI OAuth Pro', ['pro'], 30, { mode: 'fixed', value: 300 }),
-    examplePlanRule('OpenAI OAuth Team', ['team', 'k12', 'prolite'], 50, {
-      mode: 'sequence', initial: 3000, step: -20, group_size: 10, min: 2600, max: 3000,
-    }),
-  ],
-});
-
-function examplePlanRule(
-  name: string,
-  planTypes: string[],
-  maxConcurrency: number,
-  priority: ImportPriority,
-): ImportRule {
-  return {
-    name,
+  rules: [{
+    name: 'OpenAI-Plus',
     enabled: true,
     when: [
       { field: 'platform', op: 'eq', value: 'openai' },
       { field: 'type', op: 'eq', value: 'oauth' },
-      { field: 'credentials.plan_type', op: 'in', values: planTypes },
+      { field: 'credentials.plan_type', op: 'in', values: ['plus'] },
     ],
     set: {
-      max_concurrency: maxConcurrency,
       scheduling_weight: DEFAULT_SCHEDULING_WEIGHT,
-      priority,
+      max_concurrency: 15,
+      priority: { mode: 'fixed', value: 5000 },
       group_ids: [],
       model_downgrade_threshold: 0,
     },
-  };
-}
+  }],
+});
 
 function conditionDisplayValue(condition: ImportCondition): string {
   return condition.op === 'in' ? (condition.values ?? []).join(', ') : condition.value ?? '';
@@ -280,6 +262,30 @@ export function ImportConfigModal({
     setView('form');
   };
 
+  const appendExample = () => {
+    if (loading || (view === 'form' && validationError)) return;
+    try {
+      // Use the current DSL draft so unsaved edits are preserved in either view.
+      const next = view === 'dsl' ? parseImportConfigDSL(dslValue) : cloneImportConfig(config);
+      const firstNewIndex = next.rules.length;
+      const names = new Set(next.rules.map((rule) => rule.name));
+      for (const example of parseImportConfigDSL(ACCOUNT_IMPORT_DSL_EXAMPLE).rules) {
+        const baseName = example.name;
+        let suffix = 2;
+        while (names.has(example.name)) example.name = `${baseName} (${suffix++})`;
+        names.add(example.name);
+        next.rules.push(example);
+      }
+      setConfig(next);
+      setDSLValue(serializeImportConfigDSL(next));
+      setSelectedRuleIndex(firstNewIndex);
+      setDSLError('');
+      setView('form');
+    } catch (error) {
+      setDSLError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const handleSave = () => {
     if (view === 'dsl') {
       try {
@@ -462,17 +468,17 @@ export function ImportConfigModal({
       <div className={styles.root}>
         <div className={styles.toolbar}>
           <Tabs
-            className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto"
+            className={`ag-segmented-tabs ag-segmented-tabs-compact ${styles.viewTabs}`}
             isDisabled={loading}
             selectedKey={view}
             onSelectionChange={(key) => switchView(key as 'form' | 'dsl')}
           >
-            <Tabs.List>
-              <Tabs.Tab id="form">
+            <Tabs.List className={styles.viewTabList}>
+              <Tabs.Tab className={styles.viewTab} id="form">
                 <Tabs.Indicator />
                 <span>{t('accounts.import_config_graphical')}</span>
               </Tabs.Tab>
-              <Tabs.Tab id="dsl">
+              <Tabs.Tab className={styles.viewTab} id="dsl">
                 <Tabs.Separator />
                 <Tabs.Indicator />
                 <Braces />
@@ -480,12 +486,12 @@ export function ImportConfigModal({
               </Tabs.Tab>
             </Tabs.List>
           </Tabs>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onPress={() => loadConfig(ACCOUNT_IMPORT_DSL_EXAMPLE)} isDisabled={loading}>
+          <div className={styles.toolbarActions}>
+            <Button className={styles.loadExample} variant="secondary" onPress={appendExample} isDisabled={loading || (view === 'form' && validationError !== '')}>
               {t('accounts.import_config_load_example')}
             </Button>
             <Button
-              variant="ghost"
+              variant="secondary"
               onPress={() => loadConfig(serializeImportConfigDSL(EMPTY_IMPORT_CONFIG))}
               isDisabled={loading}
             >
