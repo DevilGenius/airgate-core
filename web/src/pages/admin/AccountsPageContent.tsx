@@ -16,7 +16,7 @@ import { compareAccountFilterPlatforms } from './accounts/accountFilterOrder';
 import { useToast } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
 import { pluginsApi } from '../../shared/api/plugins';
-import { getAdminServerNowMs, subscribeAdminEvents, type AdminServerEvent } from '../../shared/api/adminEvents';
+import { subscribeAdminEvents, type AdminServerEvent } from '../../shared/api/adminEvents';
 import { groupsApi } from '../../shared/api/groups';
 import { proxiesApi } from '../../shared/api/proxies';
 import { AccountTestModal } from './AccountTestModal';
@@ -33,6 +33,7 @@ import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS, REMOTE_SEARCH_DEBOUNCE_MS } from '
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { accountChangeNeedsListRefresh, applyAccountChangeToRow, isAccountState } from './accounts/accountChangeEvents';
 import { RefreshControl } from '../../shared/components/RefreshControl';
 import refreshControlStyles from '../../shared/components/RefreshControl.module.css';
 import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
@@ -169,7 +170,7 @@ const ACCOUNT_WORKING_STATE_FILTER = 'working';
 const ACCOUNT_FAMILY_LIMITED_STATE_FILTER = 'family_limited';
 const ACCOUNT_WORKING_REFETCH_THROTTLE_MS = 750;
 const ACCOUNT_STATUS_FILTER_REFETCH_THROTTLE_MS = 750;
-const ACCOUNT_STATUS_BATCH_FALLBACK_MS = 250;
+const ACCOUNT_CHANGE_BATCH_FALLBACK_MS = 250;
 const ACCOUNT_USAGE_SNAPSHOT_MAX_ACCOUNTS = 5000;
 const EMPTY_ACCOUNT_ROWS: AccountResp[] = [];
 // 多选筛选的标签拼接：未选择任何项时回退到"全部"文案（即不筛选）。
@@ -194,57 +195,6 @@ function accountUsageInfoHasContent(usage: AccountUsageInfo | undefined) {
     || usage.credits
     || usage.today_stats,
   );
-}
-
-function isAccountState(value: unknown): value is AccountResp['state'] {
-  return value === 'active' || value === 'rate_limited' || value === 'degraded' || value === 'disabled';
-}
-
-function applyAccountStatusEventToRow(row: AccountResp, event: AdminServerEvent): AccountResp {
-  let next = row;
-  if (isAccountState(event.state)) {
-    next = {
-      ...next,
-      state: event.state,
-      state_until: typeof event.state_until === 'string' && event.state_until ? event.state_until : undefined,
-      error_msg: typeof event.error_msg === 'string' && event.error_msg ? event.error_msg : undefined,
-    };
-  }
-
-  if (event.family_cooldown_action === 'clear') {
-    if (next.family_cooldowns?.length) {
-      next = { ...next, family_cooldowns: undefined };
-    }
-  } else if (
-    event.family_cooldown_action === 'upsert'
-    && typeof event.family === 'string'
-    && event.family
-    && typeof event.family_until === 'string'
-    && event.family_until
-  ) {
-    const familyCooldown = {
-      family: event.family,
-      until: event.family_until,
-      ...(typeof event.family_reason === 'string' && event.family_reason
-        ? { reason: event.family_reason }
-        : {}),
-      ...(typeof event.family_duration_ms === 'number' && event.family_duration_ms > 0
-        ? { duration_ms: event.family_duration_ms }
-        : {}),
-    };
-    const now = getAdminServerNowMs();
-    next = {
-      ...next,
-      family_cooldowns: [
-        ...(next.family_cooldowns ?? []).filter(
-          (item) => item.family !== event.family && Date.parse(item.until) > now,
-        ),
-        familyCooldown,
-      ],
-    };
-  }
-
-  return next;
 }
 
 export default function AccountsPageContent() {
@@ -421,8 +371,10 @@ export default function AccountsPageContent() {
     void refetchAccounts({ cancelRefetch: false });
   }, [refetchAccounts]);
   const stateFilterRef = useLatestRef(stateFilter);
+  const prioritySortRef = useLatestRef(prioritySortDir);
   const workingRefetchTimerRef = useRef<number | null>(null);
   const statusFilterRefetchTimerRef = useRef<number | null>(null);
+  const forcedAccountRefreshRef = useRef(false);
   const scheduleWorkingAccountsRefresh = useCallback(() => {
     if (typeof window === 'undefined') return;
     if (!accountStateFilterIncludes(stateFilterRef.current, ACCOUNT_WORKING_STATE_FILTER)) return;
@@ -433,19 +385,22 @@ export default function AccountsPageContent() {
       void refetchAccounts({ cancelRefetch: false });
     }, ACCOUNT_WORKING_REFETCH_THROTTLE_MS);
   }, [refetchAccounts, stateFilterRef]);
-  const scheduleStatusFilteredAccountsRefresh = useCallback(() => {
+  const scheduleFilteredAccountsRefresh = useCallback((force = false) => {
     if (typeof window === 'undefined') return;
-    if (!stateFilterRef.current) return;
+    forcedAccountRefreshRef.current ||= force;
+    if (!forcedAccountRefreshRef.current && !stateFilterRef.current && !prioritySortRef.current) return;
     if (statusFilterRefetchTimerRef.current != null) return;
     statusFilterRefetchTimerRef.current = window.setTimeout(() => {
       statusFilterRefetchTimerRef.current = null;
-      if (!stateFilterRef.current) return;
+      const forced = forcedAccountRefreshRef.current;
+      forcedAccountRefreshRef.current = false;
+      if (!forced && !stateFilterRef.current && !prioritySortRef.current) return;
       void queryClient.invalidateQueries({
         queryKey: queryKeys.accounts(),
         refetchType: 'active',
       });
     }, ACCOUNT_STATUS_FILTER_REFETCH_THROTTLE_MS);
-  }, [queryClient, stateFilterRef]);
+  }, [prioritySortRef, queryClient, stateFilterRef]);
   useEffect(() => () => {
     if (workingRefetchTimerRef.current != null) {
       window.clearTimeout(workingRefetchTimerRef.current);
@@ -508,25 +463,25 @@ export default function AccountsPageContent() {
     }
     pendingCapacityUpdatesRef.current.clear();
   }, []);
-  const pendingStatusEventsRef = useRef<Map<number, AdminServerEvent[]>>(new Map());
-  const statusUpdateFrameRef = useRef<number | null>(null);
-  const statusUpdateFallbackTimerRef = useRef<number | null>(null);
-  const cancelPendingStatusFlush = useCallback(() => {
+  const pendingAccountChangesRef = useRef<Map<number, AdminServerEvent[]>>(new Map());
+  const accountChangeFrameRef = useRef<number | null>(null);
+  const accountChangeFallbackTimerRef = useRef<number | null>(null);
+  const cancelPendingAccountFlush = useCallback(() => {
     if (typeof window === 'undefined') return;
-    if (statusUpdateFrameRef.current != null) {
-      window.cancelAnimationFrame(statusUpdateFrameRef.current);
-      statusUpdateFrameRef.current = null;
+    if (accountChangeFrameRef.current != null) {
+      window.cancelAnimationFrame(accountChangeFrameRef.current);
+      accountChangeFrameRef.current = null;
     }
-    if (statusUpdateFallbackTimerRef.current != null) {
-      window.clearTimeout(statusUpdateFallbackTimerRef.current);
-      statusUpdateFallbackTimerRef.current = null;
+    if (accountChangeFallbackTimerRef.current != null) {
+      window.clearTimeout(accountChangeFallbackTimerRef.current);
+      accountChangeFallbackTimerRef.current = null;
     }
   }, []);
-  const flushPendingStatusEvents = useCallback(() => {
-    cancelPendingStatusFlush();
-    const updates = pendingStatusEventsRef.current;
+  const flushPendingAccountChanges = useCallback(() => {
+    cancelPendingAccountFlush();
+    const updates = pendingAccountChangesRef.current;
     if (updates.size === 0) return;
-    pendingStatusEventsRef.current = new Map();
+    pendingAccountChangesRef.current = new Map();
     queryClient.setQueriesData<PagedData<AccountResp>>(
       { queryKey: queryKeys.accounts() },
       (old) => {
@@ -536,34 +491,34 @@ export default function AccountsPageContent() {
           const events = updates.get(account.id);
           if (!events?.length) return account;
           matched = true;
-          return events.reduce(applyAccountStatusEventToRow, account);
+          return events.reduce(applyAccountChangeToRow, account);
         });
         return matched ? { ...old, list } : old;
       },
     );
-  }, [cancelPendingStatusFlush, queryClient]);
-  const queueStatusEvent = useCallback((accountId: number, event: AdminServerEvent) => {
-    const pending = pendingStatusEventsRef.current.get(accountId);
+  }, [cancelPendingAccountFlush, queryClient]);
+  const queueAccountChange = useCallback((accountId: number, event: AdminServerEvent) => {
+    const pending = pendingAccountChangesRef.current.get(accountId);
     if (pending) {
       pending.push(event);
     } else {
-      pendingStatusEventsRef.current.set(accountId, [event]);
+      pendingAccountChangesRef.current.set(accountId, [event]);
     }
     if (typeof window === 'undefined') {
-      flushPendingStatusEvents();
+      flushPendingAccountChanges();
       return;
     }
-    if (statusUpdateFrameRef.current != null) return;
-    statusUpdateFrameRef.current = window.requestAnimationFrame(flushPendingStatusEvents);
-    statusUpdateFallbackTimerRef.current = window.setTimeout(
-      flushPendingStatusEvents,
-      ACCOUNT_STATUS_BATCH_FALLBACK_MS,
+    if (accountChangeFrameRef.current != null) return;
+    accountChangeFrameRef.current = window.requestAnimationFrame(flushPendingAccountChanges);
+    accountChangeFallbackTimerRef.current = window.setTimeout(
+      flushPendingAccountChanges,
+      ACCOUNT_CHANGE_BATCH_FALLBACK_MS,
     );
-  }, [flushPendingStatusEvents]);
+  }, [flushPendingAccountChanges]);
   useEffect(() => () => {
-    cancelPendingStatusFlush();
-    pendingStatusEventsRef.current.clear();
-  }, [cancelPendingStatusFlush]);
+    cancelPendingAccountFlush();
+    pendingAccountChangesRef.current.clear();
+  }, [cancelPendingAccountFlush]);
 
   const applyCapacityData = useCallback((nextData: { accounts: Record<string, number> }) => {
     capacityStore.setCounts(nextData.accounts);
@@ -586,17 +541,18 @@ export default function AccountsPageContent() {
       return undefined;
     }
     return subscribeAdminEvents((event) => {
-      if (event.type === 'admin_events.reconnected' || event.type === 'admin_events.gap') {
-        cancelPendingStatusFlush();
-        pendingStatusEventsRef.current.clear();
+      if (event.type === 'connected' || event.type === 'admin_events.reconnected' || event.type === 'admin_events.gap') {
+        cancelPendingAccountFlush();
+        pendingAccountChangesRef.current.clear();
         void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
         void refreshVisibleCapacity();
         return;
       }
-      if (event.type === 'account_status.changed') {
+      if (event.type === 'account.changed') {
         const accountId = Number(event.account_id);
         if (!Number.isFinite(accountId) || accountId <= 0) return;
-        queueStatusEvent(accountId, event);
+        queueAccountChange(accountId, event);
+        if (accountChangeNeedsListRefresh(event)) scheduleFilteredAccountsRefresh(true);
         const familyCooldownChangesFilteredState = (
           event.family_cooldown_action === 'upsert'
           || event.family_cooldown_action === 'clear'
@@ -604,8 +560,8 @@ export default function AccountsPageContent() {
           accountStateFilterIncludes(stateFilterRef.current, 'active')
           || accountStateFilterIncludes(stateFilterRef.current, ACCOUNT_FAMILY_LIMITED_STATE_FILTER)
         );
-        if (isAccountState(event.state) || familyCooldownChangesFilteredState) {
-          scheduleStatusFilteredAccountsRefresh();
+        if (isAccountState(event.state) || familyCooldownChangesFilteredState || (typeof event.priority === 'number' && prioritySortRef.current)) {
+          scheduleFilteredAccountsRefresh();
         }
         return;
       }
@@ -619,7 +575,7 @@ export default function AccountsPageContent() {
       if (!visibleAccountIdSetRef.current.has(accountId)) return;
       queueCapacityUpdate(accountId, currentConcurrency);
     });
-  }, [cancelPendingStatusFlush, queryClient, queueCapacityUpdate, queueStatusEvent, refreshVisibleCapacity, scheduleStatusFilteredAccountsRefresh, scheduleWorkingAccountsRefresh, stateFilterRef]);
+  }, [cancelPendingAccountFlush, queryClient, queueCapacityUpdate, queueAccountChange, refreshVisibleCapacity, scheduleFilteredAccountsRefresh, scheduleWorkingAccountsRefresh, stateFilterRef, prioritySortRef]);
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -1250,7 +1206,7 @@ export default function AccountsPageContent() {
   }, [clearSelection, queryClient]);
 
   const handleAccountTestComplete = useCallback(() => {
-    // Test metadata (including cognition flags) is not part of status SSE events.
+    // Refresh remaining test metadata; live state and cognition arrive through account.changed.
     void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
   }, [queryClient]);
 

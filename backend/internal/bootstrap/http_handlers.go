@@ -50,7 +50,7 @@ type HTTPDependencies struct {
 	Scheduler   *scheduler.Scheduler
 	Monitor     *appmonitor.Service
 	Runtime     *appmonitor.RuntimeSampler
-	Events      *adminevents.Hub
+	Events      *adminevents.Service
 	Recorder    *billing.Recorder
 }
 
@@ -87,6 +87,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	verifyCodeStore := mailer.NewVerifyCodeStore()
 	accountStore := store.NewAccountStore(dep.DB)
 	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency, dep.Scheduler)
+	accountService.SetAccountChangePublisher(dep.Events)
 	accountService.SetUsageCacheRedis(dep.Redis)
 	accountService.SetAccountDeletionObserver(dep.Scheduler)
 	groupStore := store.NewGroupStore(dep.DB)

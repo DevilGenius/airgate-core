@@ -9,7 +9,7 @@ import (
 
 const (
 	TypeAccountCapacityChanged = "account_capacity.changed"
-	TypeAccountStatusChanged   = "account_status.changed"
+	TypeAccountChanged         = "account.changed"
 	TypeMonitorChanged         = "monitor.changed"
 )
 
@@ -19,20 +19,82 @@ const (
 
 // Event is one admin-only server event delivered over SSE.
 type Event struct {
-	Type               string  `json:"type"`
-	TS                 string  `json:"ts"`
-	Seq                uint64  `json:"seq"`
-	AccountID          int     `json:"account_id,omitempty"`
-	CurrentConcurrency int     `json:"current_concurrency"`
-	Reason             string  `json:"reason,omitempty"`
-	AccountState       string  `json:"state,omitempty"`
-	StateUntil         *string `json:"state_until,omitempty"`
-	ErrorMsg           *string `json:"error_msg,omitempty"`
-	FamilyAction       string  `json:"family_cooldown_action,omitempty"`
-	Family             string  `json:"family,omitempty"`
-	FamilyUntil        string  `json:"family_until,omitempty"`
-	FamilyReason       string  `json:"family_reason,omitempty"`
-	FamilyDurationMs   int64   `json:"family_duration_ms,omitempty"`
+	Type               string `json:"type"`
+	TS                 string `json:"ts"`
+	Seq                uint64 `json:"seq"`
+	AccountID          int    `json:"account_id,omitempty"`
+	CurrentConcurrency int    `json:"current_concurrency"`
+	Reason             string `json:"reason,omitempty"`
+	AccountPatch
+	FamilyAction     string `json:"family_cooldown_action,omitempty"`
+	Family           string `json:"family,omitempty"`
+	FamilyUntil      string `json:"family_until,omitempty"`
+	FamilyReason     string `json:"family_reason,omitempty"`
+	FamilyDurationMs int64  `json:"family_duration_ms,omitempty"`
+}
+
+// AccountPatch carries only changed, non-secret fields. Cognition distinguishes
+// an absent patch from a tested false value and an explicit clear (null).
+type CognitionResult struct {
+	Degraded *bool `json:"degraded"`
+}
+type AccountPatch struct {
+	ModelDowngradeThreshold *float64 `json:"model_downgrade_threshold,omitempty"`
+	MaxConcurrency          *int     `json:"max_concurrency,omitempty"`
+
+	AccountState     string           `json:"state,omitempty"`
+	StateUntil       *string          `json:"state_until,omitempty"`
+	ErrorMsg         *string          `json:"error_msg,omitempty"`
+	Priority         *int             `json:"priority,omitempty"`
+	SchedulingWeight *int             `json:"scheduling_weight,omitempty"`
+	Cognition        *CognitionResult `json:"cognition,omitempty"`
+}
+
+func (p AccountPatch) Merge(next AccountPatch) AccountPatch {
+	if next.ModelDowngradeThreshold != nil {
+		value := *next.ModelDowngradeThreshold
+		p.ModelDowngradeThreshold = &value
+	}
+	if next.MaxConcurrency != nil {
+		value := *next.MaxConcurrency
+		p.MaxConcurrency = &value
+	}
+	if next.AccountState != "" {
+		p.AccountState = next.AccountState
+		p.StateUntil = cloneString(next.StateUntil)
+		p.ErrorMsg = cloneString(next.ErrorMsg)
+	}
+	if next.Priority != nil {
+		value := *next.Priority
+		p.Priority = &value
+	}
+	if next.SchedulingWeight != nil {
+		value := *next.SchedulingWeight
+		p.SchedulingWeight = &value
+	}
+	if next.Cognition != nil {
+		p.Cognition = &CognitionResult{}
+		if next.Cognition.Degraded != nil {
+			value := *next.Cognition.Degraded
+			p.Cognition.Degraded = &value
+		}
+	}
+	return p
+}
+
+func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func (h *Hub) PublishAccountChanged(accountID int, patch AccountPatch) {
+	if h == nil || accountID <= 0 {
+		return
+	}
+	h.Publish(Event{Type: TypeAccountChanged, AccountID: accountID, AccountPatch: patch})
 }
 
 // Hub fans out admin events to connected SSE clients. Publishing never blocks
@@ -132,12 +194,8 @@ func (h *Hub) PublishAccountStateChanged(accountID int, state string, stateUntil
 		stateUntilValue = &value
 	}
 	errorMsgValue := errorMsg
-	h.Publish(Event{
-		Type:         TypeAccountStatusChanged,
-		AccountID:    accountID,
-		AccountState: state,
-		StateUntil:   stateUntilValue,
-		ErrorMsg:     &errorMsgValue,
+	h.PublishAccountChanged(accountID, AccountPatch{
+		AccountState: state, StateUntil: stateUntilValue, ErrorMsg: &errorMsgValue,
 	})
 }
 
@@ -154,7 +212,7 @@ func (h *Hub) PublishAccountFamilyCooldownChanged(accountID int, action, family 
 		untilValue = until.UTC().Format(time.RFC3339Nano)
 	}
 	h.Publish(Event{
-		Type:             TypeAccountStatusChanged,
+		Type:             TypeAccountChanged,
 		AccountID:        accountID,
 		FamilyAction:     action,
 		Family:           family,

@@ -58,7 +58,7 @@ func TestNewHTTPHandlersConstructsServicesAndHandlers(t *testing.T) {
 		JWTMgr:      auth.NewJWTManager("jwt-secret", 1),
 		PluginMgr:   pluginMgr,
 		Marketplace: marketplace,
-		Events:      adminevents.NewHub(1),
+		Events:      adminevents.NewService(1),
 		Recorder:    recorder,
 	})
 

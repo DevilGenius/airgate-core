@@ -25,6 +25,11 @@ export interface AdminServerEvent {
   account_id?: number;
   current_concurrency?: number;
   reason?: string;
+  max_concurrency?: number;
+  priority?: number;
+  model_downgrade_threshold?: number;
+  scheduling_weight?: number;
+  cognition?: { degraded: boolean | null };
   state?: string;
   state_until?: string;
   error_msg?: string;

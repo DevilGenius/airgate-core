@@ -30,6 +30,12 @@ const account: AccountResp = {
   updated_at: '',
 };
 
+it('redraws status when only model demotions change', () => {
+  const demoted = { ...account, model_demotions: [{ model: 'gpt', success_rate: 0.2, valid_requests: 10 }] };
+  expect(accountTableCellRowsEqual('status', account, demoted)).toBe(false);
+  expect(accountTableCellRowsEqual('status', demoted, { ...demoted, model_demotions: [] })).toBe(false);
+});
+
 describe('accountTableCellRowsEqual', () => {
   it('refreshes status when cognition results are set or cleared', () => {
     const degraded = { ...account, extra: { cognition_degraded: true } };

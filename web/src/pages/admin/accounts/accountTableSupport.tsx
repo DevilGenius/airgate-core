@@ -164,6 +164,8 @@ function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
     && left.usage_7d_observed_at === right.usage_7d_observed_at
     && left.usage_7d_full_cost === right.usage_7d_full_cost
     && left.group_ids === right.group_ids
+    && left.model_demotions === right.model_demotions
+    // Model-demotion badges change only with list snapshots, not statistics SSE.
     && left.family_cooldowns === right.family_cooldowns
     && left.today_image_count === right.today_image_count
     && left.total_image_count === right.total_image_count
@@ -192,7 +194,9 @@ export function accountTableCellRowsEqual(columnKey: string, left: AccountResp, 
       return left.current_concurrency === right.current_concurrency
         && left.max_concurrency === right.max_concurrency;
     case 'status':
+      // List refreshes can change demotions; retain this check to redraw the badge.
       return left.state === right.state
+        && left.model_demotions === right.model_demotions
         && left.extra?.cognition_degraded === right.extra?.cognition_degraded
         && left.state_until === right.state_until
         && left.error_msg === right.error_msg

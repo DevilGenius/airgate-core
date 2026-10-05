@@ -84,6 +84,7 @@ type AccountDeletionObserver interface {
 // Service 提供账号域用例编排；账号用量探测与缓存由内部 accountUsageService 负责。
 type Service struct {
 	repo             Repository
+	accountEvents    AccountChangePublisher
 	plugins          PluginCatalog
 	concurrency      ConcurrencyReader
 	stateWriter      StateWriter
@@ -449,7 +450,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 	}
 	input.Extra = stripDeprecatedAccountExtra(input.Extra)
 
-	account, err := s.repo.Create(ctx, input)
+	account, err := s.createAccount(ctx, input)
 	if err != nil {
 		logger.Error("account_credential_persist_failed",
 			sdk.LogFieldPlatform, input.Platform,
@@ -544,7 +545,7 @@ func (s *Service) importAccounts(ctx context.Context, items []CreateInput, prese
 			})
 			continue
 		}
-		created, err := s.repo.Create(ctx, prepared)
+		created, err := s.createAccount(ctx, prepared)
 		if err != nil {
 			summary.Failed++
 			summary.Errors = append(summary.Errors, ImportItemError{
@@ -684,7 +685,7 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 
 	var updated Account
 	if hasUpdateInputChanges(repoInput) {
-		updated, err = s.repo.Update(ctx, id, repoInput)
+		updated, err = s.updateAccount(ctx, id, repoInput)
 	} else {
 		updated, err = s.repo.FindByID(ctx, id, LoadOptions{WithGroups: true, WithProxy: true})
 	}
@@ -943,7 +944,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 		}
 
 		if patchHasChanges {
-			if _, err := s.repo.Update(ctx, id, patch); err != nil {
+			if _, err := s.updateAccount(ctx, id, patch); err != nil {
 				result.appendFailure(id, err)
 				continue
 			}
@@ -1288,7 +1289,7 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			timing := connectivityTestTiming(outcome)
 			if policy.Enabled {
 				degraded := forwardErr != nil || outcome.Kind != sdk.OutcomeSuccess || capture.overflow || !policy.matcher.MatchString(capture.text())
-				if _, persistErr := s.repo.Update(runCtx, item.ID, UpdateInput{CognitionDegraded: &degraded}); persistErr != nil {
+				if _, persistErr := s.updateAccount(runCtx, item.ID, UpdateInput{CognitionDegraded: &degraded}); persistErr != nil {
 					return timing, fmt.Errorf("保存降智检测结果失败: %w", persistErr)
 				}
 				timing.CognitionDegraded = &degraded
@@ -1762,7 +1763,7 @@ func (s *Service) refreshToken(ctx context.Context, item Account, probeUsage boo
 			Email:                refreshedEmail,
 			HasEmail:             true,
 		}
-		persisted, persistErr := s.repo.Update(ctx, item.ID, patch)
+		persisted, persistErr := s.updateAccount(ctx, item.ID, patch)
 		if persistErr != nil {
 			logger.Error("account_credential_persist_failed",
 				sdk.LogFieldAccountID, item.ID,

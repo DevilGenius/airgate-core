@@ -59,10 +59,10 @@ type Judgment struct {
 //
 // 确定性的账号级信号仍由 state 记录；临时 403 和 5xx 共享瞬时避让策略。
 type StateMachine struct {
-	db              *ent.Client
-	familyCooldown  *FamilyCooldown
-	monitor         monitoring.Recorder
-	statusPublisher AccountStatusEventPublisher
+	db               *ent.Client
+	familyCooldown   *FamilyCooldown
+	monitor          monitoring.Recorder
+	accountPublisher AccountEventPublisher
 
 	familyBackoffMu sync.RWMutex
 	familyBackoff   FamilyTransientBackoffPolicy

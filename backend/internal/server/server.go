@@ -57,8 +57,7 @@ type Server struct {
 	monitor         *appmonitor.Service
 	runtime         *appmonitor.RuntimeSampler
 	runtimeFeatures *runtimefeatures.Controller
-	events          *adminevents.Hub
-	statusEvents    *adminevents.CoalescingStatusPublisher
+	events          *adminevents.Service
 	handlers        *bootstrap.HTTPHandlers
 
 	pluginStartCancel context.CancelFunc
@@ -73,8 +72,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	jwtMgr := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.ExpireHour)
 
 	// 核心服务组件
-	eventHub := adminevents.NewHub(0)
-	statusEvents := adminevents.NewCoalescingStatusPublisher(eventHub)
+	events := adminevents.NewService(0)
 	monitorSettingsStore := store.NewSettingsStore(db)
 	monitorSettingsService := appsettings.NewService(monitorSettingsStore)
 	familyBackoffPolicy, err := scheduler.LoadOrInitializeFamilyTransientBackoffPolicy(context.Background(), monitorSettingsService)
@@ -83,9 +81,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	}
 	sched := scheduler.NewScheduler(db, rdb)
 	sched.SetFamilyTransientBackoffPolicy(familyBackoffPolicy)
-	sched.SetAccountStatusEventPublisher(statusEvents)
+	sched.SetAccountEventPublisher(events)
 	concurrency := scheduler.NewConcurrencyManager(rdb)
-	concurrency.SetCapacityEventPublisher(eventHub)
+	concurrency.SetCapacityEventPublisher(events)
 	calculator := billing.NewCalculator()
 	recorder := billing.NewRecorder(db, 0, rdb)
 	var sqlDB *stdsql.DB
@@ -100,7 +98,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 	monitorService := appmonitor.NewService(
 		monitorStore,
 		appmonitor.WithRedis(rdb),
-		appmonitor.WithMonitorChangeBroadcaster(eventHub),
+		appmonitor.WithMonitorChangeBroadcaster(events),
 		appmonitor.WithRequestTrace(runtimeFeatureState.RequestTraceEnabled),
 	)
 	if runtimeFeatureState.RequestTraceEnabled {
@@ -177,8 +175,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		monitor:         monitorService,
 		runtime:         runtimeSampler,
 		runtimeFeatures: runtimeFeatureController,
-		events:          eventHub,
-		statusEvents:    statusEvents,
+		events:          events,
 	}
 
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
@@ -192,7 +189,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client, sqlDBOpt .
 		Scheduler:   sched,
 		Monitor:     monitorService,
 		Runtime:     runtimeSampler,
-		Events:      eventHub,
+		Events:      events,
 		Recorder:    recorder,
 	})
 	if s.handlers.Monitor != nil {
@@ -268,8 +265,8 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	pluginCtx, cancel := context.WithCancel(ctx)
 	s.pluginStartCancel = cancel
 
-	if s.statusEvents != nil {
-		safego.Go("admin_status_event_coalescer", func() { s.statusEvents.Run(pluginCtx) })
+	if s.events != nil {
+		safego.Go("admin_event_service", func() { s.events.Run(pluginCtx) })
 	}
 	if s.scheduler != nil {
 		safego.Go("account_model_success_rate_sync", func() { s.scheduler.StartModelSuccessRateSync(pluginCtx) })

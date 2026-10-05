@@ -22,7 +22,7 @@ type cognitionTestPolicy struct {
 
 // ClearCognitionTest restores the untested state without changing other account metadata.
 func (s *Service) ClearCognitionTest(ctx context.Context, id int) error {
-	if _, err := s.repo.Update(ctx, id, UpdateInput{ClearCognitionTest: true}); err != nil {
+	if _, err := s.updateAccount(ctx, id, UpdateInput{ClearCognitionTest: true}); err != nil {
 		return err
 	}
 	if s.stateWriter != nil {

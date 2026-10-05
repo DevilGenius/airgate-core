@@ -8,11 +8,11 @@ import (
 
 // EventHandler handles admin server event streams.
 type EventHandler struct {
-	hub *adminevents.Hub
+	hub *adminevents.Service
 }
 
 // NewEventHandler creates an EventHandler.
-func NewEventHandler(hub *adminevents.Hub) *EventHandler {
+func NewEventHandler(hub *adminevents.Service) *EventHandler {
 	return &EventHandler{hub: hub}
 }
 

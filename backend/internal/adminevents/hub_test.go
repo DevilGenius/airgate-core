@@ -54,7 +54,7 @@ func TestHubPublishesTimestampedEventsAndCancelIsIdempotent(t *testing.T) {
 	until := now.Add(time.Hour)
 	hub.PublishAccountStateChanged(7, "rate_limited", &until, "limited")
 	statusEvent := <-ch
-	if statusEvent.Type != TypeAccountStatusChanged || statusEvent.AccountID != 7 ||
+	if statusEvent.Type != TypeAccountChanged || statusEvent.AccountID != 7 ||
 		statusEvent.Seq != 2 ||
 		statusEvent.AccountState != "rate_limited" || statusEvent.StateUntil == nil ||
 		*statusEvent.StateUntil != until.Format(time.RFC3339Nano) || statusEvent.ErrorMsg == nil || *statusEvent.ErrorMsg != "limited" {
@@ -63,7 +63,7 @@ func TestHubPublishesTimestampedEventsAndCancelIsIdempotent(t *testing.T) {
 
 	hub.PublishAccountFamilyCooldownChanged(7, "upsert", "gpt-5.6-sol", &until, "subscription", 90000)
 	cooldownEvent := <-ch
-	if cooldownEvent.Type != TypeAccountStatusChanged || cooldownEvent.FamilyAction != "upsert" ||
+	if cooldownEvent.Type != TypeAccountChanged || cooldownEvent.FamilyAction != "upsert" ||
 		cooldownEvent.Seq != 3 ||
 		cooldownEvent.Family != "gpt-5.6-sol" || cooldownEvent.FamilyUntil != until.Format(time.RFC3339Nano) ||
 		cooldownEvent.FamilyDurationMs != 90000 {

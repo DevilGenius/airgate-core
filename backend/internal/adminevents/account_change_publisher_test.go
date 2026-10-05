@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestCoalescingStatusPublisherKeepsLatestValuesAndClearOrder(t *testing.T) {
+func TestAccountChangePublisherKeepsLatestValuesAndClearOrder(t *testing.T) {
 	hub := NewHub(8)
 	subscriptionCtx, cancelSubscriptionContext := context.WithCancel(context.Background())
 	ch, cancelSubscription := hub.Subscribe(subscriptionCtx)
@@ -14,7 +14,7 @@ func TestCoalescingStatusPublisherKeepsLatestValuesAndClearOrder(t *testing.T) {
 		cancelSubscription()
 		cancelSubscriptionContext()
 	}()
-	publisher := NewCoalescingStatusPublisher(hub)
+	publisher := NewAccountChangePublisher(hub)
 
 	now := time.Date(2026, 7, 27, 1, 2, 3, 0, time.UTC)
 	stateUntil := now.Add(time.Hour)
@@ -55,7 +55,7 @@ func TestCoalescingStatusPublisherKeepsLatestValuesAndClearOrder(t *testing.T) {
 	}
 }
 
-func TestCoalescingStatusPublisherFlushesOnContextCancel(t *testing.T) {
+func TestAccountChangePublisherFlushesOnContextCancel(t *testing.T) {
 	hub := NewHub(1)
 	subscriptionCtx, cancelSubscriptionContext := context.WithCancel(context.Background())
 	ch, cancelSubscription := hub.Subscribe(subscriptionCtx)
@@ -63,7 +63,7 @@ func TestCoalescingStatusPublisherFlushesOnContextCancel(t *testing.T) {
 		cancelSubscription()
 		cancelSubscriptionContext()
 	}()
-	publisher := NewCoalescingStatusPublisher(hub)
+	publisher := NewAccountChangePublisher(hub)
 	publisher.interval = time.Hour
 	publisher.PublishAccountStateChanged(9, "disabled", nil, "manual")
 
