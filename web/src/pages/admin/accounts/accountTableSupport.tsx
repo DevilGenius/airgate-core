@@ -201,7 +201,8 @@ export function accountTableCellRowsEqual(columnKey: string, left: AccountResp, 
       return left.id === right.id
         && left.state === right.state;
     case 'priority':
-      return left.priority === right.priority;
+      return left.priority === right.priority
+        && left.scheduling_weight === right.scheduling_weight;
     case 'rate_multiplier':
       return left.rate_multiplier === right.rate_multiplier;
     case 'usage_window':

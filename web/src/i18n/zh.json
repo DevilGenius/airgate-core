@@ -376,6 +376,7 @@
     "concurrency": "并发数",
     "rate_multiplier": "费率倍率",
     "scheduling_weight": "调度权重",
+    "scheduling_weight_value": "权重 {{weight}}",
     "scheduling_weight_hint": "默认 100，范围 0–1,000,000。0 停止新分配，已有会话仍按原规则复用。同等负载下按相对权重分配，繁忙时减少新流量；仅影响新分配，不迁移已有会话。",
     "scheduling_weight_invalid": "请输入 0 到 1,000,000 之间的整数。",
     "model_downgrade_threshold": "模型降级阈值",

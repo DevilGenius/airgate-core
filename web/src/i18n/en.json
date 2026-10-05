@@ -376,6 +376,7 @@
     "concurrency": "Concurrency",
     "rate_multiplier": "Rate Multiplier",
     "scheduling_weight": "Scheduling Weight",
+    "scheduling_weight_value": "Weight {{weight}}",
     "scheduling_weight_hint": "Default 100; range 0–1,000,000. Zero stops new assignments; existing sessions remain eligible under the usual rules. Relative weights apply at equal load, with less new traffic as load rises.",
     "scheduling_weight_invalid": "Enter an integer from 0 to 1,000,000.",
     "model_downgrade_threshold": "Model Downgrade Threshold",

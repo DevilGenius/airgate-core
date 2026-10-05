@@ -653,9 +653,17 @@ export function useAccountTableColumns({
       align: 'center',
       sortKey: 'priority',
       render: (row) => (
-        <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
-          {row.priority}
-        </span>
+        <div className="flex min-w-0 flex-col items-center">
+          <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>
+            {row.priority}
+          </span>
+          <span
+            className="max-w-full truncate text-[10px] leading-4 text-text-tertiary"
+            title={t('accounts.scheduling_weight_value', { weight: row.scheduling_weight })}
+          >
+            {t('accounts.scheduling_weight_value', { weight: row.scheduling_weight })}
+          </span>
+        </div>
       ),
     },
     {
