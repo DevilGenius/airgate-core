@@ -1062,20 +1062,22 @@ func TestPickAccountRechecksPrimaryAfterFallbackWasSelectedForPoolMiss(t *testin
 	defer restoreRouteGraph()
 
 	primary := &ent.Account{
-		ID:          1,
-		Name:        "primary",
-		Platform:    "openai",
-		State:       account.StateActive,
-		ModelPolicy: modelpolicy.Policy{Allow: []string{"gpt-primary"}},
-		Extra:       map[string]interface{}{},
+		ID:               1,
+		Name:             "primary",
+		Platform:         "openai",
+		State:            account.StateActive,
+		ModelPolicy:      modelpolicy.Policy{Allow: []string{"gpt-primary"}},
+		Extra:            map[string]interface{}{},
+		SchedulingWeight: 100,
 	}
 	fallback := &ent.Account{
-		ID:          2,
-		Name:        "fallback",
-		Platform:    "openai",
-		State:       account.StateActive,
-		ModelPolicy: modelpolicy.Policy{Allow: []string{"gpt-fallback"}},
-		Extra:       map[string]interface{}{},
+		ID:               2,
+		Name:             "fallback",
+		Platform:         "openai",
+		State:            account.StateActive,
+		ModelPolicy:      modelpolicy.Policy{Allow: []string{"gpt-fallback"}},
+		Extra:            map[string]interface{}{},
+		SchedulingWeight: 100,
 	}
 	group := &ent.Group{ID: 42, Platform: "openai"}
 	group.Edges.Accounts = []*ent.Account{fallback}
