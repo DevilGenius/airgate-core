@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditAccountModal } from './EditAccountModal';
 import { BulkEditAccountModal } from './BulkEditAccountModal';
+import { getBulkEditInitialValues } from './bulkEditSupport';
 import type { AccountResp, CredentialSchemaResp } from '../../../shared/types';
 
 vi.mock('@heroui/react', async (importOriginal) => {
@@ -301,6 +302,54 @@ describe('EditAccountModal model policy', () => {
 });
 
 describe('BulkEditAccountModal plan controls', () => {
+  it('does not submit changes when only the scheduling group is enabled', () => {
+    const onSubmit = vi.fn();
+    render(<BulkEditAccountModal open count={2} loading={false} onClose={() => {}} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.dispatch_toggle' }));
+    const save = screen.getByRole('button', { name: 'common.save' });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.scheduling_weight' }));
+    fireEvent.click(save);
+    expect(onSubmit).toHaveBeenCalledWith({ scheduling_weight: 100 });
+  });
+
+  it.each([
+    ['accounts.message_lock', { extra: { msg_lock_enabled: true } }],
+    ['accounts.upstream_is_pool', { upstream_is_pool: true }],
+    ['accounts.plan_type_locked', { extra: { plan_type_locked: true } }],
+  ])('preserves mixed account states when editing only %s', (switchName, expectedPatch) => {
+    const initial = getBulkEditInitialValues([
+      account({ id: 1, state: 'active' }),
+      account({ id: 2, state: 'disabled' }),
+    ], [1, 2]);
+    expect(initial.dispatchEnabled).toBeUndefined();
+    const onSubmit = vi.fn();
+    render(<BulkEditAccountModal open count={2} loading={false}
+      initialDispatchEnabled={initial.dispatchEnabled}
+      initialPoolMode={initial.poolMode}
+      initialPlanTypeLocked={initial.planTypeLocked}
+      initialMessageLockEnabled={initial.messageLockEnabled}
+      onClose={() => {}} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.dispatch_toggle' }));
+    fireEvent.click(screen.getByRole('switch', { name: switchName }));
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith(expectedPatch);
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty('state');
+  });
+
+  it('submits active only after explicitly switching Enable on', () => {
+    const onSubmit = vi.fn();
+    render(<BulkEditAccountModal open count={2} loading={false} initialDispatchEnabled={false}
+      onClose={() => {}} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.dispatch_toggle' }));
+    expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('switch', { name: 'accounts.dispatch_enabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({ state: 'active' });
+  });
+
   it('uses four switches and patches only explicitly edited fields', () => {
     const onSubmit = vi.fn();
     render(<BulkEditAccountModal open count={2} loading={false} initialPlanType="plus" initialPlanTypeLocked initialPoolMode onClose={() => {}} onSubmit={onSubmit} />);
@@ -313,7 +362,7 @@ describe('BulkEditAccountModal plan controls', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'accounts.plan_type_locked' }));
     fireEvent.click(screen.getByRole('switch', { name: 'accounts.upstream_is_pool' }));
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
-    expect(onSubmit).toHaveBeenCalledWith({ state: 'active', plan_type: 'pro', upstream_is_pool: false, extra: { plan_type_locked: false } });
+    expect(onSubmit).toHaveBeenCalledWith({ plan_type: 'pro', upstream_is_pool: false, extra: { plan_type_locked: false } });
   });
 
   it('disables all four switches until scheduling options are enabled', () => {

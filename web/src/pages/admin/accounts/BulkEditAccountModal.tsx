@@ -89,7 +89,8 @@ export function BulkEditAccountModal({
   const { t } = useTranslation();
 
   // 每个字段独立的「启用」开关
-  const [enableStatus, setEnableStatus] = useState(false);
+  const [enableSchedulingOptions, setEnableSchedulingOptions] = useState(false);
+  const [enableDispatchState, setEnableDispatchState] = useState(false);
   const [enablePriority, setEnablePriority] = useState(false);
   const [enablePrioritySequence, setEnablePrioritySequence] = useState(false);
   const [enablePriorityOffset, setEnablePriorityOffset] = useState(false);
@@ -142,8 +143,12 @@ export function BulkEditAccountModal({
     queryFn: () => proxiesApi.list(FETCH_ALL_PARAMS),
   });
 
+  // The group checkbox only permits edits; it never changes account state itself.
+  const hasSchedulingChanges = enableSchedulingOptions && (
+    enableDispatchState || enablePlanTypeLock || enablePoolMode || enableMessageLock
+  );
   const hasAnyField =
-    enableStatus ||
+    hasSchedulingChanges ||
     enablePriority ||
     enablePrioritySequence ||
     enablePriorityOffset ||
@@ -184,7 +189,7 @@ export function BulkEditAccountModal({
     if (!canSubmit) return;
 
     const patch: Omit<BulkUpdateAccountsReq, 'account_ids'> = {};
-    if (enableStatus) patch.state = status;
+    if (enableSchedulingOptions && enableDispatchState) patch.state = status;
     if (enablePriority) patch.priority = commitAccountPriorityInput(priorityInput, priority);
     if (enablePrioritySequence && prioritySequencePreview) {
       patch.priority_sequence = {
@@ -197,7 +202,7 @@ export function BulkEditAccountModal({
     if (enableSchedulingWeight) patch.scheduling_weight = schedulingWeightValue!;
     if (enableConcurrency) patch.max_concurrency = maxConcurrency;
     if (enablePlanType) patch.plan_type = planType.trim();
-    if (enableStatus && enablePoolMode) patch.upstream_is_pool = poolMode;
+    if (enableSchedulingOptions && enablePoolMode) patch.upstream_is_pool = poolMode;
     if (enableModelDowngradeThreshold) {
       patch.model_downgrade_threshold = modelDowngradeThresholdEmpty ? null : modelDowngradeThresholdValue;
     }
@@ -210,8 +215,8 @@ export function BulkEditAccountModal({
       }
     }
     let extraPatch: Record<string, unknown> | undefined;
-    if (enableStatus && enablePlanTypeLock) extraPatch = { plan_type_locked: planTypeLocked };
-    if (enableStatus && enableMessageLock) {
+    if (enableSchedulingOptions && enablePlanTypeLock) extraPatch = { plan_type_locked: planTypeLocked };
+    if (enableSchedulingOptions && enableMessageLock) {
       extraPatch = setAccountMessageLockEnabled(extraPatch, messageLockEnabled);
     }
     if (extraPatch) patch.extra = extraPatch;
@@ -528,41 +533,41 @@ export function BulkEditAccountModal({
           <div className={styles.dispatch}>
             <NativeCheckbox
               ariaLabel={t('accounts.dispatch_toggle')}
-              isSelected={enableStatus}
-              onChange={setEnableStatus}
+              isSelected={enableSchedulingOptions}
+              onChange={setEnableSchedulingOptions}
             >
-              <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+              <span className={enableSchedulingOptions ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
                 {t('accounts.dispatch_toggle')}
               </span>
             </NativeCheckbox>
           </div>
-          <div className={styles.switchCell} data-edited={enableStatus || undefined}>
+          <div className={styles.switchCell} data-edited={(enableSchedulingOptions && enableDispatchState) || undefined}>
             <NativeSwitch
-              isDisabled={!enableStatus}
+              isDisabled={!enableSchedulingOptions}
               isSelected={status === 'active'}
               label={t('accounts.dispatch_enabled')}
-              onChange={(on) => setStatus(on ? 'active' : 'disabled')}
+              onChange={(on) => { setEnableDispatchState(true); setStatus(on ? 'active' : 'disabled'); }}
             />
           </div>
-          <div className={styles.switchCell} data-edited={(enableStatus && enablePlanTypeLock) || undefined}>
+          <div className={styles.switchCell} data-edited={(enableSchedulingOptions && enablePlanTypeLock) || undefined}>
             <NativeSwitch
-              isDisabled={!enableStatus}
+              isDisabled={!enableSchedulingOptions}
               isSelected={planTypeLocked}
               label={t('accounts.plan_type_locked')}
               onChange={(on) => { setEnablePlanTypeLock(true); setPlanTypeLocked(on); }}
             />
           </div>
-          <div className={styles.switchCell} data-edited={(enableStatus && enablePoolMode) || undefined}>
+          <div className={styles.switchCell} data-edited={(enableSchedulingOptions && enablePoolMode) || undefined}>
             <NativeSwitch
-              isDisabled={!enableStatus}
+              isDisabled={!enableSchedulingOptions}
               isSelected={poolMode}
               label={t('accounts.upstream_is_pool')}
               onChange={(on) => { setEnablePoolMode(true); setPoolMode(on); }}
             />
           </div>
-          <div className={styles.switchCell} data-edited={(enableStatus && enableMessageLock) || undefined}>
+          <div className={styles.switchCell} data-edited={(enableSchedulingOptions && enableMessageLock) || undefined}>
             <NativeSwitch
-              isDisabled={!enableStatus}
+              isDisabled={!enableSchedulingOptions}
               isSelected={messageLockEnabled}
               label={t('accounts.message_lock')}
               onChange={(on) => { setEnableMessageLock(true); setMessageLockEnabled(on); }}

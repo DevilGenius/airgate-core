@@ -600,11 +600,11 @@ export function ImportConfigModal({
                         />
                       </HeroTextField>
                     </div>
-                    <Button className={styles.ruleAction} variant="secondary" isDisabled={selectedRule.enabled === false} onPress={duplicateRule}>
+                    <Button className={styles.ruleAction} variant="secondary" onPress={duplicateRule}>
                       <CopyPlus className="h-4 w-4" />
                       {t('accounts.import_config_duplicate_rule')}
                     </Button>
-                    <Button className={styles.ruleAction} variant="secondary" isDisabled={selectedRule.enabled === false} onPress={deleteRule}>
+                    <Button className={styles.ruleAction} variant="secondary" onPress={deleteRule}>
                       <Trash2 className="h-4 w-4 text-danger" />
                       {t('accounts.import_config_delete_rule')}
                     </Button>
@@ -881,10 +881,10 @@ export function ImportConfigModal({
                     </div>
                   </section>
 
-                  {validationError ? (
-                    <p className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{validationError}</p>
-                  ) : null}
                   </fieldset>
+                  {validationError ? (
+                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{validationError}</p>
+                  ) : null}
                 </>
               ) : (
                 <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-text-tertiary">

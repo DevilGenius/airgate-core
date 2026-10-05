@@ -65,7 +65,6 @@ html[data-theme="dark"] {
   --ag-dropdown-padding-inline: 0.75rem;
   --ag-toolbar-control-width: 10rem;
   --ag-toolbar-button-min-width: 7.5rem;
-  --ag-auto-refresh-trigger-width: 8rem;
   --cursor-interactive: pointer;
   --cursor-disabled: not-allowed;
   --skeleton-animation: shimmer;

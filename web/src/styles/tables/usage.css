@@ -24,7 +24,6 @@
   .select__trigger,
   .ag-simple-select-trigger,
   .button,
-  .ag-auto-refresh-trigger,
   .ag-toolbar-menu-trigger-label,
   .ag-toolbar-menu-item,
   .ag-toolbar-menu-item-label,
@@ -60,7 +59,6 @@
   flex: 0 0 auto;
 }
 
-.ag-usage-page .ag-usage-toolbar-actions > .ag-auto-refresh-menu,
 .ag-usage-page .ag-usage-toolbar-actions > .ag-column-visibility-menu {
   width: 100%;
   min-width: 0;
@@ -68,10 +66,6 @@
 
 .ag-usage-page .ag-usage-toolbar-actions > .ag-toolbar-menu > .ag-toolbar-menu-trigger {
   width: 100%;
-}
-
-.ag-usage-page .ag-usage-toolbar-actions .ag-auto-refresh-trigger {
-  --ag-auto-refresh-trigger-width: 0;
 }
 
 .ag-usage-page .ag-usage-toolbar-actions .ag-page-toolbar-button {

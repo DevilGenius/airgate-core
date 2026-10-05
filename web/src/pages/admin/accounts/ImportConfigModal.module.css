@@ -330,8 +330,7 @@
 }
 
 .editorContent[data-rule-disabled] .ruleFields,
-.editorContent[data-rule-disabled] .ruleName,
-.editorContent[data-rule-disabled] .ruleAction {
+.editorContent[data-rule-disabled] .ruleName {
   opacity: 0.5;
   filter: grayscale(1);
 }
