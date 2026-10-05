@@ -412,9 +412,8 @@ const META_CHIP_LOW_COLOR = 'var(--ag-meta-low-color)';
 const META_CHIP_MEDIUM_COLOR = 'var(--ag-meta-medium-color)';
 const META_CHIP_HIGH_COLOR = 'var(--ag-meta-high-color)';
 const META_CHIP_XHIGH_COLOR = 'rgb(239,68,68)';
-const META_CHIP_MAX_COLOR = 'rgb(148,163,184)';
 const META_CHIP_ULTRA_COLOR = 'var(--ag-text)';
-const META_CHIP_FALLBACK_COLOR = 'var(--ag-text-secondary)';
+const META_CHIP_FALLBACK_COLOR = 'rgb(148,163,184)';
 const META_CHIP_SERVICE_TIER_COLOR = 'var(--ag-meta-service-tier-color)';
 const IMAGE_TIER_1K_MAX_PIXELS = 1536 * 1024;
 const IMAGE_TIER_2K_MAX_PIXELS = 2048 * 2048;
@@ -424,7 +423,7 @@ const META_CHIP_EFFORT_COLORS: Record<string, string> = {
   medium: META_CHIP_MEDIUM_COLOR,
   high: META_CHIP_HIGH_COLOR,
   xhigh: META_CHIP_XHIGH_COLOR,
-  max: META_CHIP_MAX_COLOR,
+  max: META_CHIP_ULTRA_COLOR,
   ultra: META_CHIP_ULTRA_COLOR,
 };
 
