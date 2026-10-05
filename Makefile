@@ -29,6 +29,12 @@ GO := GOTOOLCHAIN=local go
 GOLANGCI_LINT_VERSION := v2.12.2
 TOOLS_DIR := $(CURDIR)/.tools
 TOOLS_BIN := $(TOOLS_DIR)/bin
+# Keep lint subprocesses away from shared caches/locks that may be inaccessible
+# in restricted development environments. All paths follow the checkout.
+LINT_GO_CACHE := $(TOOLS_DIR)/go-build-cache
+LINT_CACHE := $(TOOLS_DIR)/golangci-cache
+LINT_TEMP := $(TOOLS_DIR)/lint-temp
+LINT_ENV := GOCACHE="$(LINT_GO_CACHE)" GOLANGCI_LINT_CACHE="$(LINT_CACHE)" TMPDIR="$(LINT_TEMP)" TMP="$(LINT_TEMP)" TEMP="$(LINT_TEMP)"
 ifeq ($(OS),Windows_NT)
 GOLANGCI_LINT_EXE := golangci-lint.exe
 else
@@ -263,17 +269,17 @@ ent: ## 生成 Ent ORM 代码
 # ===================== 质量检查 =====================
 
 lint-tools: ## 安装本地 lint 工具（版本与 CI 固定一致）
-	@mkdir -p $(TOOLS_BIN)
-	@GOBIN=$(TOOLS_BIN) $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@mkdir -p "$(TOOLS_BIN)" "$(LINT_GO_CACHE)" "$(LINT_CACHE)" "$(LINT_TEMP)"
+	@$(LINT_ENV) GOBIN="$(TOOLS_BIN)" $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 lint: lint-tools ## 代码检查
-	@cd $(BACKEND_DIR) && $(GOLANGCI_LINT) run ./...
+	@cd $(BACKEND_DIR) && $(LINT_ENV) "$(GOLANGCI_LINT)" run ./...
 	@cd $(WEB_DIR) && pnpm exec tsc -b --noEmit
 	@cd $(WEB_DIR) && pnpm lint
 	@echo "代码检查通过"
 
 lint-unused: lint-tools ## 仅检查 Go 未使用代码和 staticcheck
-	@cd $(BACKEND_DIR) && $(GOLANGCI_LINT) run --enable-only=unused,staticcheck ./...
+	@cd $(BACKEND_DIR) && $(LINT_ENV) "$(GOLANGCI_LINT)" run --enable-only=unused,staticcheck ./...
 	@echo "Go unused/staticcheck 检查通过"
 
 fmt: ## 格式化代码

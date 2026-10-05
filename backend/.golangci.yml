@@ -4,10 +4,9 @@ linters:
   exclusions:
     generated: strict
     paths:
-      # Scratch Go programs under backend/tmp are gitignored, but golangci-lint
-      # does not honor .gitignore, so they would otherwise fail lint on a clean
-      # checkout that happens to contain them. Paths here are relative to this
-      # config file's directory (backend/), not the repository root.
+      # Filter reported lint issues in backend/tmp (relative to this config).
+      # This does not skip package loading or suppress typecheck errors.
+      # Put scratch Go programs in the repository-root .tools/ instead.
       - ^tmp/
   enable:
     - errcheck
