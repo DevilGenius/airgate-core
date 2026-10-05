@@ -134,8 +134,8 @@
 
 .ag-usage-page .ag-column-visibility-menu .ag-toolbar-menu-popover {
   box-sizing: border-box;
-  width: min(13.5rem, calc(100vw - 2rem));
-  min-width: min(10.5rem, calc(100vw - 2rem));
+  width: var(--ag-floating-trigger-width);
+  min-width: 0;
   max-width: calc(100vw - 2rem);
   max-height: min(28rem, calc(100dvh - var(--ag-floating-top, 0px) - 0.75rem));
   overflow-x: hidden;

@@ -171,6 +171,7 @@ export const RefreshControl = memo(function RefreshControl({
   isDisabled = false,
 }: RefreshControlProps) {
   const { t } = useTranslation();
+  const controlRef = useRef<HTMLDivElement | null>(null);
   const label = t('usage.auto_update');
   const offLabel = t('common.manual_update');
   const enabled = value > 0;
@@ -232,7 +233,7 @@ export const RefreshControl = memo(function RefreshControl({
   return (
     <>
       {beforeRefresh}
-      <div className={styles.control} role="group" aria-label={ariaLabel}>
+      <div ref={controlRef} className={styles.control} role="group" aria-label={ariaLabel}>
         <button
           type="button"
           aria-label={refreshAriaLabel}
@@ -250,6 +251,7 @@ export const RefreshControl = memo(function RefreshControl({
           <span ref={setLabelValueElement} className={styles.value} />
         </button>
         <ToolbarMenu
+          anchorRef={controlRef}
           ariaLabel={ariaLabel}
           rootClassName={styles.menu}
           label={null}

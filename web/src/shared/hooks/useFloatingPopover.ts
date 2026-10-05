@@ -9,16 +9,18 @@ type FloatingAlign = 'start' | 'end';
  */
 export function useFloatingPopover<T extends HTMLElement>({
   align = 'end',
+  anchorRef,
   isOpen,
 }: {
   align?: FloatingAlign;
+  anchorRef?: RefObject<HTMLElement | null>;
   isOpen: boolean;
 }) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const popoverRef = useRef<T | null>(null);
 
   const updatePosition = useCallback(() => {
-    const trigger = triggerRef.current;
+    const trigger = anchorRef?.current ?? triggerRef.current;
     const popover = popoverRef.current;
     if (!trigger || !popover) return;
 
@@ -46,7 +48,7 @@ export function useFloatingPopover<T extends HTMLElement>({
 
     popover.style.setProperty('--ag-floating-left', `${left}px`);
     popover.style.setProperty('--ag-floating-top', `${Math.round(Math.max(viewportPadding, top))}px`);
-  }, [align]);
+  }, [align, anchorRef]);
 
   useLayoutEffect(() => {
     const popover = popoverRef.current;
@@ -72,6 +74,7 @@ export function useFloatingPopover<T extends HTMLElement>({
       scheduleUpdate();
       const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(scheduleUpdate);
       if (triggerRef.current) observer?.observe(triggerRef.current);
+      if (anchorRef?.current) observer?.observe(anchorRef.current);
       observer?.observe(popover);
       window.addEventListener('resize', scheduleUpdate);
       window.addEventListener('scroll', scheduleUpdate, true);
@@ -91,7 +94,7 @@ export function useFloatingPopover<T extends HTMLElement>({
       }
     }
     return undefined;
-  }, [isOpen, updatePosition]);
+  }, [anchorRef, isOpen, updatePosition]);
 
   return {
     popoverRef,

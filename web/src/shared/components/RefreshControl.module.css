@@ -90,7 +90,7 @@
 }
 
 .control .menu :global(.ag-toolbar-menu-popover) {
-  width: max-content;
-  min-width: 12rem;
-  max-width: min(16rem, calc(100vw - 2rem));
+  width: var(--ag-floating-trigger-width);
+  min-width: 0;
+  max-width: calc(100vw - 2rem);
 }

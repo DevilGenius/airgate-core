@@ -4,6 +4,7 @@ import { DropdownIndicator } from './DropdownIndicator';
 import { useFloatingPopover } from '../hooks/useFloatingPopover';
 
 interface ToolbarMenuProps {
+  anchorRef?: RefObject<HTMLElement | null>;
   ariaLabel: string;
   children: (close: () => void) => ReactNode;
   className?: string;
@@ -27,6 +28,7 @@ interface ToolbarMenuItemProps {
 }
 
 export const ToolbarMenu = memo(function ToolbarMenu({
+  anchorRef,
   ariaLabel,
   children,
   className,
@@ -40,7 +42,7 @@ export const ToolbarMenu = memo(function ToolbarMenu({
   const [isOpen, setIsOpen] = useState(false);
   const isOpenRef = useRef(isOpen);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const { popoverRef, triggerRef } = useFloatingPopover<HTMLDivElement>({ isOpen, align: popoverAlign });
+  const { popoverRef, triggerRef } = useFloatingPopover<HTMLDivElement>({ isOpen, align: popoverAlign, anchorRef });
 
   useEffect(() => {
     isOpenRef.current = isOpen;

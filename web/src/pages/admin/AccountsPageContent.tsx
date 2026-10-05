@@ -34,6 +34,8 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { RefreshControl } from '../../shared/components/RefreshControl';
+import refreshControlStyles from '../../shared/components/RefreshControl.module.css';
+import { ToolbarMenu, ToolbarMenuItem } from '../../shared/components/ToolbarMenu';
 import { SimpleMultiSelect } from '../../shared/components/SimpleMultiSelect';
 import { AccountFilterIcons } from './accounts/AccountFilterIcons';
 import type { SimpleSelectOption } from '../../shared/components/SimpleSelect';
@@ -1478,20 +1480,69 @@ export default function AccountsPageContent() {
     typeFilterItems, updateAuthFilters, updatePlanFilters, updatePlatformFilters,
   ]);
 
+  const importControlRef = useRef<HTMLDivElement | null>(null);
   const actionsNode = useMemo(() => (
     <>
-      <RefreshControl
-        value={autoRefresh}
-        options={ACCOUNT_AUTO_REFRESH_OPTIONS}
-        ariaLabel={t('accounts.auto_refresh')}
-        refreshAriaLabel={t('common.refresh')}
-        onChange={setAutoRefresh}
-        onAutoRefresh={refreshAccountOverview}
-        onMenuOpenChange={(isOpen) => handleToolbarMenuOpenChange('auto-refresh', isOpen)}
-        onRefresh={refreshAccountOverview}
-        isRefreshing={isAccountsFetching}
-        isAutoRefreshing={isAccountsFetching || isUsageFetching}
-      />
+      <div className="inline-grid gap-2 md:grid-cols-2">
+        <RefreshControl
+          value={autoRefresh}
+          options={ACCOUNT_AUTO_REFRESH_OPTIONS}
+          ariaLabel={t('accounts.auto_refresh')}
+          refreshAriaLabel={t('common.refresh')}
+          onChange={setAutoRefresh}
+          onAutoRefresh={refreshAccountOverview}
+          onMenuOpenChange={(isOpen) => handleToolbarMenuOpenChange('auto-refresh', isOpen)}
+          onRefresh={refreshAccountOverview}
+          isRefreshing={isAccountsFetching}
+          isAutoRefreshing={isAccountsFetching || isUsageFetching}
+        />
+        <div className="hidden min-w-0 md:grid">
+          <div ref={importControlRef} className={refreshControlStyles.control} role="group" aria-label={`${t('accounts.import')} / ${t('accounts.export')}`}>
+            <button
+              type="button"
+              className={refreshControlStyles.refresh}
+              onClick={() => openAICompatImportEnabled ? setShowCompatImportModal(true) : importInputRef.current?.click()}
+              disabled={isAnyImportPending}
+              aria-busy={openAICompatImportEnabled ? isCompatImportPending : isImportPending}
+            >
+              {openAICompatImportEnabled ? <FileJson2 className="h-4 w-4 shrink-0" /> : <Download className="h-4 w-4 shrink-0" />}
+              <span className={refreshControlStyles.label}>
+                {t(openAICompatImportEnabled ? 'accounts.compat_import' : 'accounts.import')}
+              </span>
+            </button>
+            <ToolbarMenu
+              anchorRef={importControlRef}
+              ariaLabel={`${t('accounts.import')} / ${t('accounts.export')}`}
+              rootClassName={refreshControlStyles.menu}
+              label={null}
+              className={refreshControlStyles.arrow}
+            >
+              {(close) => (
+                <>
+                  <ToolbarMenuItem
+                    isDisabled={isAnyImportPending}
+                    onSelect={() => {
+                      importInputRef.current?.click();
+                      close();
+                    }}
+                  >
+                    <span className="flex items-center gap-2"><Download className="h-4 w-4" />{t('accounts.import')}</span>
+                  </ToolbarMenuItem>
+                  <ToolbarMenuItem
+                    isDisabled={isExportPending}
+                    onSelect={() => {
+                      runExportMutation();
+                      close();
+                    }}
+                  >
+                    <span className="flex items-center gap-2"><Upload className="h-4 w-4" />{t('accounts.export')}</span>
+                  </ToolbarMenuItem>
+                </>
+              )}
+            </ToolbarMenu>
+          </div>
+        </div>
+      </div>
       <Button
         className="ag-page-toolbar-button hidden md:inline-flex"
         variant="secondary"
@@ -1500,38 +1551,6 @@ export default function AccountsPageContent() {
         <Settings2 className="h-4 w-4" />
         {t('accounts.import_config')}
       </Button>
-      <Button
-        className="ag-page-toolbar-button hidden md:inline-flex"
-        variant="secondary"
-        onPress={() => importInputRef.current?.click()}
-        isDisabled={isAnyImportPending}
-        aria-busy={isImportPending}
-      >
-        <Download className="h-4 w-4" />
-        {t('accounts.import')}
-      </Button>
-      <Button
-        className="ag-page-toolbar-button hidden md:inline-flex"
-        variant="secondary"
-        onPress={() => runExportMutation()}
-        isDisabled={isExportPending}
-        aria-busy={isExportPending}
-      >
-        <Upload className="h-4 w-4" />
-        {t('accounts.export')}
-      </Button>
-      {openAICompatImportEnabled ? (
-        <Button
-          className="ag-page-toolbar-button hidden md:inline-flex"
-          variant="secondary"
-          onPress={() => setShowCompatImportModal(true)}
-          isDisabled={isAnyImportPending}
-          aria-busy={isCompatImportPending}
-        >
-          <FileJson2 className="h-4 w-4" />
-          {t('accounts.compat_import')}
-        </Button>
-      ) : null}
       <Button className="ag-page-toolbar-button" variant="primary" onPress={handleCreateAccount}>
         <Plus className="h-4 w-4" />
         {t('accounts.create')}
