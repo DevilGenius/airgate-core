@@ -1,3 +1,12 @@
+export const DEFAULT_SCHEDULING_WEIGHT = 100;
+export const MAX_SCHEDULING_WEIGHT = 1000000;
+
+export function parseSchedulingWeightInput(value: string): number | null {
+  if (value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= MAX_SCHEDULING_WEIGHT ? parsed : null;
+}
+
 export const DEFAULT_ACCOUNT_MAX_CONCURRENCY = 10;
 export const DEFAULT_ACCOUNT_PRIORITY = 50;
 export const DEFAULT_MODEL_DOWNGRADE_THRESHOLD = 0;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  parseSchedulingWeightInput,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
   ACCOUNT_PRIORITY_OFFSET_MAX,
@@ -85,5 +86,18 @@ describe('account default helpers', () => {
     expect(parseModelDowngradeThresholdInput('1.01')).toBeNull();
     expect(isValidModelDowngradeThresholdInput('')).toBe(true);
     expect(isValidModelDowngradeThresholdInput('abc')).toBe(false);
+  });
+});
+
+
+describe('scheduling weights', () => {
+  it('accepts nonnegative integers within range and rejects invalid drafts', () => {
+    for (const input of ['', ' ', '-1', '1.5', 'NaN', 'Infinity', '1000001']) {
+      expect(parseSchedulingWeightInput(input)).toBeNull();
+    }
+    expect(parseSchedulingWeightInput('0')).toBe(0);
+    expect(parseSchedulingWeightInput('1')).toBe(1);
+    expect(parseSchedulingWeightInput('100')).toBe(100);
+    expect(parseSchedulingWeightInput('1000000')).toBe(1000000);
   });
 });

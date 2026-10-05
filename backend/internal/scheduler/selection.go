@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -78,7 +77,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 	}
 	for _, acc := range candidates {
 		result := s.checkSchedulabilityResult(ctx, acc, model, now, opts.RequireContinuationAffinity, snapshot)
-		capacityBlocked = capacityBlocked || result.capacityBlocked
+		capacityBlocked = capacityBlocked || (acc.SchedulingWeight > 0 && result.capacityBlocked)
 		if !opts.RequireContinuationAffinity {
 			switch result.normal {
 			case Normal:
@@ -104,10 +103,59 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		}
 		return nil, ErrContinuationAffinityMissing
 	}
+
+	// 续链请求的 session sticky 是硬亲和；普通 session sticky 只是软粘连，
+	// 低优先级旧账号不能抢过当前可用最高优先级账号。
+	if sessionID != "" {
+		if accountID, found := s.sticky.Get(ctx, userID, platform, sessionID); found {
+			stickyNormal, stickyPool := s.selectionCandidatePools(normalCandidates, stickyCandidates, platform, model, opts.PreferDifferentAccountType, now)
+			if acc := selectSoftStickyAccount(softStickyCandidates(stickyNormal, stickyPool), accountID); acc != nil {
+				s.sticky.Set(ctx, userID, platform, sessionID, accountID)
+				return acc, nil
+			}
+		}
+	}
+
+	// 零权重只允许复用已有绑定。新分配在类型偏好、优先级及模型质量分层前
+	// 排除零权重，避免它们阻挡仍可接收新流量的兜底账号。
+	normalSelectionCandidates, stickySelectionCandidates := s.selectionCandidatePools(
+		positiveWeightCandidates(normalCandidates), positiveWeightCandidates(stickyCandidates),
+		platform, model, opts.PreferDifferentAccountType, now,
+	)
+	if len(normalSelectionCandidates) == 0 {
+		// 没有 Normal 但可能有 StickyOnly 兜底（如 degraded 账号）
+		if len(stickySelectionCandidates) == 0 {
+			if capacityBlocked {
+				return nil, ErrAccountCapacityExhausted
+			}
+			return nil, ErrNoAvailableAccount
+		}
+		selected = s.selectByWeight(ctx, stickySelectionCandidates, snapshot)
+		if selected == nil {
+			return nil, ErrNoAvailableAccount
+		}
+		slog.Warn("scheduler_fallback_degraded_account",
+			sdk.LogFieldAccountID, selected.ID,
+			sdk.LogFieldPlatform, platform,
+			sdk.LogFieldModel, model,
+		)
+		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickySelectionCandidates, snapshot)
+	}
+
+	selected = s.selectByWeight(ctx, normalSelectionCandidates, snapshot)
+	if selected == nil {
+		return nil, ErrNoAvailableAccount
+	}
+	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalSelectionCandidates, snapshot)
+}
+
+// selectionCandidatePools applies the same layering policy to the supplied
+// eligible pools. Sticky reuse includes zero weights; new allocation does not.
+func (s *Scheduler) selectionCandidatePools(normalCandidates, stickyCandidates []*ent.Account, platform, model, previousType string, now time.Time) ([]*ent.Account, []*ent.Account) {
 	normalCandidates, stickyCandidates = preferDifferentAccountTypeCandidates(
 		normalCandidates,
 		stickyCandidates,
-		opts.PreferDifferentAccountType,
+		previousType,
 	)
 
 	// 先保留优先级的正/负应急层不变量，再在当前层内应用模型质量软降级。
@@ -138,43 +186,25 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		stickyCandidates = ensureNormalCandidatesInSticky(normalCandidates, stickyCandidates)
 	}
 
-	// 续链请求的 session sticky 是硬亲和；普通 session sticky 只是软粘连，
-	// 低优先级旧账号不能抢过当前可用最高优先级账号。
-	if sessionID != "" {
-		if accountID, found := s.sticky.Get(ctx, userID, platform, sessionID); found {
-			if acc := selectSoftStickyAccount(softStickyCandidates(normalCandidates, stickyCandidates), accountID); acc != nil {
-				s.sticky.Set(ctx, userID, platform, sessionID, accountID)
-				return acc, nil
+	return normalCandidates, stickyCandidates
+}
+
+// positiveWeightCandidates does not mutate the original sticky candidate pool.
+func positiveWeightCandidates(candidates []*ent.Account) []*ent.Account {
+	for i, acc := range candidates {
+		if acc.SchedulingWeight > 0 {
+			continue
+		}
+		filtered := make([]*ent.Account, 0, len(candidates)-1)
+		filtered = append(filtered, candidates[:i]...)
+		for _, candidate := range candidates[i+1:] {
+			if candidate.SchedulingWeight > 0 {
+				filtered = append(filtered, candidate)
 			}
 		}
+		return filtered
 	}
-
-	normalSelectionCandidates, stickySelectionCandidates := normalCandidates, stickyCandidates
-	if len(normalSelectionCandidates) == 0 {
-		// 没有 Normal 但可能有 StickyOnly 兜底（如 degraded 账号）
-		if len(stickySelectionCandidates) == 0 {
-			if capacityBlocked {
-				return nil, ErrAccountCapacityExhausted
-			}
-			return nil, ErrNoAvailableAccount
-		}
-		selected = s.selectByLoadBalance(ctx, stickySelectionCandidates, now, snapshot)
-		if selected == nil {
-			return nil, ErrNoAvailableAccount
-		}
-		slog.Warn("scheduler_fallback_degraded_account",
-			sdk.LogFieldAccountID, selected.ID,
-			sdk.LogFieldPlatform, platform,
-			sdk.LogFieldModel, model,
-		)
-		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickySelectionCandidates, now, snapshot)
-	}
-
-	selected = s.selectByLoadBalance(ctx, normalSelectionCandidates, now, snapshot)
-	if selected == nil {
-		return nil, ErrNoAvailableAccount
-	}
-	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalSelectionCandidates, now, snapshot)
+	return candidates
 }
 
 func (s *Scheduler) splitModelQualityCandidates(candidates []*ent.Account, normalizedModel string, now time.Time) (healthy, demoted []*ent.Account) {
@@ -600,7 +630,7 @@ func filterDifferentAccountType(candidates []*ent.Account, previousType string) 
 }
 
 // maybeRegisterSession 有 sessionID 时登记会话；session 数超限换一个候选重试。
-func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Account, userID int, platform, sessionID string, pool []*ent.Account, now time.Time, snapshot *selectionSnapshot) (*ent.Account, error) {
+func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Account, userID int, platform, sessionID string, pool []*ent.Account, snapshot *selectionSnapshot) (*ent.Account, error) {
 	if sessionID == "" {
 		return selected, nil
 	}
@@ -617,7 +647,7 @@ func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Acco
 	if len(retry) == 0 {
 		return nil, ErrNoAvailableAccount
 	}
-	selected = s.selectByLoadBalance(ctx, retry, now, snapshot)
+	selected = s.selectByWeight(ctx, retry, snapshot)
 	if selected == nil || !s.RegisterSession(ctx, selected.ID, sessionID, selected.Extra) {
 		return nil, ErrNoAvailableAccount
 	}
@@ -793,53 +823,6 @@ func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Acco
 		return StickyOnly
 	}
 	return Normal
-}
-
-// selectByLoadBalance 严格按优先级分层：只从最高优先级层选账号，
-// 同层内按 (1-load)*100 + lru_score 打分做加权随机。
-//
-// 低优先级账号只有在高优先级全部被 checkSchedulability 过滤掉后才能被选中。
-// 负优先级沿用同一规则：只要有 >=0 的可调度账号，就不会进入负优先级兜底层。
-// 同层内从 top-N 随机选一个，避免高并发下全部命中同一账号。
-func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account, now time.Time, snapshot *selectionSnapshot) *ent.Account {
-	if len(candidates) == 0 {
-		return nil
-	}
-	if len(candidates) == 1 {
-		return candidates[0]
-	}
-
-	// 找到最高优先级，只保留该层候选
-	maxPriority := candidates[0].Priority
-	for _, acc := range candidates[1:] {
-		if acc.Priority > maxPriority {
-			maxPriority = acc.Priority
-		}
-	}
-	// 同优先级内按负载 + LRU 打分
-	items := make(bestAccounts, 0, maxLoadBalanceCandidates)
-	for _, acc := range candidates {
-		if acc.Priority != maxPriority {
-			continue
-		}
-		maxConc := acc.MaxConcurrency
-		if maxConc <= 0 {
-			maxConc = DefaultAccountMaxConcurrency
-		}
-		loadRate := float64(snapshot.currentLoad(s, ctx, acc.ID)) / float64(maxConc)
-		if loadRate > 1 {
-			loadRate = 1
-		}
-
-		lruScore := 100.0
-		if acc.LastUsedAt != nil {
-			if elapsed := now.Sub(*acc.LastUsedAt).Minutes(); elapsed < 100 {
-				lruScore = elapsed
-			}
-		}
-		items.consider(acc, (1-loadRate)*100+lruScore)
-	}
-	return items[rand.Intn(len(items))].account
 }
 
 // getCurrentLoad 读取 acquire/release 维护的账号并发 count key。

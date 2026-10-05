@@ -1733,6 +1733,7 @@ export default function AccountsPageContent() {
           initialPoolMode={bulkEditSelection.initialValues.poolMode}
           initialMessageLockEnabled={bulkEditSelection.initialValues.messageLockEnabled}
           initialDispatchEnabled={bulkEditSelection.initialValues.dispatchEnabled}
+          initialSchedulingWeight={bulkEditSelection.initialValues.schedulingWeight}
           initialModelDowngradeThreshold={bulkEditSelection.initialValues.modelDowngradeThreshold}
           onClose={() => setBulkEditSelection(null)}
           onSubmit={(patch) =>

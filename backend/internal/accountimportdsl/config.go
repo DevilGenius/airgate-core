@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
+	"github.com/DevilGenius/airgate-core/internal/accountweight"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	"github.com/DevilGenius/airgate-core/internal/plantype"
@@ -46,11 +47,12 @@ type Condition struct {
 }
 
 type Assignment struct {
-	MaxConcurrency *int                 `json:"max_concurrency,omitempty"`
-	Priority       *PriorityAssignment  `json:"priority,omitempty"`
-	GroupIDs       []int64              `json:"group_ids,omitempty"`
-	ProxyID        *int64               `json:"proxy_id,omitempty"`
-	ProxySlot      *ProxySlotAssignment `json:"proxy_slot,omitempty"`
+	MaxConcurrency   *int                 `json:"max_concurrency,omitempty"`
+	SchedulingWeight *int                 `json:"scheduling_weight,omitempty"`
+	Priority         *PriorityAssignment  `json:"priority,omitempty"`
+	GroupIDs         []int64              `json:"group_ids,omitempty"`
+	ProxyID          *int64               `json:"proxy_id,omitempty"`
+	ProxySlot        *ProxySlotAssignment `json:"proxy_slot,omitempty"`
 	// 模型降级阈值始终应用：0 表示关闭，0～1 之间的其它值表示开启。
 	ModelDowngradeThreshold float64 `json:"model_downgrade_threshold"`
 }
@@ -60,6 +62,7 @@ type Assignment struct {
 func (a *Assignment) UnmarshalJSON(data []byte) error {
 	type assignmentWire struct {
 		MaxConcurrency          *int                 `json:"max_concurrency,omitempty"`
+		SchedulingWeight        *int                 `json:"scheduling_weight,omitempty"`
 		Priority                *PriorityAssignment  `json:"priority,omitempty"`
 		GroupIDs                []int64              `json:"group_ids,omitempty"`
 		ProxyID                 *int64               `json:"proxy_id,omitempty"`
@@ -77,6 +80,7 @@ func (a *Assignment) UnmarshalJSON(data []byte) error {
 	}
 	*a = Assignment{
 		MaxConcurrency:          wire.MaxConcurrency,
+		SchedulingWeight:        wire.SchedulingWeight,
 		Priority:                wire.Priority,
 		GroupIDs:                wire.GroupIDs,
 		ProxyID:                 wire.ProxyID,
@@ -183,6 +187,9 @@ func validateRule(index int, rule Rule) error {
 		if err := validateCondition(condition); err != nil {
 			return fmt.Errorf("%s 的 when[%d] 无效: %w", label, conditionIndex, err)
 		}
+	}
+	if rule.Set.SchedulingWeight != nil && !accountweight.Valid(*rule.Set.SchedulingWeight) {
+		return fmt.Errorf("%s 的 scheduling_weight 必须在 0～1000000 范围内", label)
 	}
 	if rule.Set.MaxConcurrency != nil && *rule.Set.MaxConcurrency < 0 {
 		return fmt.Errorf("%s 的 max_concurrency 不能小于 0", label)
@@ -467,6 +474,10 @@ func applyAssignment(
 			slot := *assignment.ProxySlot.Value
 			item.ProxySlot = &slot
 		}
+	}
+	if assignment.SchedulingWeight != nil {
+		weight := *assignment.SchedulingWeight
+		item.SchedulingWeight = &weight
 	}
 	item.ModelDowngradeThreshold = assignment.ModelDowngradeThreshold
 	return nil

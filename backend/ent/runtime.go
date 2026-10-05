@@ -158,12 +158,32 @@ func init() {
 			return nil
 		}
 	}()
+	// accountDescSchedulingWeight is the schema descriptor for scheduling_weight field.
+	accountDescSchedulingWeight := accountFields[9].Descriptor()
+	// account.DefaultSchedulingWeight holds the default value on creation for the scheduling_weight field.
+	account.DefaultSchedulingWeight = accountDescSchedulingWeight.Default.(int)
+	// account.SchedulingWeightValidator is a validator for the "scheduling_weight" field. It is called by the builders before save.
+	account.SchedulingWeightValidator = func() func(int) error {
+		validators := accountDescSchedulingWeight.Validators
+		fns := [...]func(int) error{
+			validators[0].(func(int) error),
+			validators[1].(func(int) error),
+		}
+		return func(scheduling_weight int) error {
+			for _, fn := range fns {
+				if err := fn(scheduling_weight); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// accountDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	accountDescMaxConcurrency := accountFields[9].Descriptor()
+	accountDescMaxConcurrency := accountFields[10].Descriptor()
 	// account.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	account.DefaultMaxConcurrency = accountDescMaxConcurrency.Default.(int)
 	// accountDescRateMultiplier is the schema descriptor for rate_multiplier field.
-	accountDescRateMultiplier := accountFields[10].Descriptor()
+	accountDescRateMultiplier := accountFields[11].Descriptor()
 	// account.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	account.DefaultRateMultiplier = accountDescRateMultiplier.Default.(float64)
 	// account.RateMultiplierValidator is a validator for the "rate_multiplier" field. It is called by the builders before save.
@@ -183,7 +203,7 @@ func init() {
 		}
 	}()
 	// accountDescModelDowngradeThreshold is the schema descriptor for model_downgrade_threshold field.
-	accountDescModelDowngradeThreshold := accountFields[11].Descriptor()
+	accountDescModelDowngradeThreshold := accountFields[12].Descriptor()
 	// account.DefaultModelDowngradeThreshold holds the default value on creation for the model_downgrade_threshold field.
 	account.DefaultModelDowngradeThreshold = accountDescModelDowngradeThreshold.Default.(float64)
 	// account.ModelDowngradeThresholdValidator is a validator for the "model_downgrade_threshold" field. It is called by the builders before save.
@@ -203,23 +223,23 @@ func init() {
 		}
 	}()
 	// accountDescErrorMsg is the schema descriptor for error_msg field.
-	accountDescErrorMsg := accountFields[12].Descriptor()
+	accountDescErrorMsg := accountFields[13].Descriptor()
 	// account.DefaultErrorMsg holds the default value on creation for the error_msg field.
 	account.DefaultErrorMsg = accountDescErrorMsg.Default.(string)
 	// accountDescUpstreamIsPool is the schema descriptor for upstream_is_pool field.
-	accountDescUpstreamIsPool := accountFields[13].Descriptor()
+	accountDescUpstreamIsPool := accountFields[14].Descriptor()
 	// account.DefaultUpstreamIsPool holds the default value on creation for the upstream_is_pool field.
 	account.DefaultUpstreamIsPool = accountDescUpstreamIsPool.Default.(bool)
 	// accountDescUsageEstimateMeta is the schema descriptor for usage_estimate_meta field.
-	accountDescUsageEstimateMeta := accountFields[16].Descriptor()
+	accountDescUsageEstimateMeta := accountFields[17].Descriptor()
 	// account.DefaultUsageEstimateMeta holds the default value on creation for the usage_estimate_meta field.
 	account.DefaultUsageEstimateMeta = accountDescUsageEstimateMeta.Default.(accountusage.EstimateMeta)
 	// accountDescExtra is the schema descriptor for extra field.
-	accountDescExtra := accountFields[17].Descriptor()
+	accountDescExtra := accountFields[18].Descriptor()
 	// account.DefaultExtra holds the default value on creation for the extra field.
 	account.DefaultExtra = accountDescExtra.Default.(map[string]interface{})
 	// accountDescProxySlot is the schema descriptor for proxy_slot field.
-	accountDescProxySlot := accountFields[18].Descriptor()
+	accountDescProxySlot := accountFields[19].Descriptor()
 	// account.ProxySlotValidator is a validator for the "proxy_slot" field. It is called by the builders before save.
 	account.ProxySlotValidator = func() func(int) error {
 		validators := accountDescProxySlot.Validators
@@ -237,11 +257,11 @@ func init() {
 		}
 	}()
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[20].Descriptor()
+	accountDescCreatedAt := accountFields[21].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[21].Descriptor()
+	accountDescUpdatedAt := accountFields[22].Descriptor()
 	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
 	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

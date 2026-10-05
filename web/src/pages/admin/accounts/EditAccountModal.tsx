@@ -41,6 +41,8 @@ import {
 } from '../../../shared/utils/rateMultiplier';
 import type { AccountResp, ModelPolicy, UpdateAccountReq } from '../../../shared/types';
 import {
+  MAX_SCHEDULING_WEIGHT,
+  parseSchedulingWeightInput,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
   commitAccountPriorityInput,
@@ -93,6 +95,9 @@ export function EditAccountModal({
   );
   const [priorityInput, setPriorityInput] = useState(String(account.priority ?? DEFAULT_ACCOUNT_PRIORITY));
   const [rateMultiplierInput, setRateMultiplierInput] = useState(String(account.rate_multiplier ?? 1));
+  const [schedulingWeightInput, setSchedulingWeightInput] = useState(String(account.scheduling_weight));
+  const schedulingWeightValue = parseSchedulingWeightInput(schedulingWeightInput);
+  const schedulingWeightValid = schedulingWeightValue != null;
   const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState(
     String(account.model_downgrade_threshold ?? DEFAULT_MODEL_DOWNGRADE_THRESHOLD),
   );
@@ -170,7 +175,7 @@ export function EditAccountModal({
     const rateMultiplierValue = parseRateMultiplier(rateMultiplierInput);
     const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplierInput);
     if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
-    if (!modelDowngradeThresholdValid) return;
+    if (!modelDowngradeThresholdValid || !schedulingWeightValid) return;
     if (!proxySlotInputValid) return;
     const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
     const merged = { ...credentials };
@@ -200,6 +205,7 @@ export function EditAccountModal({
       priority,
       rate_multiplier: rateMultiplier,
       model_downgrade_threshold: modelDowngradeThresholdValue,
+      scheduling_weight: schedulingWeightValue!,
       type: accountType || undefined,
       credentials: identity.credentials,
       model_policy: buildModelPolicy(modelAllowlistInput, modelDenylistInput),
@@ -268,7 +274,7 @@ export function EditAccountModal({
           <Button
             variant="primary"
             onPress={handleSubmit}
-            isDisabled={loading || !form.name || !rateMultiplierValid || !modelDowngradeThresholdValid || !proxySlotInputValid}
+            isDisabled={loading || !form.name || !rateMultiplierValid || !modelDowngradeThresholdValid || !schedulingWeightValid || !proxySlotInputValid}
             aria-busy={loading}
           >
             {t('common.save')}
@@ -352,6 +358,13 @@ export function EditAccountModal({
                       </div>
                     </HeroTextField>
 
+                    <HeroTextField fullWidth isInvalid={!schedulingWeightValid}>
+                      <Label>{t('accounts.scheduling_weight')}</Label>
+                      <Input aria-label={t('accounts.scheduling_weight')} type="number" min={0} max={MAX_SCHEDULING_WEIGHT} step={1}
+                        value={schedulingWeightInput} onChange={(event) => setSchedulingWeightInput(event.target.value)} />
+                      {!schedulingWeightValid && <p className="mt-1 text-[11px] leading-4 text-danger">{t('accounts.scheduling_weight_invalid')}</p>}
+                    </HeroTextField>
+
                     <HeroTextField fullWidth>
                       <Label>{t('accounts.concurrency')}</Label>
                       <div className="relative">
@@ -365,18 +378,6 @@ export function EditAccountModal({
                           }
                         />
                       </div>
-                    </HeroTextField>
-
-                    <HeroTextField fullWidth>
-                      <Label>{t('accounts.rate_multiplier')}</Label>
-                      <Input
-                        type="number"
-                        min={MIN_POSITIVE_RATE_MULTIPLIER}
-                        max={MAX_RATE_MULTIPLIER}
-                        step={RATE_MULTIPLIER_STEP}
-                        value={rateMultiplierInput}
-                        onChange={(event) => setRateMultiplierInput(event.target.value)}
-                      />
                     </HeroTextField>
 
                     <HeroTextField fullWidth isInvalid={!modelDowngradeThresholdValid}>
@@ -396,6 +397,24 @@ export function EditAccountModal({
                       )}
                     </HeroTextField>
 
+                    <AccountPlanTypeInput
+                      showLabel
+                      label={t('accounts.plan_type')}
+                      value={planType}
+                      onChange={setPlanType}
+                    />
+
+                    <HeroTextField fullWidth>
+                      <Label>{t('accounts.rate_multiplier')}</Label>
+                      <Input
+                        type="number"
+                        min={MIN_POSITIVE_RATE_MULTIPLIER}
+                        max={MAX_RATE_MULTIPLIER}
+                        step={RATE_MULTIPLIER_STEP}
+                        value={rateMultiplierInput}
+                        onChange={(event) => setRateMultiplierInput(event.target.value)}
+                      />
+                    </HeroTextField>
                   </div>
 
                   <div className="ag-edit-account-routing-row">
@@ -410,35 +429,27 @@ export function EditAccountModal({
 
                   </div>
 
-                  <div className="grid items-end gap-4 md:grid-cols-2">
-                      <AccountPlanTypeInput
-                        showLabel
-                        label={t('accounts.plan_type')}
-                        value={planType}
-                        onChange={setPlanType}
-                      />
-                    <div className="flex flex-wrap items-center gap-4 pb-2">
-                      <NativeCheckbox
-                        isSelected={form.extra?.plan_type_locked === true}
-                        onChange={(checked) => setForm({ ...form, extra: { ...form.extra, plan_type_locked: checked } })}
-                      >
-                        {t('accounts.plan_type_locked')}
-                      </NativeCheckbox>
-                      <NativeCheckbox
-                        isSelected={form.upstream_is_pool ?? false}
-                        onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
-                      >
-                        {t('accounts.upstream_is_pool', '池模式')}
-                      </NativeCheckbox>
-                      <NativeCheckbox
-                        isSelected={getAccountMessageLockEnabled(form.extra)}
-                        onChange={(checked) =>
-                          setForm({ ...form, extra: setAccountMessageLockEnabled(form.extra, checked) })
-                        }
-                      >
-                        {t('accounts.message_lock')}
-                      </NativeCheckbox>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-4 pb-2">
+                    <NativeCheckbox
+                      isSelected={form.extra?.plan_type_locked === true}
+                      onChange={(checked) => setForm({ ...form, extra: { ...form.extra, plan_type_locked: checked } })}
+                    >
+                      {t('accounts.plan_type_locked')}
+                    </NativeCheckbox>
+                    <NativeCheckbox
+                      isSelected={form.upstream_is_pool ?? false}
+                      onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
+                    >
+                      {t('accounts.upstream_is_pool', '池模式')}
+                    </NativeCheckbox>
+                    <NativeCheckbox
+                      isSelected={getAccountMessageLockEnabled(form.extra)}
+                      onChange={(checked) =>
+                        setForm({ ...form, extra: setAccountMessageLockEnabled(form.extra, checked) })
+                      }
+                    >
+                      {t('accounts.message_lock')}
+                    </NativeCheckbox>
                   </div>
 
                   {availableGroups.length > 0 && (

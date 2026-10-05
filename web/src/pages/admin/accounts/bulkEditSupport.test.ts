@@ -14,6 +14,7 @@ function account(input: Partial<AccountResp> & Pick<AccountResp, 'id'>): Account
     state: input.state ?? 'active',
     priority: input.priority ?? 50,
     max_concurrency: input.max_concurrency ?? 10,
+    scheduling_weight: input.scheduling_weight ?? 100,
     current_concurrency: input.current_concurrency ?? 0,
     rate_multiplier: input.rate_multiplier ?? 1,
     upstream_is_pool: input.upstream_is_pool ?? false,

@@ -24,6 +24,7 @@ export function resolveProxyBinding(proxies: ProxyResp[], proxyId: number | null
 
 export function ProxyBindingFields({
   disabled = false,
+  showProxyLabel = true,
   emptyLabel,
   onProxyChange,
   onSlotChange,
@@ -32,6 +33,7 @@ export function ProxyBindingFields({
   slotInput,
 }: {
   disabled?: boolean;
+  showProxyLabel?: boolean;
   emptyLabel: string;
   onProxyChange: (proxyId: number | null, proxy: ProxyResp | undefined) => void;
   onSlotChange: (value: string) => void;
@@ -57,7 +59,7 @@ export function ProxyBindingFields({
   return (
     <div className="ag-account-proxy-binding-row">
       <div className="min-w-0 space-y-1.5">
-        <Label>{t('accounts.proxy')}</Label>
+        {showProxyLabel && <Label>{t('accounts.proxy')}</Label>}
         <SimpleSelect
           ariaLabel={t('accounts.proxy')}
           fullWidth
@@ -94,7 +96,7 @@ export function ProxyBindingFields({
           fullWidth
           isDisabled
         >
-          <Label className="block max-w-full truncate whitespace-nowrap">Slot</Label>
+          {showProxyLabel && <Label className="block max-w-full truncate whitespace-nowrap">Slot</Label>}
           <Input tabIndex={-1} value="" readOnly />
         </HeroTextField>
       )}

@@ -136,6 +136,7 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 			MaxConcurrency:          item.MaxConcurrency,
 			RateMultiplier:          item.RateMultiplier.Ptr(),
 			ModelDowngradeThreshold: item.ModelDowngradeThreshold,
+			SchedulingWeight:        item.SchedulingWeight,
 		})
 	}
 	inputs, err := h.applyConfiguredImport(c.Request.Context(), inputs)
@@ -184,6 +185,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		ProxyID:                 req.ProxyID,
 		RateMultiplier:          req.RateMultiplier.Ptr(),
 		ModelDowngradeThreshold: req.ModelDowngradeThreshold,
+		SchedulingWeight:        req.SchedulingWeight,
 		UpstreamIsPool:          req.UpstreamIsPool,
 		Extra:                   req.Extra,
 		GroupIDs:                req.GroupIDs,
@@ -232,6 +234,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		MaxConcurrency:          req.MaxConcurrency,
 		RateMultiplier:          req.RateMultiplier.PtrOrDefault(1),
 		ModelDowngradeThreshold: req.ModelDowngradeThreshold,
+		SchedulingWeight:        req.SchedulingWeight,
 		UpstreamIsPool:          req.UpstreamIsPool,
 		GroupIDs:                req.GroupIDs,
 		HasGroupIDs:             req.GroupIDs != nil,
@@ -328,6 +331,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		MaxConcurrency:          req.MaxConcurrency,
 		RateMultiplier:          req.RateMultiplier.PtrOrDefault(1),
 		ModelDowngradeThreshold: req.ModelDowngradeThreshold,
+		SchedulingWeight:        req.SchedulingWeight,
 		ModelPolicy:             req.ModelPolicy,
 		GroupIDs:                req.GroupIDs,
 		HasGroupIDs:             req.GroupIDs != nil,

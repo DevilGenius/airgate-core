@@ -23,6 +23,7 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		CurrentConcurrency:      account.CurrentConcurrency,
 		RateMultiplier:          account.RateMultiplier,
 		ModelDowngradeThreshold: account.ModelDowngradeThreshold,
+		SchedulingWeight:        account.SchedulingWeight,
 		ErrorMsg:                account.ErrorMsg,
 		UpstreamIsPool:          account.UpstreamIsPool,
 		Usage5hGrowthDate:       account.UsageEstimateMeta.FiveHour.GrowthDate,
@@ -109,6 +110,7 @@ func toAccountExportItem(account appaccount.Account) dto.AccountExportItem {
 		MaxConcurrency:          account.MaxConcurrency,
 		RateMultiplier:          dto.NewOptionalFloat(account.RateMultiplier),
 		ModelDowngradeThreshold: account.ModelDowngradeThreshold,
+		SchedulingWeight:        &account.SchedulingWeight,
 	}
 }
 

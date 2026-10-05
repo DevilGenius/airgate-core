@@ -143,6 +143,7 @@ function sameAccountExceptCapacity(left: AccountResp, right: AccountResp) {
     && left.model_policy === right.model_policy
     && left.state === right.state
     && left.state_until === right.state_until
+    && left.scheduling_weight === right.scheduling_weight
     && left.priority === right.priority
     && left.max_concurrency === right.max_concurrency
     && left.proxy_id === right.proxy_id

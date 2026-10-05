@@ -68,6 +68,7 @@ var (
 		{Name: "state", Type: field.TypeEnum, Enums: []string{"active", "rate_limited", "degraded", "disabled"}, Default: "active"},
 		{Name: "state_until", Type: field.TypeTime, Nullable: true},
 		{Name: "priority", Type: field.TypeInt, Default: 50},
+		{Name: "scheduling_weight", Type: field.TypeInt, Default: 100},
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 10},
 		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
 		{Name: "model_downgrade_threshold", Type: field.TypeFloat64, Default: 0},
@@ -91,7 +92,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[23]},
+				Columns:    []*schema.Column{AccountsColumns[24]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -105,22 +106,22 @@ var (
 			{
 				Name:    "account_deleted_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[20]},
+				Columns: []*schema.Column{AccountsColumns[21]},
 			},
 			{
 				Name:    "account_priority_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[21]},
+				Columns: []*schema.Column{AccountsColumns[9], AccountsColumns[22]},
 			},
 			{
 				Name:    "account_proxy_idx",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[23]},
+				Columns: []*schema.Column{AccountsColumns[24]},
 			},
 			{
 				Name:    "account_proxy_slot_idx",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[19], AccountsColumns[23]},
+				Columns: []*schema.Column{AccountsColumns[20], AccountsColumns[24]},
 			},
 		},
 	}

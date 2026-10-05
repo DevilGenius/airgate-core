@@ -55,7 +55,7 @@ describe('100-row platform and authentication icons', () => {
     const rows: AccountResp[] = Array.from({ length: 100 }, (_, index) => ({
       id: index + 1, name: `Account ${index + 1}`, email: null,
       platform: 'icon-render-test', type: index % 2 === 0 ? 'oauth' : 'apikey', credentials: { plan_type: 'Plus' },
-      model_policy: {}, state: 'active', priority: 0, max_concurrency: 4, current_concurrency: 0,
+      model_policy: {}, state: 'active', priority: 0, max_concurrency: 4, scheduling_weight: 100, current_concurrency: 0,
       rate_multiplier: 1, upstream_is_pool: false, group_ids: [], created_at: '', updated_at: '',
     }));
     const selection = new AccountSelectionStore();

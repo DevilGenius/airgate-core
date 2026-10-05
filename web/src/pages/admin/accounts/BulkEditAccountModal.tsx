@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import styles from './BulkEditAccountModal.module.css';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -20,6 +21,9 @@ import { AccountPlanTypeInput } from './AccountPlanTypeInput';
 import { ProxyBindingFields, resolveProxyBinding } from './ProxyBindingFields';
 import type { BulkUpdateAccountsReq } from '../../../shared/types';
 import {
+  DEFAULT_SCHEDULING_WEIGHT,
+  MAX_SCHEDULING_WEIGHT,
+  parseSchedulingWeightInput,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
   DEFAULT_ACCOUNT_PRIORITY_SEQUENCE_GROUP_SIZE,
@@ -58,6 +62,7 @@ export function BulkEditAccountModal({
   initialPoolMode,
   initialMessageLockEnabled,
   initialDispatchEnabled,
+  initialSchedulingWeight,
   initialModelDowngradeThreshold,
   onClose,
   onSubmit,
@@ -75,6 +80,7 @@ export function BulkEditAccountModal({
   initialPoolMode?: boolean;
   initialMessageLockEnabled?: boolean;
   initialDispatchEnabled?: boolean;
+  initialSchedulingWeight?: number;
   initialModelDowngradeThreshold?: number;
   onClose: () => void;
   onSubmit: (data: Omit<BulkUpdateAccountsReq, 'account_ids'>) => void;
@@ -87,6 +93,10 @@ export function BulkEditAccountModal({
   const [enablePriority, setEnablePriority] = useState(false);
   const [enablePrioritySequence, setEnablePrioritySequence] = useState(false);
   const [enablePriorityOffset, setEnablePriorityOffset] = useState(false);
+  const [enableSchedulingWeight, setEnableSchedulingWeight] = useState(false);
+  const [schedulingWeightInput, setSchedulingWeightInput] = useState(String(initialSchedulingWeight ?? DEFAULT_SCHEDULING_WEIGHT));
+  const schedulingWeightValue = parseSchedulingWeightInput(schedulingWeightInput);
+  const schedulingWeightValid = !enableSchedulingWeight || schedulingWeightValue != null;
   const [enableConcurrency, setEnableConcurrency] = useState(false);
   const [enablePlanType, setEnablePlanType] = useState(false);
   const [enablePlanTypeLock, setEnablePlanTypeLock] = useState(false);
@@ -137,14 +147,12 @@ export function BulkEditAccountModal({
     enablePriority ||
     enablePrioritySequence ||
     enablePriorityOffset ||
+    enableSchedulingWeight ||
     enableConcurrency ||
     enablePlanType ||
-    enablePlanTypeLock ||
-    enablePoolMode ||
     enableModelDowngradeThreshold ||
     enableGroups ||
-    enableProxy ||
-    enableMessageLock;
+    enableProxy;
   const modelDowngradeThresholdValue = parseModelDowngradeThresholdInput(modelDowngradeThreshold);
   const modelDowngradeThresholdEmpty = isEmptyModelDowngradeThresholdInput(modelDowngradeThreshold);
   const modelDowngradeThresholdValid = !enableModelDowngradeThreshold || isValidModelDowngradeThresholdInput(modelDowngradeThreshold);
@@ -168,6 +176,7 @@ export function BulkEditAccountModal({
   const canSubmit = hasAnyField
     && priorityOffsetValid
     && prioritySequenceValid
+    && schedulingWeightValid
     && modelDowngradeThresholdValid
     && (!enableProxy || proxyBinding.valid);
 
@@ -185,9 +194,10 @@ export function BulkEditAccountModal({
       };
     }
     if (enablePriorityOffset && parsedPriorityOffset != null) patch.priority_offset = parsedPriorityOffset;
+    if (enableSchedulingWeight) patch.scheduling_weight = schedulingWeightValue!;
     if (enableConcurrency) patch.max_concurrency = maxConcurrency;
     if (enablePlanType) patch.plan_type = planType.trim();
-    if (enablePoolMode) patch.upstream_is_pool = poolMode;
+    if (enableStatus && enablePoolMode) patch.upstream_is_pool = poolMode;
     if (enableModelDowngradeThreshold) {
       patch.model_downgrade_threshold = modelDowngradeThresholdEmpty ? null : modelDowngradeThresholdValue;
     }
@@ -200,8 +210,8 @@ export function BulkEditAccountModal({
       }
     }
     let extraPatch: Record<string, unknown> | undefined;
-    if (enablePlanTypeLock) extraPatch = { plan_type_locked: planTypeLocked };
-    if (enableMessageLock) {
+    if (enableStatus && enablePlanTypeLock) extraPatch = { plan_type_locked: planTypeLocked };
+    if (enableStatus && enableMessageLock) {
       extraPatch = setAccountMessageLockEnabled(extraPatch, messageLockEnabled);
     }
     if (extraPatch) patch.extra = extraPatch;
@@ -273,7 +283,7 @@ export function BulkEditAccountModal({
 
   return (
     <CommonModal
-      className="ag-account-page-modal"
+      className={`ag-account-page-modal ${styles.modal}`}
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={onClose}>
@@ -284,266 +294,226 @@ export function BulkEditAccountModal({
           </Button>
         </div>
       )}
-      size="md"
+      size="lg"
       state={modalState}
       title={`${t('accounts.bulk_update_title')} (${count})`}
     >
-      <Form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
-        <p className="rounded-md border border-border bg-surface px-3 py-2 text-xs leading-5 text-text-secondary">
-          {t('accounts.bulk_update_hint')}
-        </p>
-
-        {/* 调度复选框控制状态字段；其余开关拨动后独立纳入本次修改。 */}
-        <div className="grid items-center gap-3 border-t border-border-subtle pt-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
-          <NativeCheckbox
-            className="self-center"
-            isSelected={enableStatus}
-            onChange={setEnableStatus}
+      <Form className={styles.form} onSubmit={(event) => event.preventDefault()}>
+        <p className={styles.hint}>{t('accounts.bulk_update_hint')}</p>
+        <div className={styles.fields}>
+          <FieldRow
+            enabled={enablePriority}
+            onToggle={handlePriorityToggle}
+            label={t('accounts.priority')}
           >
-            <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
-              {t('accounts.dispatch_toggle')}
-            </span>
-          </NativeCheckbox>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-            <NativeSwitch
-              isDisabled={!enableStatus}
-              isSelected={status === 'active'}
-              label={(
-                <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
-                  {t('accounts.dispatch_enabled')}
-                </span>
-              )}
-              onChange={(on) => setStatus(on ? 'active' : 'disabled')}
-            />
-            <NativeSwitch
-              isSelected={planTypeLocked}
-              label={<span className={enablePlanTypeLock ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>{t('accounts.plan_type_locked')}</span>}
-              onChange={(on) => { setEnablePlanTypeLock(true); setPlanTypeLocked(on); }}
-            />
-            <NativeSwitch
-              isSelected={poolMode}
-              label={<span className={enablePoolMode ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>{t('accounts.upstream_is_pool')}</span>}
-              onChange={(on) => { setEnablePoolMode(true); setPoolMode(on); }}
-            />
-            <NativeSwitch
-              isSelected={messageLockEnabled}
-              label={(
-                <span className={enableMessageLock ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
-                  {t('accounts.message_lock')}
-                </span>
-              )}
-              onChange={(on) => {
-                setEnableMessageLock(true);
-                setMessageLockEnabled(on);
-              }}
-            />
-          </div>
-        </div>
-
-        {/* 优先级 */}
-        <FieldRow
-          enabled={enablePriority}
-          onToggle={handlePriorityToggle}
-          label={t('accounts.priority')}
-        >
-          <HeroTextField fullWidth isDisabled={!enablePriority}>
-            <div className="relative">
-              <Hash className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                className="pl-9"
-                type="text"
-                inputMode="numeric"
-                pattern="-?[0-9]*"
-                min={ACCOUNT_PRIORITY_MIN}
-                max={ACCOUNT_PRIORITY_MAX}
-                step={1}
-                value={priorityInput}
-                disabled={!enablePriority}
-                onBlur={commitPriorityChange}
-                onChange={(e) => handlePriorityChange(e.target.value)}
-              />
-            </div>
-          </HeroTextField>
-        </FieldRow>
-
-        {/* 优先级序列 */}
-        <FieldRow
-          enabled={enablePrioritySequence}
-          onToggle={handlePrioritySequenceToggle}
-          label={t('accounts.priority_sequence')}
-        >
-          <div className="space-y-2">
-            <div className="grid gap-2 sm:grid-cols-3">
-              <label className="min-w-0">
-                <span className="block text-[11px] leading-4 text-text-tertiary">
-                  {t('accounts.priority_sequence_initial')}
-                </span>
-                <Input
-                  aria-label={t('accounts.priority_sequence_initial')}
-                  className="mt-1"
-                  disabled={!enablePrioritySequence}
-                  inputMode="numeric"
-                  max={ACCOUNT_PRIORITY_MAX}
-                  min={ACCOUNT_PRIORITY_MIN}
-                  pattern="-?[0-9]*"
-                  type="text"
-                  value={prioritySequenceInitialInput}
-                  onChange={(event) => {
-                    if (isAccountPriorityDraft(event.target.value)) {
-                      setPrioritySequenceInitialInput(event.target.value);
-                    }
-                  }}
-                />
-              </label>
-              <label className="min-w-0">
-                <span className="block text-[11px] leading-4 text-text-tertiary">
-                  {t('accounts.priority_sequence_step')}
-                </span>
-                <Input
-                  aria-label={t('accounts.priority_sequence_step')}
-                  className="mt-1"
-                  disabled={!enablePrioritySequence}
-                  inputMode="numeric"
-                  pattern="-?[0-9]*"
-                  type="text"
-                  value={prioritySequenceStepInput}
-                  onChange={(event) => {
-                    if (isAccountPriorityDraft(event.target.value)) {
-                      setPrioritySequenceStepInput(event.target.value);
-                    }
-                  }}
-                />
-              </label>
-              <label className="min-w-0">
-                <span className="block text-[11px] leading-4 text-text-tertiary">
-                  {t('accounts.priority_sequence_group_size')}
-                </span>
-                <Input
-                  aria-label={t('accounts.priority_sequence_group_size')}
-                  className="mt-1"
-                  disabled={!enablePrioritySequence}
-                  inputMode="numeric"
-                  min={1}
-                  pattern="[0-9]*"
-                  step={1}
-                  type="text"
-                  value={prioritySequenceGroupSizeInput}
-                  onChange={(event) => {
-                    if (/^\d*$/.test(event.target.value)) {
-                      setPrioritySequenceGroupSizeInput(event.target.value);
-                    }
-                  }}
-                />
-              </label>
-            </div>
-            {enablePrioritySequence && !prioritySequencePreview ? (
-              <p className="text-[11px] leading-4 text-danger">
-                {t('accounts.priority_sequence_invalid')}
-              </p>
-            ) : null}
-          </div>
-        </FieldRow>
-
-        {/* 优先级偏移 */}
-        <FieldRow
-          enabled={enablePriorityOffset}
-          onToggle={handlePriorityOffsetToggle}
-          label={t('accounts.priority_offset')}
-        >
-          <div>
-            <HeroTextField fullWidth isDisabled={!enablePriorityOffset}>
+            <HeroTextField fullWidth isDisabled={!enablePriority}>
               <div className="relative">
-                <Diff className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                <Hash className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                 <Input
+                  aria-label={t('accounts.priority')}
                   className="pl-9"
                   type="text"
                   inputMode="numeric"
                   pattern="-?[0-9]*"
-                  min={priorityOffsetRange.min}
-                  max={priorityOffsetRange.max}
+                  min={ACCOUNT_PRIORITY_MIN}
+                  max={ACCOUNT_PRIORITY_MAX}
                   step={1}
-                  value={priorityOffsetInput}
-                  disabled={!enablePriorityOffset}
-                  placeholder={t('accounts.priority_offset_placeholder')}
-                  onBlur={commitPriorityOffsetChange}
-                  onChange={(event) => handlePriorityOffsetChange(event.target.value)}
+                  value={priorityInput}
+                  disabled={!enablePriority}
+                  onBlur={commitPriorityChange}
+                  onChange={(e) => handlePriorityChange(e.target.value)}
                 />
               </div>
             </HeroTextField>
-            <p className="mt-1 text-[11px] leading-4 text-text-tertiary">
-              {t('accounts.priority_offset_hint', {
-                min: priorityOffsetRange.min,
-                max: priorityOffsetRange.max,
-              })}
-            </p>
-          </div>
-        </FieldRow>
+          </FieldRow>
 
-        {/* 并发数 */}
-        <FieldRow
-          enabled={enableConcurrency}
-          onToggle={setEnableConcurrency}
-          label={t('accounts.concurrency')}
-        >
-          <HeroTextField fullWidth isDisabled={!enableConcurrency}>
-            <div className="relative">
-              <Gauge className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <FieldRow enabled={enableSchedulingWeight} onToggle={setEnableSchedulingWeight} label={t('accounts.scheduling_weight')}>
+            <HeroTextField fullWidth isDisabled={!enableSchedulingWeight} isInvalid={!schedulingWeightValid}>
+              <Input aria-label={t('accounts.scheduling_weight')} type="number" min={0} max={MAX_SCHEDULING_WEIGHT} step={1}
+                value={schedulingWeightInput} disabled={!enableSchedulingWeight}
+                onChange={(event) => setSchedulingWeightInput(event.target.value)} />
+              {!schedulingWeightValid && <p className="mt-1 text-[11px] leading-4 text-danger">{t('accounts.scheduling_weight_invalid')}</p>}
+            </HeroTextField>
+          </FieldRow>
+
+          <FieldRow
+            enabled={enableConcurrency}
+            onToggle={setEnableConcurrency}
+            label={t('accounts.concurrency')}
+          >
+            <HeroTextField fullWidth isDisabled={!enableConcurrency}>
+              <div className="relative">
+                <Gauge className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  aria-label={t('accounts.concurrency')}
+                  className="pl-9"
+                  type="number"
+                  value={String(maxConcurrency)}
+                  disabled={!enableConcurrency}
+                  onChange={(e) => setMaxConcurrency(Number(e.target.value))}
+                />
+              </div>
+            </HeroTextField>
+          </FieldRow>
+
+          <FieldRow
+            enabled={enableModelDowngradeThreshold}
+            onToggle={setEnableModelDowngradeThreshold}
+            label={t('accounts.model_downgrade_threshold')}
+          >
+            <HeroTextField fullWidth isDisabled={!enableModelDowngradeThreshold} isInvalid={enableModelDowngradeThreshold && !modelDowngradeThresholdValid}>
               <Input
-                className="pl-9"
+                aria-label={t('accounts.model_downgrade_threshold')}
                 type="number"
-                value={String(maxConcurrency)}
-                disabled={!enableConcurrency}
-                onChange={(e) => setMaxConcurrency(Number(e.target.value))}
+                min={0}
+                max={1}
+                step={0.01}
+                value={modelDowngradeThreshold}
+                disabled={!enableModelDowngradeThreshold}
+                onChange={(event) => setModelDowngradeThreshold(event.target.value)}
               />
-            </div>
-          </HeroTextField>
-        </FieldRow>
+              {enableModelDowngradeThreshold && !modelDowngradeThresholdValid && (
+                <p className="mt-1 text-[11px] leading-4 text-danger">
+                  {t('accounts.model_downgrade_threshold_invalid')}
+                </p>
+              )}
+            </HeroTextField>
+          </FieldRow>
 
-        {/* 账号套餐类型：空字符串可清除已有类型。 */}
-        <FieldRow
-          enabled={enablePlanType}
-          onToggle={setEnablePlanType}
-          label={t('accounts.plan_type_label')}
-        >
+          <FieldRow
+            enabled={enablePlanType}
+            onToggle={setEnablePlanType}
+            label={t('accounts.plan_type_label')}
+          >
             <AccountPlanTypeInput
               label={t('accounts.plan_type_label')}
               value={planType}
               disabled={!enablePlanType}
               onChange={setPlanType}
             />
-        </FieldRow>
+          </FieldRow>
 
-        {/* 模型降级阈值 */}
-        <FieldRow
-          enabled={enableModelDowngradeThreshold}
-          onToggle={setEnableModelDowngradeThreshold}
-          label={t('accounts.model_downgrade_threshold')}
-        >
-          <HeroTextField fullWidth isDisabled={!enableModelDowngradeThreshold} isInvalid={enableModelDowngradeThreshold && !modelDowngradeThresholdValid}>
-            <Input
-              type="number"
-              min={0}
-              max={1}
-              step={0.01}
-              value={modelDowngradeThreshold}
-              disabled={!enableModelDowngradeThreshold}
-              onChange={(event) => setModelDowngradeThreshold(event.target.value)}
-            />
-            {enableModelDowngradeThreshold && !modelDowngradeThresholdValid && (
-              <p className="mt-1 text-[11px] leading-4 text-danger">
-                {t('accounts.model_downgrade_threshold_invalid')}
-              </p>
-            )}
-          </HeroTextField>
-        </FieldRow>
+          <FieldRow
+            enabled={enablePriorityOffset}
+            onToggle={handlePriorityOffsetToggle}
+            label={t('accounts.priority_offset')}
+          >
+            <div>
+              <HeroTextField fullWidth isDisabled={!enablePriorityOffset}>
+                <div className="relative">
+                  <Diff className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                  <Input
+                    aria-label={t('accounts.priority_offset')}
+                    className="pl-9"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="-?[0-9]*"
+                    min={priorityOffsetRange.min}
+                    max={priorityOffsetRange.max}
+                    step={1}
+                    value={priorityOffsetInput}
+                    disabled={!enablePriorityOffset}
+                    placeholder={t('accounts.priority_offset_placeholder')}
+                    onBlur={commitPriorityOffsetChange}
+                    onChange={(event) => handlePriorityOffsetChange(event.target.value)}
+                  />
+                </div>
+              </HeroTextField>
+              {enablePriorityOffset && <p className="mt-1 text-[11px] leading-4 text-text-tertiary">
+                {t('accounts.priority_offset_hint', {
+                  min: priorityOffsetRange.min,
+                  max: priorityOffsetRange.max,
+                })}
+              </p>}
+            </div>
+          </FieldRow>
 
-        {/* 代理 */}
+          <FieldRow
+            wide
+            enabled={enablePrioritySequence}
+            onToggle={handlePrioritySequenceToggle}
+            label={t('accounts.priority_sequence')}
+          >
+            <div className={styles.sequence}>
+              <div className={styles.sequenceInputs}>
+                <label className="min-w-0">
+                  <span className="block text-[11px] leading-4 text-text-tertiary">
+                    {t('accounts.priority_sequence_initial')}
+                  </span>
+                  <Input
+                    aria-label={t('accounts.priority_sequence_initial')}
+                    className="mt-1"
+                    disabled={!enablePrioritySequence}
+                    inputMode="numeric"
+                    max={ACCOUNT_PRIORITY_MAX}
+                    min={ACCOUNT_PRIORITY_MIN}
+                    pattern="-?[0-9]*"
+                    type="text"
+                    value={prioritySequenceInitialInput}
+                    onChange={(event) => {
+                      if (isAccountPriorityDraft(event.target.value)) {
+                        setPrioritySequenceInitialInput(event.target.value);
+                      }
+                    }}
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="block text-[11px] leading-4 text-text-tertiary">
+                    {t('accounts.priority_sequence_step')}
+                  </span>
+                  <Input
+                    aria-label={t('accounts.priority_sequence_step')}
+                    className="mt-1"
+                    disabled={!enablePrioritySequence}
+                    inputMode="numeric"
+                    pattern="-?[0-9]*"
+                    type="text"
+                    value={prioritySequenceStepInput}
+                    onChange={(event) => {
+                      if (isAccountPriorityDraft(event.target.value)) {
+                        setPrioritySequenceStepInput(event.target.value);
+                      }
+                    }}
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="block text-[11px] leading-4 text-text-tertiary">
+                    {t('accounts.priority_sequence_group_size')}
+                  </span>
+                  <Input
+                    aria-label={t('accounts.priority_sequence_group_size')}
+                    className="mt-1"
+                    disabled={!enablePrioritySequence}
+                    inputMode="numeric"
+                    min={1}
+                    pattern="[0-9]*"
+                    step={1}
+                    type="text"
+                    value={prioritySequenceGroupSizeInput}
+                    onChange={(event) => {
+                      if (/^\d*$/.test(event.target.value)) {
+                        setPrioritySequenceGroupSizeInput(event.target.value);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              {enablePrioritySequence && !prioritySequencePreview ? (
+                <p className="text-[11px] leading-4 text-danger">
+                  {t('accounts.priority_sequence_invalid')}
+                </p>
+              ) : null}
+            </div>
+          </FieldRow>
+        </div>
+
         <FieldRow
           enabled={enableProxy}
           onToggle={setEnableProxy}
           label={t('accounts.proxy')}
         >
           <ProxyBindingFields
+            showProxyLabel={false}
             disabled={!enableProxy}
             emptyLabel={t('accounts.no_proxy')}
             onProxyChange={handleProxyChange}
@@ -554,24 +524,69 @@ export function BulkEditAccountModal({
           />
         </FieldRow>
 
-        {/* 所属分组（直接替换） */}
+        <div className={styles.switches}>
+          <div className={styles.dispatch}>
+            <NativeCheckbox
+              ariaLabel={t('accounts.dispatch_toggle')}
+              isSelected={enableStatus}
+              onChange={setEnableStatus}
+            >
+              <span className={enableStatus ? 'text-sm text-text' : 'text-sm text-text-tertiary'}>
+                {t('accounts.dispatch_toggle')}
+              </span>
+            </NativeCheckbox>
+          </div>
+          <div className={styles.switchCell} data-edited={enableStatus || undefined}>
+            <NativeSwitch
+              isDisabled={!enableStatus}
+              isSelected={status === 'active'}
+              label={t('accounts.dispatch_enabled')}
+              onChange={(on) => setStatus(on ? 'active' : 'disabled')}
+            />
+          </div>
+          <div className={styles.switchCell} data-edited={(enableStatus && enablePlanTypeLock) || undefined}>
+            <NativeSwitch
+              isDisabled={!enableStatus}
+              isSelected={planTypeLocked}
+              label={t('accounts.plan_type_locked')}
+              onChange={(on) => { setEnablePlanTypeLock(true); setPlanTypeLocked(on); }}
+            />
+          </div>
+          <div className={styles.switchCell} data-edited={(enableStatus && enablePoolMode) || undefined}>
+            <NativeSwitch
+              isDisabled={!enableStatus}
+              isSelected={poolMode}
+              label={t('accounts.upstream_is_pool')}
+              onChange={(on) => { setEnablePoolMode(true); setPoolMode(on); }}
+            />
+          </div>
+          <div className={styles.switchCell} data-edited={(enableStatus && enableMessageLock) || undefined}>
+            <NativeSwitch
+              isDisabled={!enableStatus}
+              isSelected={messageLockEnabled}
+              label={t('accounts.message_lock')}
+              onChange={(on) => { setEnableMessageLock(true); setMessageLockEnabled(on); }}
+            />
+          </div>
+        </div>
+
         <FieldRow
           enabled={enableGroups}
           onToggle={setEnableGroups}
           label={t('accounts.groups')}
         >
-          <div className="ag-create-account-group-list ag-bulk-account-group-list">
+          <div className={styles.groups}>
             {(groupsData?.list ?? []).map((group) => {
               const selected = groupIds.includes(group.id);
               return (
                 <div
                   key={group.id}
-                  className="ag-create-account-group-item"
+                  className={styles.groupItem}
                   data-checked={selected ? 'true' : undefined}
                   data-disabled={!enableGroups ? 'true' : undefined}
                 >
                   <NativeCheckbox
-                    className="ag-create-account-group-check"
+                    className={styles.groupCheck}
                     isDisabled={!enableGroups}
                     isSelected={selected}
                     onChange={() => toggleGroup(group.id)}
@@ -588,7 +603,6 @@ export function BulkEditAccountModal({
             })}
           </div>
         </FieldRow>
-
       </Form>
     </CommonModal>
   );
@@ -599,16 +613,18 @@ function FieldRow({
   onToggle,
   label,
   children,
+  wide = false,
 }: {
   enabled: boolean;
   onToggle: (on: boolean) => void;
   label: string;
   children: ReactNode;
+  wide?: boolean;
 }) {
   return (
-    <div className="grid items-center gap-3 border-t border-border-subtle pt-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
+    <div className={`${styles.field} ${wide ? styles.wide : ''}`} data-enabled={enabled || undefined}>
       <NativeCheckbox
-        className="self-center"
+        className={styles.fieldToggle}
         isSelected={enabled}
         onChange={onToggle}
       >
@@ -616,7 +632,7 @@ function FieldRow({
           {label}
         </span>
       </NativeCheckbox>
-      <div className="min-w-0">{children}</div>
+      <div className={styles.fieldControl}>{children}</div>
     </div>
   );
 }

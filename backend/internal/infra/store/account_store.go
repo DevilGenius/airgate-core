@@ -536,6 +536,7 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 				SetMaxConcurrency(input.MaxConcurrency).
 				SetRateMultiplier(rateMultiplier).
 				SetModelDowngradeThreshold(input.ModelDowngradeThreshold).
+				SetNillableSchedulingWeight(input.SchedulingWeight).
 				SetErrorMsg("").
 				SetUpstreamIsPool(input.UpstreamIsPool).
 				ClearDeletedAt().
@@ -581,6 +582,7 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 			SetMaxConcurrency(input.MaxConcurrency).
 			SetRateMultiplier(rateMultiplier).
 			SetModelDowngradeThreshold(input.ModelDowngradeThreshold).
+			SetNillableSchedulingWeight(input.SchedulingWeight).
 			SetUpstreamIsPool(input.UpstreamIsPool)
 
 		if input.Extra != nil {
@@ -789,6 +791,9 @@ func (s *AccountStore) Update(ctx context.Context, id int, input appaccount.Upda
 	}
 	if input.RateMultiplier != nil {
 		builder = builder.SetRateMultiplier(*input.RateMultiplier)
+	}
+	if input.SchedulingWeight != nil {
+		builder = builder.SetSchedulingWeight(*input.SchedulingWeight)
 	}
 	if input.ModelDowngradeThreshold != nil {
 		builder = builder.SetModelDowngradeThreshold(*input.ModelDowngradeThreshold)
@@ -1320,6 +1325,7 @@ func mapAccount(item *ent.Account) appaccount.Account {
 		MaxConcurrency:          item.MaxConcurrency,
 		RateMultiplier:          item.RateMultiplier,
 		ModelDowngradeThreshold: item.ModelDowngradeThreshold,
+		SchedulingWeight:        item.SchedulingWeight,
 		ErrorMsg:                item.ErrorMsg,
 		UpstreamIsPool:          item.UpstreamIsPool,
 		UsageEstimateMeta:       accountusage.Clone(item.UsageEstimateMeta),

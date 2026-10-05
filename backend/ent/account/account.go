@@ -34,6 +34,8 @@ const (
 	FieldStateUntil = "state_until"
 	// FieldPriority holds the string denoting the priority field in the database.
 	FieldPriority = "priority"
+	// FieldSchedulingWeight holds the string denoting the scheduling_weight field in the database.
+	FieldSchedulingWeight = "scheduling_weight"
 	// FieldMaxConcurrency holds the string denoting the max_concurrency field in the database.
 	FieldMaxConcurrency = "max_concurrency"
 	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
@@ -101,6 +103,7 @@ var Columns = []string{
 	FieldState,
 	FieldStateUntil,
 	FieldPriority,
+	FieldSchedulingWeight,
 	FieldMaxConcurrency,
 	FieldRateMultiplier,
 	FieldModelDowngradeThreshold,
@@ -156,6 +159,10 @@ var (
 	DefaultPriority int
 	// PriorityValidator is a validator for the "priority" field. It is called by the builders before save.
 	PriorityValidator func(int) error
+	// DefaultSchedulingWeight holds the default value on creation for the "scheduling_weight" field.
+	DefaultSchedulingWeight int
+	// SchedulingWeightValidator is a validator for the "scheduling_weight" field. It is called by the builders before save.
+	SchedulingWeightValidator func(int) error
 	// DefaultMaxConcurrency holds the default value on creation for the "max_concurrency" field.
 	DefaultMaxConcurrency int
 	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
@@ -253,6 +260,11 @@ func ByStateUntil(opts ...sql.OrderTermOption) OrderOption {
 // ByPriority orders the results by the priority field.
 func ByPriority(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPriority, opts...).ToFunc()
+}
+
+// BySchedulingWeight orders the results by the scheduling_weight field.
+func BySchedulingWeight(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSchedulingWeight, opts...).ToFunc()
 }
 
 // ByMaxConcurrency orders the results by the max_concurrency field.

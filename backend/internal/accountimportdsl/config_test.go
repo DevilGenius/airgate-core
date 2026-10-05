@@ -318,3 +318,22 @@ func TestProxySlotNumericAssignment(t *testing.T) {
 		t.Fatalf("numeric proxy assignment = %+v, err=%v", items[0], err)
 	}
 }
+
+func TestSchedulingWeightAssignment(t *testing.T) {
+	for _, weight := range []int{-1, 0, 1, 250, 1000000, 1000001} {
+		config, err := Parse(fmt.Sprintf(`{"version":1,"rules":[{"name":"weighted","when":[],"set":{"scheduling_weight":%d,"model_downgrade_threshold":0}}]}`, weight))
+		if weight < 0 || weight > 1000000 {
+			if err == nil {
+				t.Fatalf("accepted weight %d", weight)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		items, err := config.Apply([]appaccount.CreateInput{{Name: "one"}})
+		if err != nil || items[0].SchedulingWeight == nil || *items[0].SchedulingWeight != weight {
+			t.Fatalf("weight %d: items=%+v err=%v", weight, items, err)
+		}
+	}
+}

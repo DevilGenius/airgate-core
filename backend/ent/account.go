@@ -39,6 +39,8 @@ type Account struct {
 	StateUntil *time.Time `json:"state_until,omitempty"`
 	// Priority holds the value of the "priority" field.
 	Priority int `json:"priority,omitempty"`
+	// SchedulingWeight holds the value of the "scheduling_weight" field.
+	SchedulingWeight int `json:"scheduling_weight,omitempty"`
 	// MaxConcurrency holds the value of the "max_concurrency" field.
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// RateMultiplier holds the value of the "rate_multiplier" field.
@@ -125,7 +127,7 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case account.FieldRateMultiplier, account.FieldModelDowngradeThreshold:
 			values[i] = new(sql.NullFloat64)
-		case account.FieldID, account.FieldPriority, account.FieldMaxConcurrency, account.FieldProxySlot:
+		case account.FieldID, account.FieldPriority, account.FieldSchedulingWeight, account.FieldMaxConcurrency, account.FieldProxySlot:
 			values[i] = new(sql.NullInt64)
 		case account.FieldName, account.FieldEmail, account.FieldPlatform, account.FieldType, account.FieldState, account.FieldErrorMsg:
 			values[i] = new(sql.NullString)
@@ -213,6 +215,12 @@ func (a *Account) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field priority", values[i])
 			} else if value.Valid {
 				a.Priority = int(value.Int64)
+			}
+		case account.FieldSchedulingWeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field scheduling_weight", values[i])
+			} else if value.Valid {
+				a.SchedulingWeight = int(value.Int64)
 			}
 		case account.FieldMaxConcurrency:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -388,6 +396,9 @@ func (a *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("priority=")
 	builder.WriteString(fmt.Sprintf("%v", a.Priority))
+	builder.WriteString(", ")
+	builder.WriteString("scheduling_weight=")
+	builder.WriteString(fmt.Sprintf("%v", a.SchedulingWeight))
 	builder.WriteString(", ")
 	builder.WriteString("max_concurrency=")
 	builder.WriteString(fmt.Sprintf("%v", a.MaxConcurrency))

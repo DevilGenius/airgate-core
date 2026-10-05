@@ -20,6 +20,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/internal/accountcredentials"
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
+	"github.com/DevilGenius/airgate-core/internal/accountweight"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
@@ -427,6 +428,13 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 	if err != nil {
 		return Account{}, err
 	}
+	if input.SchedulingWeight == nil {
+		weight := accountweight.Default
+		input.SchedulingWeight = &weight
+	}
+	if err := validateSchedulingWeight(*input.SchedulingWeight); err != nil {
+		return Account{}, err
+	}
 	if err := validateModelDowngradeThreshold(input.ModelDowngradeThreshold); err != nil {
 		return Account{}, err
 	}
@@ -579,6 +587,13 @@ func prepareImportAccount(input CreateInput, preserveAssignments bool) (CreateIn
 		return CreateInput{}, errors.New("账号容量不能小于 0")
 	}
 	input.Priority = accountpriority.Clamp(input.Priority)
+	if input.SchedulingWeight == nil {
+		weight := accountweight.Default
+		input.SchedulingWeight = &weight
+	}
+	if err := validateSchedulingWeight(*input.SchedulingWeight); err != nil {
+		return CreateInput{}, err
+	}
 
 	rateMultiplier, err := normalizeCreateRateMultiplier(input.RateMultiplier)
 	if err != nil {
@@ -635,6 +650,11 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 	}
 	if input.RateMultiplier != nil {
 		if err := validateRateMultiplier(*input.RateMultiplier); err != nil {
+			return Account{}, err
+		}
+	}
+	if input.SchedulingWeight != nil {
+		if err := validateSchedulingWeight(*input.SchedulingWeight); err != nil {
 			return Account{}, err
 		}
 	}
@@ -816,6 +836,14 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			return result
 		}
 	}
+	if input.SchedulingWeight != nil {
+		if err := validateSchedulingWeight(*input.SchedulingWeight); err != nil {
+			for _, id := range input.IDs {
+				result.appendFailure(id, err)
+			}
+			return result
+		}
+	}
 	if input.ModelDowngradeThreshold != nil {
 		if err := validateModelDowngradeThreshold(*input.ModelDowngradeThreshold); err != nil {
 			for _, id := range input.IDs {
@@ -853,6 +881,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			MaxConcurrency:          input.MaxConcurrency,
 			RateMultiplier:          input.RateMultiplier,
 			ModelDowngradeThreshold: input.ModelDowngradeThreshold,
+			SchedulingWeight:        input.SchedulingWeight,
 			ModelPolicy:             input.ModelPolicy,
 			ProxyAssignment:         input.ProxyAssignment,
 			ProxySlot:               input.ProxySlot,
@@ -1026,6 +1055,7 @@ func hasUpdateInputChanges(input UpdateInput) bool {
 		input.Priority != nil ||
 		input.MaxConcurrency != nil ||
 		input.RateMultiplier != nil ||
+		input.SchedulingWeight != nil ||
 		input.ModelDowngradeThreshold != nil ||
 		input.ModelPolicy != nil ||
 		input.UpstreamIsPool != nil ||
@@ -1942,4 +1972,11 @@ func cloneStringMap(input map[string]string) map[string]string {
 		cloned[key] = value
 	}
 	return cloned
+}
+
+func validateSchedulingWeight(value int) error {
+	if !accountweight.Valid(value) {
+		return ErrInvalidSchedulingWeight
+	}
+	return nil
 }

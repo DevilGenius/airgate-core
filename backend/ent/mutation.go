@@ -2071,6 +2071,8 @@ type AccountMutation struct {
 	state_until                  *time.Time
 	priority                     *int
 	addpriority                  *int
+	scheduling_weight            *int
+	addscheduling_weight         *int
 	max_concurrency              *int
 	addmax_concurrency           *int
 	rate_multiplier              *float64
@@ -2594,6 +2596,62 @@ func (m *AccountMutation) AddedPriority() (r int, exists bool) {
 func (m *AccountMutation) ResetPriority() {
 	m.priority = nil
 	m.addpriority = nil
+}
+
+// SetSchedulingWeight sets the "scheduling_weight" field.
+func (m *AccountMutation) SetSchedulingWeight(i int) {
+	m.scheduling_weight = &i
+	m.addscheduling_weight = nil
+}
+
+// SchedulingWeight returns the value of the "scheduling_weight" field in the mutation.
+func (m *AccountMutation) SchedulingWeight() (r int, exists bool) {
+	v := m.scheduling_weight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSchedulingWeight returns the old "scheduling_weight" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldSchedulingWeight(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSchedulingWeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSchedulingWeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSchedulingWeight: %w", err)
+	}
+	return oldValue.SchedulingWeight, nil
+}
+
+// AddSchedulingWeight adds i to the "scheduling_weight" field.
+func (m *AccountMutation) AddSchedulingWeight(i int) {
+	if m.addscheduling_weight != nil {
+		*m.addscheduling_weight += i
+	} else {
+		m.addscheduling_weight = &i
+	}
+}
+
+// AddedSchedulingWeight returns the value that was added to the "scheduling_weight" field in this mutation.
+func (m *AccountMutation) AddedSchedulingWeight() (r int, exists bool) {
+	v := m.addscheduling_weight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSchedulingWeight resets all changes to the "scheduling_weight" field.
+func (m *AccountMutation) ResetSchedulingWeight() {
+	m.scheduling_weight = nil
+	m.addscheduling_weight = nil
 }
 
 // SetMaxConcurrency sets the "max_concurrency" field.
@@ -3404,7 +3462,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 22)
+	fields := make([]string, 0, 23)
 	if m.name != nil {
 		fields = append(fields, account.FieldName)
 	}
@@ -3431,6 +3489,9 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.priority != nil {
 		fields = append(fields, account.FieldPriority)
+	}
+	if m.scheduling_weight != nil {
+		fields = append(fields, account.FieldSchedulingWeight)
 	}
 	if m.max_concurrency != nil {
 		fields = append(fields, account.FieldMaxConcurrency)
@@ -3497,6 +3558,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.StateUntil()
 	case account.FieldPriority:
 		return m.Priority()
+	case account.FieldSchedulingWeight:
+		return m.SchedulingWeight()
 	case account.FieldMaxConcurrency:
 		return m.MaxConcurrency()
 	case account.FieldRateMultiplier:
@@ -3550,6 +3613,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldStateUntil(ctx)
 	case account.FieldPriority:
 		return m.OldPriority(ctx)
+	case account.FieldSchedulingWeight:
+		return m.OldSchedulingWeight(ctx)
 	case account.FieldMaxConcurrency:
 		return m.OldMaxConcurrency(ctx)
 	case account.FieldRateMultiplier:
@@ -3647,6 +3712,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPriority(v)
+		return nil
+	case account.FieldSchedulingWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSchedulingWeight(v)
 		return nil
 	case account.FieldMaxConcurrency:
 		v, ok := value.(int)
@@ -3750,6 +3822,9 @@ func (m *AccountMutation) AddedFields() []string {
 	if m.addpriority != nil {
 		fields = append(fields, account.FieldPriority)
 	}
+	if m.addscheduling_weight != nil {
+		fields = append(fields, account.FieldSchedulingWeight)
+	}
 	if m.addmax_concurrency != nil {
 		fields = append(fields, account.FieldMaxConcurrency)
 	}
@@ -3772,6 +3847,8 @@ func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case account.FieldPriority:
 		return m.AddedPriority()
+	case account.FieldSchedulingWeight:
+		return m.AddedSchedulingWeight()
 	case account.FieldMaxConcurrency:
 		return m.AddedMaxConcurrency()
 	case account.FieldRateMultiplier:
@@ -3795,6 +3872,13 @@ func (m *AccountMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPriority(v)
+		return nil
+	case account.FieldSchedulingWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSchedulingWeight(v)
 		return nil
 	case account.FieldMaxConcurrency:
 		v, ok := value.(int)
@@ -3940,6 +4024,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldPriority:
 		m.ResetPriority()
+		return nil
+	case account.FieldSchedulingWeight:
+		m.ResetSchedulingWeight()
 		return nil
 	case account.FieldMaxConcurrency:
 		m.ResetMaxConcurrency()

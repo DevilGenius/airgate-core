@@ -4,6 +4,7 @@ import { getAccountMessageLockEnabled } from './accountDefaults';
 export type BulkEditInitialValues = {
   groupIds: number[];
   maxConcurrency?: number;
+  schedulingWeight?: number;
   priority?: number;
   priorityMax?: number;
   priorityMin?: number;
@@ -82,6 +83,7 @@ export function getBulkEditInitialValues(rows: AccountResp[], selectedIds: numbe
   const hasCompletePriorityRange = selectedRows.length === selectedIds.length && priorities.length === selectedRows.length;
   return {
     groupIds,
+    schedulingWeight: getCommonNumber((account) => account.scheduling_weight),
     maxConcurrency: getCommonNumber((account) => account.max_concurrency),
     priority: getCommonNumber((account) => account.priority),
     priorityMax: hasCompletePriorityRange ? Math.max(...priorities) : undefined,

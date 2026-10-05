@@ -85,6 +85,11 @@ func Priority(v int) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldPriority, v))
 }
 
+// SchedulingWeight applies equality check predicate on the "scheduling_weight" field. It's identical to SchedulingWeightEQ.
+func SchedulingWeight(v int) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldSchedulingWeight, v))
+}
+
 // MaxConcurrency applies equality check predicate on the "max_concurrency" field. It's identical to MaxConcurrencyEQ.
 func MaxConcurrency(v int) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldMaxConcurrency, v))
@@ -538,6 +543,46 @@ func PriorityLT(v int) predicate.Account {
 // PriorityLTE applies the LTE predicate on the "priority" field.
 func PriorityLTE(v int) predicate.Account {
 	return predicate.Account(sql.FieldLTE(FieldPriority, v))
+}
+
+// SchedulingWeightEQ applies the EQ predicate on the "scheduling_weight" field.
+func SchedulingWeightEQ(v int) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldSchedulingWeight, v))
+}
+
+// SchedulingWeightNEQ applies the NEQ predicate on the "scheduling_weight" field.
+func SchedulingWeightNEQ(v int) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldSchedulingWeight, v))
+}
+
+// SchedulingWeightIn applies the In predicate on the "scheduling_weight" field.
+func SchedulingWeightIn(vs ...int) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldSchedulingWeight, vs...))
+}
+
+// SchedulingWeightNotIn applies the NotIn predicate on the "scheduling_weight" field.
+func SchedulingWeightNotIn(vs ...int) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldSchedulingWeight, vs...))
+}
+
+// SchedulingWeightGT applies the GT predicate on the "scheduling_weight" field.
+func SchedulingWeightGT(v int) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldSchedulingWeight, v))
+}
+
+// SchedulingWeightGTE applies the GTE predicate on the "scheduling_weight" field.
+func SchedulingWeightGTE(v int) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldSchedulingWeight, v))
+}
+
+// SchedulingWeightLT applies the LT predicate on the "scheduling_weight" field.
+func SchedulingWeightLT(v int) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldSchedulingWeight, v))
+}
+
+// SchedulingWeightLTE applies the LTE predicate on the "scheduling_weight" field.
+func SchedulingWeightLTE(v int) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldSchedulingWeight, v))
 }
 
 // MaxConcurrencyEQ applies the EQ predicate on the "max_concurrency" field.

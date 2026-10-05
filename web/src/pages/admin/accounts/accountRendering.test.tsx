@@ -11,7 +11,7 @@ function account(id: number): AccountResp {
   return {
     id, name: `account-${id}`, email: null, platform: 'openai', type: 'oauth',
     credentials: {}, model_policy: {}, state: 'active', priority: 0,
-    max_concurrency: 4, current_concurrency: 0, rate_multiplier: 1,
+    max_concurrency: 4, scheduling_weight: 100, current_concurrency: 0, rate_multiplier: 1,
     upstream_is_pool: false, group_ids: [], last_used_at: '',
     created_at: '', updated_at: '',
   };

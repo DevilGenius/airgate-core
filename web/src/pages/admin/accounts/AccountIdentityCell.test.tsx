@@ -8,7 +8,7 @@ afterEach(cleanup);
 const account: AccountResp = {
   id: 1, name: 'test-account', email: null,
   platform: 'openai', type: 'oauth', credentials: {}, model_policy: {},
-  state: 'active', priority: 0, max_concurrency: 4, current_concurrency: 0,
+  state: 'active', priority: 0, max_concurrency: 4, scheduling_weight: 100, current_concurrency: 0,
   rate_multiplier: 1, upstream_is_pool: false, group_ids: [],
   created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z',
 };

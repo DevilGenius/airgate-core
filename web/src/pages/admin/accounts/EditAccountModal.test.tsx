@@ -148,7 +148,7 @@ function account(overrides: Partial<AccountResp> = {}): AccountResp {
   return {
     created_at: '2026-08-04T00:00:00Z',
     credentials: { api_key: 'sk-existing' },
-    current_concurrency: 0,
+    scheduling_weight: 100, current_concurrency: 0,
     email: null,
     extra: {},
     group_ids: [],
@@ -309,19 +309,64 @@ describe('BulkEditAccountModal plan controls', () => {
     expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.plan_type_label' }));
     fireEvent.change(screen.getByRole('combobox', { name: 'accounts.plan_type_label' }), { target: { value: ' pro ' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.dispatch_toggle' }));
     fireEvent.click(screen.getByRole('switch', { name: 'accounts.plan_type_locked' }));
     fireEvent.click(screen.getByRole('switch', { name: 'accounts.upstream_is_pool' }));
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
-    expect(onSubmit).toHaveBeenCalledWith({ plan_type: 'pro', upstream_is_pool: false, extra: { plan_type_locked: false } });
+    expect(onSubmit).toHaveBeenCalledWith({ state: 'active', plan_type: 'pro', upstream_is_pool: false, extra: { plan_type_locked: false } });
   });
 
-  it('keeps dispatch opt-in separate from the other switches', () => {
+  it('disables all four switches until scheduling options are enabled', () => {
     const onSubmit = vi.fn();
     render(<BulkEditAccountModal open count={2} loading={false} onClose={() => {}} onSubmit={onSubmit} />);
-    expect(screen.getByRole('switch', { name: 'accounts.dispatch_enabled' })).toBeDisabled();
+    for (const control of screen.getAllByRole('switch')) expect(control).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.dispatch_toggle' }));
+    for (const control of screen.getAllByRole('switch')) expect(control).toBeEnabled();
     fireEvent.click(screen.getByRole('switch', { name: 'accounts.dispatch_enabled' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'accounts.upstream_is_pool' }));
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
-    expect(onSubmit).toHaveBeenCalledWith({ state: 'disabled' });
+    expect(onSubmit).toHaveBeenCalledWith({ state: 'disabled', upstream_is_pool: true });
+  });
+
+  it('excludes all switch edits after dispatch is unchecked', () => {
+    const onSubmit = vi.fn();
+    render(<BulkEditAccountModal open count={2} loading={false} onClose={() => {}} onSubmit={onSubmit} />);
+    const dispatch = screen.getByRole('checkbox', { name: 'accounts.dispatch_toggle' });
+    fireEvent.click(dispatch);
+    for (const control of screen.getAllByRole('switch')) fireEvent.click(control);
+    fireEvent.click(dispatch);
+    for (const control of screen.getAllByRole('switch')) expect(control).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.scheduling_weight' }));
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledWith({ scheduling_weight: 100 });
+  });
+});
+
+
+describe('account scheduling weight controls', () => {
+  it('edits and validates a nonnegative integer weight', () => {
+    const onSubmit = renderModal(account({ scheduling_weight: 200 }));
+    const weight = screen.getByLabelText('accounts.scheduling_weight');
+    expect(weight).toHaveValue(200);
+    fireEvent.change(weight, { target: { value: '-1' } });
+    expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
+    fireEvent.change(weight, { target: { value: '1.5' } });
+    expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
+    fireEvent.change(weight, { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ scheduling_weight: 0 }));
+  });
+
+  it('includes weight only when enabled in bulk edits', () => {
+    const onSubmit = vi.fn();
+    render(<BulkEditAccountModal open count={2} loading={false} initialSchedulingWeight={250} onClose={() => {}} onSubmit={onSubmit} />);
+    const input = screen.getByRole('spinbutton', { name: 'accounts.scheduling_weight' });
+    expect(input).toHaveValue(250);
+    expect(input).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'accounts.scheduling_weight' }));
+    fireEvent.change(input, { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(onSubmit).toHaveBeenCalledWith({ scheduling_weight: 0 });
   });
 });

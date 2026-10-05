@@ -8,6 +8,7 @@ import (
 
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	"github.com/DevilGenius/airgate-core/internal/accountusage"
+	"github.com/DevilGenius/airgate-core/internal/accountweight"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 )
 
@@ -41,6 +42,7 @@ func (Account) Fields() []ent.Field {
 			Comment("state 的到期时间：rate_limited / degraded 到期自动恢复 active；disabled 无到期"),
 
 		field.Int("priority").Default(50).Min(accountpriority.Min).Max(accountpriority.Max),
+		field.Int("scheduling_weight").Default(accountweight.Default).Min(accountweight.Min).Max(accountweight.Max),
 		field.Int("max_concurrency").Default(10),
 		field.Float("rate_multiplier").Default(1.0).Min(0.01).Max(100),
 		field.Float("model_downgrade_threshold").Default(0).Min(0).Max(1).

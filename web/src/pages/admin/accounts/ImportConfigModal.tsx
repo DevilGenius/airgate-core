@@ -28,7 +28,11 @@ import {
   type ImportPriority,
   type ImportRule,
 } from './importConfigDsl';
-import { parseModelDowngradeThresholdInput } from './accountDefaults';
+import {
+  MAX_SCHEDULING_WEIGHT,
+  parseSchedulingWeightInput,
+  parseModelDowngradeThresholdInput
+} from './accountDefaults';
 
 const CONDITION_FIELD_SUGGESTIONS = [
   'platform',
@@ -136,6 +140,8 @@ export function ImportConfigModal({
   const [selectedRuleIndex, setSelectedRuleIndex] = useState(0);
   const [dslValue, setDSLValue] = useState(() => serializeImportConfigDSL(EMPTY_IMPORT_CONFIG));
   const [dslError, setDSLError] = useState('');
+  const [schedulingWeightInput, setSchedulingWeightInput] = useState('');
+  const schedulingWeightValid = schedulingWeightInput.trim() === '' || parseSchedulingWeightInput(schedulingWeightInput) != null;
   const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState('0');
   const [proxySlotInput, setProxySlotInput] = useState('');
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -182,7 +188,7 @@ export function ImportConfigModal({
     rule.set.proxy_id,
     rule.set.proxy_slot == null ? '' : String(rule.set.proxy_slot),
   ).valid), [config.rules, proxies]);
-  const validationError = !modelDowngradeThresholdValid
+  const validationError = !schedulingWeightValid ? t('accounts.scheduling_weight_invalid') : !modelDowngradeThresholdValid
     ? t('accounts.model_downgrade_threshold_invalid')
     : !proxyBinding.valid || !proxyAssignmentsValid
       ? t('accounts.proxy_slot_invalid')
@@ -196,6 +202,10 @@ export function ImportConfigModal({
       : sortedGroups,
     [selectedPlatform, sortedGroups],
   );
+
+  useEffect(() => {
+    setSchedulingWeightInput(selectedRule?.set.scheduling_weight == null ? '' : String(selectedRule.set.scheduling_weight));
+  }, [selectedRuleIndex, selectedRule?.set.scheduling_weight]);
 
   useEffect(() => {
     setModelDowngradeThresholdInput(
@@ -739,6 +749,21 @@ export function ImportConfigModal({
                           });
                         }}
                       />
+                      <HeroTextField fullWidth isInvalid={!schedulingWeightValid}>
+                        <Label>{t('accounts.scheduling_weight')}</Label>
+                        <Input aria-label={t('accounts.scheduling_weight')} type="number" min={0} max={MAX_SCHEDULING_WEIGHT} step={1}
+                          value={schedulingWeightInput}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            setSchedulingWeightInput(raw);
+                            const parsed = parseSchedulingWeightInput(raw);
+                            if (raw.trim() === '' || parsed != null) updateSelectedRule((rule) => {
+                              if (parsed == null) delete rule.set.scheduling_weight;
+                              else rule.set.scheduling_weight = parsed;
+                            });
+                          }} />
+                        {!schedulingWeightValid && <p className="mt-1 text-[11px] leading-4 text-danger">{t('accounts.scheduling_weight_invalid')}</p>}
+                      </HeroTextField>
                       <HeroTextField fullWidth isInvalid={!modelDowngradeThresholdValid}>
                         <Input
                           aria-label={t('accounts.model_downgrade_threshold')}

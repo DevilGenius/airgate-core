@@ -52,6 +52,7 @@ type AccountResp struct {
 	ProxyUsername           string              `json:"proxy_username,omitempty"`
 	RateMultiplier          float64             `json:"rate_multiplier"`
 	ModelDowngradeThreshold float64             `json:"model_downgrade_threshold"`
+	SchedulingWeight        int                 `json:"scheduling_weight"`
 	ErrorMsg                string              `json:"error_msg,omitempty"`
 	UpstreamIsPool          bool                `json:"upstream_is_pool"`
 	Extra                   map[string]any      `json:"extra,omitempty"`
@@ -87,6 +88,7 @@ type CreateAccountReq struct {
 	ProxyID                 *int64             `json:"proxy_id"`
 	RateMultiplier          OptionalFloat      `json:"rate_multiplier"`
 	ModelDowngradeThreshold float64            `json:"model_downgrade_threshold"`
+	SchedulingWeight        *int               `json:"scheduling_weight"`
 	UpstreamIsPool          bool               `json:"upstream_is_pool"`
 	Extra                   map[string]any     `json:"extra,omitempty"`
 	GroupIDs                []int64            `json:"group_ids"`
@@ -110,6 +112,7 @@ type UpdateAccountReq struct {
 	ProxySlot               *int                `json:"proxy_slot" binding:"omitempty,gte=0,lte=65535"`
 	RateMultiplier          OptionalFloat       `json:"rate_multiplier"`
 	ModelDowngradeThreshold *float64            `json:"model_downgrade_threshold"`
+	SchedulingWeight        *int                `json:"scheduling_weight"`
 	UpstreamIsPool          *bool               `json:"upstream_is_pool"`
 	Extra                   map[string]any      `json:"extra,omitempty"`
 	HasExtra                bool                `json:"-"`
@@ -128,6 +131,7 @@ type AccountExportItem struct {
 	MaxConcurrency          int                `json:"max_concurrency"`
 	RateMultiplier          OptionalFloat      `json:"rate_multiplier"`
 	ModelDowngradeThreshold float64            `json:"model_downgrade_threshold"`
+	SchedulingWeight        *int               `json:"scheduling_weight"`
 }
 
 // AccountExportFile 导出文件结构，仅包含可跨环境迁移的账号本体字段。
@@ -199,6 +203,7 @@ type BulkUpdateAccountsReq struct {
 	MaxConcurrency          *int                     `json:"max_concurrency"`
 	RateMultiplier          OptionalFloat            `json:"rate_multiplier"`
 	ModelDowngradeThreshold *float64                 `json:"model_downgrade_threshold"`
+	SchedulingWeight        *int                     `json:"scheduling_weight"`
 	ModelPolicy             *modelpolicy.Policy      `json:"model_policy"`
 	GroupIDs                []int64                  `json:"group_ids"`
 	ProxyID                 *int64                   `json:"proxy_id"`

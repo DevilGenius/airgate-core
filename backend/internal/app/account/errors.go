@@ -7,6 +7,7 @@ import (
 )
 
 var (
+	ErrInvalidSchedulingWeight = errors.New("调度权重必须是 0 到 1000000 之间的整数")
 	// ErrAccountNotFound 账号不存在。
 	ErrAccountNotFound = accountscope.ErrAccountNotFound
 	// ErrStateWriterUnavailable 账号状态写入器不可用。

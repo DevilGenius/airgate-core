@@ -127,6 +127,20 @@ func (ac *AccountCreate) SetNillablePriority(i *int) *AccountCreate {
 	return ac
 }
 
+// SetSchedulingWeight sets the "scheduling_weight" field.
+func (ac *AccountCreate) SetSchedulingWeight(i int) *AccountCreate {
+	ac.mutation.SetSchedulingWeight(i)
+	return ac
+}
+
+// SetNillableSchedulingWeight sets the "scheduling_weight" field if the given value is not nil.
+func (ac *AccountCreate) SetNillableSchedulingWeight(i *int) *AccountCreate {
+	if i != nil {
+		ac.SetSchedulingWeight(*i)
+	}
+	return ac
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (ac *AccountCreate) SetMaxConcurrency(i int) *AccountCreate {
 	ac.mutation.SetMaxConcurrency(i)
@@ -401,6 +415,10 @@ func (ac *AccountCreate) defaults() {
 		v := account.DefaultPriority
 		ac.mutation.SetPriority(v)
 	}
+	if _, ok := ac.mutation.SchedulingWeight(); !ok {
+		v := account.DefaultSchedulingWeight
+		ac.mutation.SetSchedulingWeight(v)
+	}
 	if _, ok := ac.mutation.MaxConcurrency(); !ok {
 		v := account.DefaultMaxConcurrency
 		ac.mutation.SetMaxConcurrency(v)
@@ -474,6 +492,14 @@ func (ac *AccountCreate) check() error {
 	if v, ok := ac.mutation.Priority(); ok {
 		if err := account.PriorityValidator(v); err != nil {
 			return &ValidationError{Name: "priority", err: fmt.Errorf(`ent: validator failed for field "Account.priority": %w`, err)}
+		}
+	}
+	if _, ok := ac.mutation.SchedulingWeight(); !ok {
+		return &ValidationError{Name: "scheduling_weight", err: errors.New(`ent: missing required field "Account.scheduling_weight"`)}
+	}
+	if v, ok := ac.mutation.SchedulingWeight(); ok {
+		if err := account.SchedulingWeightValidator(v); err != nil {
+			return &ValidationError{Name: "scheduling_weight", err: fmt.Errorf(`ent: validator failed for field "Account.scheduling_weight": %w`, err)}
 		}
 	}
 	if _, ok := ac.mutation.MaxConcurrency(); !ok {
@@ -573,6 +599,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.Priority(); ok {
 		_spec.SetField(account.FieldPriority, field.TypeInt, value)
 		_node.Priority = value
+	}
+	if value, ok := ac.mutation.SchedulingWeight(); ok {
+		_spec.SetField(account.FieldSchedulingWeight, field.TypeInt, value)
+		_node.SchedulingWeight = value
 	}
 	if value, ok := ac.mutation.MaxConcurrency(); ok {
 		_spec.SetField(account.FieldMaxConcurrency, field.TypeInt, value)

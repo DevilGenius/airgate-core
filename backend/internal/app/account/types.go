@@ -41,6 +41,7 @@ type Account struct {
 	CurrentConcurrency      int
 	RateMultiplier          float64
 	ModelDowngradeThreshold float64
+	SchedulingWeight        int
 	// ErrorMsg 进入当前非 active 状态的原因（给运维看）。
 	ErrorMsg string
 	// UpstreamIsPool 上游是账号池时置 true：临时上游错误会进入退避 degraded，不永久标错。
@@ -154,6 +155,7 @@ type CreateInput struct {
 	ProxySlot               *int
 	RateMultiplier          *float64
 	ModelDowngradeThreshold float64
+	SchedulingWeight        *int
 	GroupIDs                []int64
 	UpstreamIsPool          bool
 	Extra                   map[string]any
@@ -181,6 +183,7 @@ type UpdateInput struct {
 	MaxConcurrency          *int
 	RateMultiplier          *float64
 	ModelDowngradeThreshold *float64
+	SchedulingWeight        *int
 	UpstreamIsPool          *bool
 	GroupIDs                []int64
 	HasGroupIDs             bool
@@ -212,6 +215,7 @@ type BulkUpdateInput struct {
 	MaxConcurrency          *int
 	RateMultiplier          *float64
 	ModelDowngradeThreshold *float64
+	SchedulingWeight        *int
 	ModelPolicy             *modelpolicy.Policy
 	GroupIDs                []int64
 	HasGroupIDs             bool

@@ -80,3 +80,17 @@ describe('importConfigDsl', () => {
     }
   });
 });
+
+
+describe('import scheduling weights', () => {
+  const dsl = (weight: unknown) => JSON.stringify({ version: 1, rules: [{ name: 'weighted', when: [], set: { scheduling_weight: weight, model_downgrade_threshold: 0 } }] });
+  it('preserves a configured weight when parsing and serializing', () => {
+    const config = parseImportConfigDSL(dsl(0));
+    expect(parseImportConfigDSL(serializeImportConfigDSL(config)).rules[0]?.set.scheduling_weight).toBe(0);
+  });
+  it('rejects negative, fractional, excessive and nonnumeric weights', () => {
+    for (const weight of [-1, 1.5, 1000001, '100']) {
+      expect(() => parseImportConfigDSL(dsl(weight))).toThrow(/scheduling_weight/);
+    }
+  });
+});

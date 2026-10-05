@@ -182,6 +182,27 @@ func (au *AccountUpdate) AddPriority(i int) *AccountUpdate {
 	return au
 }
 
+// SetSchedulingWeight sets the "scheduling_weight" field.
+func (au *AccountUpdate) SetSchedulingWeight(i int) *AccountUpdate {
+	au.mutation.ResetSchedulingWeight()
+	au.mutation.SetSchedulingWeight(i)
+	return au
+}
+
+// SetNillableSchedulingWeight sets the "scheduling_weight" field if the given value is not nil.
+func (au *AccountUpdate) SetNillableSchedulingWeight(i *int) *AccountUpdate {
+	if i != nil {
+		au.SetSchedulingWeight(*i)
+	}
+	return au
+}
+
+// AddSchedulingWeight adds i to the "scheduling_weight" field.
+func (au *AccountUpdate) AddSchedulingWeight(i int) *AccountUpdate {
+	au.mutation.AddSchedulingWeight(i)
+	return au
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (au *AccountUpdate) SetMaxConcurrency(i int) *AccountUpdate {
 	au.mutation.ResetMaxConcurrency()
@@ -558,6 +579,11 @@ func (au *AccountUpdate) check() error {
 			return &ValidationError{Name: "priority", err: fmt.Errorf(`ent: validator failed for field "Account.priority": %w`, err)}
 		}
 	}
+	if v, ok := au.mutation.SchedulingWeight(); ok {
+		if err := account.SchedulingWeightValidator(v); err != nil {
+			return &ValidationError{Name: "scheduling_weight", err: fmt.Errorf(`ent: validator failed for field "Account.scheduling_weight": %w`, err)}
+		}
+	}
 	if v, ok := au.mutation.RateMultiplier(); ok {
 		if err := account.RateMultiplierValidator(v); err != nil {
 			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Account.rate_multiplier": %w`, err)}
@@ -629,6 +655,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := au.mutation.AddedPriority(); ok {
 		_spec.AddField(account.FieldPriority, field.TypeInt, value)
+	}
+	if value, ok := au.mutation.SchedulingWeight(); ok {
+		_spec.SetField(account.FieldSchedulingWeight, field.TypeInt, value)
+	}
+	if value, ok := au.mutation.AddedSchedulingWeight(); ok {
+		_spec.AddField(account.FieldSchedulingWeight, field.TypeInt, value)
 	}
 	if value, ok := au.mutation.MaxConcurrency(); ok {
 		_spec.SetField(account.FieldMaxConcurrency, field.TypeInt, value)
@@ -981,6 +1013,27 @@ func (auo *AccountUpdateOne) SetNillablePriority(i *int) *AccountUpdateOne {
 // AddPriority adds i to the "priority" field.
 func (auo *AccountUpdateOne) AddPriority(i int) *AccountUpdateOne {
 	auo.mutation.AddPriority(i)
+	return auo
+}
+
+// SetSchedulingWeight sets the "scheduling_weight" field.
+func (auo *AccountUpdateOne) SetSchedulingWeight(i int) *AccountUpdateOne {
+	auo.mutation.ResetSchedulingWeight()
+	auo.mutation.SetSchedulingWeight(i)
+	return auo
+}
+
+// SetNillableSchedulingWeight sets the "scheduling_weight" field if the given value is not nil.
+func (auo *AccountUpdateOne) SetNillableSchedulingWeight(i *int) *AccountUpdateOne {
+	if i != nil {
+		auo.SetSchedulingWeight(*i)
+	}
+	return auo
+}
+
+// AddSchedulingWeight adds i to the "scheduling_weight" field.
+func (auo *AccountUpdateOne) AddSchedulingWeight(i int) *AccountUpdateOne {
+	auo.mutation.AddSchedulingWeight(i)
 	return auo
 }
 
@@ -1373,6 +1426,11 @@ func (auo *AccountUpdateOne) check() error {
 			return &ValidationError{Name: "priority", err: fmt.Errorf(`ent: validator failed for field "Account.priority": %w`, err)}
 		}
 	}
+	if v, ok := auo.mutation.SchedulingWeight(); ok {
+		if err := account.SchedulingWeightValidator(v); err != nil {
+			return &ValidationError{Name: "scheduling_weight", err: fmt.Errorf(`ent: validator failed for field "Account.scheduling_weight": %w`, err)}
+		}
+	}
 	if v, ok := auo.mutation.RateMultiplier(); ok {
 		if err := account.RateMultiplierValidator(v); err != nil {
 			return &ValidationError{Name: "rate_multiplier", err: fmt.Errorf(`ent: validator failed for field "Account.rate_multiplier": %w`, err)}
@@ -1461,6 +1519,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if value, ok := auo.mutation.AddedPriority(); ok {
 		_spec.AddField(account.FieldPriority, field.TypeInt, value)
+	}
+	if value, ok := auo.mutation.SchedulingWeight(); ok {
+		_spec.SetField(account.FieldSchedulingWeight, field.TypeInt, value)
+	}
+	if value, ok := auo.mutation.AddedSchedulingWeight(); ok {
+		_spec.AddField(account.FieldSchedulingWeight, field.TypeInt, value)
 	}
 	if value, ok := auo.mutation.MaxConcurrency(); ok {
 		_spec.SetField(account.FieldMaxConcurrency, field.TypeInt, value)

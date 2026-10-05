@@ -323,31 +323,30 @@ func TestRecordNoAvailableAccountRecordsInitialExhaustion(t *testing.T) {
 	}
 }
 
-func TestSelectByLoadBalanceUsesNegativePriorityAsFallback(t *testing.T) {
+func TestSelectByWeightUsesNegativePriorityAsFallback(t *testing.T) {
 	t.Parallel()
 
 	s := newSelectionTestScheduler(Normal)
-	now := time.Now()
 
-	selected := s.selectByLoadBalance(context.Background(), []*ent.Account{
-		{ID: 1, Priority: -1},
-		{ID: 2, Priority: 0},
-		{ID: 3, Priority: -2},
-	}, now, nil)
+	selected := s.selectByWeight(context.Background(), []*ent.Account{
+		{SchedulingWeight: 100, ID: 1, Priority: -1},
+		{SchedulingWeight: 100, ID: 2, Priority: 0},
+		{SchedulingWeight: 100, ID: 3, Priority: -2},
+	}, nil)
 	if selected == nil || selected.ID != 2 {
 		t.Fatalf("selected account = %+v, want priority 0 account", selected)
 	}
 
-	selected = s.selectByLoadBalance(context.Background(), []*ent.Account{
-		{ID: 1, Priority: -2},
-		{ID: 2, Priority: -1},
-	}, now, nil)
+	selected = s.selectByWeight(context.Background(), []*ent.Account{
+		{SchedulingWeight: 100, ID: 1, Priority: -2},
+		{SchedulingWeight: 100, ID: 2, Priority: -1},
+	}, nil)
 	if selected == nil || selected.ID != 2 {
 		t.Fatalf("selected account = %+v, want priority -1 account", selected)
 	}
 }
 
-func TestSelectByLoadBalanceScoresSamePriorityTier(t *testing.T) {
+func TestSelectByWeightUsesSamePriorityTier(t *testing.T) {
 	t.Parallel()
 
 	s := newSelectionTestScheduler(Normal)
@@ -370,7 +369,7 @@ func TestSelectByLoadBalanceScoresSamePriorityTier(t *testing.T) {
 		}
 		candidates = append(candidates, acc)
 	}
-	selected := s.selectByLoadBalance(context.Background(), candidates, now, nil)
+	selected := s.selectByWeight(context.Background(), candidates, nil)
 	if selected == nil || selected.Priority != 5 {
 		t.Fatalf("selected account = %+v, want same priority candidate", selected)
 	}
@@ -800,7 +799,6 @@ func (s *scriptedSessionTracker) RegisterSession(_ context.Context, accountID in
 
 func TestMaybeRegisterSessionRetriesAndReportsExhaustion(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
 	primary := newSelectionTestAccount(10)
 	primary.Extra = map[string]interface{}{"max_sessions": 1}
 	fallback := newSelectionTestAccount(20)
@@ -809,7 +807,7 @@ func TestMaybeRegisterSessionRetriesAndReportsExhaustion(t *testing.T) {
 	session := &scriptedSessionTracker{allowed: []bool{false, true}}
 	s := newSelectionTestScheduler(Normal)
 	s.session = session
-	selected, err := s.maybeRegisterSession(ctx, primary, 7, "openai", "sess", []*ent.Account{primary, fallback}, now, nil)
+	selected, err := s.maybeRegisterSession(ctx, primary, 7, "openai", "sess", []*ent.Account{primary, fallback}, nil)
 	if err != nil {
 		t.Fatalf("maybeRegisterSession retry error = %v", err)
 	}
@@ -826,7 +824,7 @@ func TestMaybeRegisterSessionRetriesAndReportsExhaustion(t *testing.T) {
 	session = &scriptedSessionTracker{allowed: []bool{false}}
 	s = newSelectionTestScheduler(Normal)
 	s.session = session
-	if _, err := s.maybeRegisterSession(ctx, primary, 7, "openai", "sess", []*ent.Account{primary}, now, nil); !errors.Is(err, ErrNoAvailableAccount) {
+	if _, err := s.maybeRegisterSession(ctx, primary, 7, "openai", "sess", []*ent.Account{primary}, nil); !errors.Is(err, ErrNoAvailableAccount) {
 		t.Fatalf("maybeRegisterSession exhausted error = %v, want ErrNoAvailableAccount", err)
 	}
 }
@@ -948,11 +946,12 @@ func seedSelectionTestGroup(t *testing.T, groupID int, platform string, accounts
 
 func newSelectionTestAccount(id int) *ent.Account {
 	return &ent.Account{
-		ID:             id,
-		Name:           "selection test",
-		Platform:       "openai",
-		State:          account.StateActive,
-		MaxConcurrency: DefaultAccountMaxConcurrency,
-		Extra:          map[string]interface{}{},
+		ID:               id,
+		Name:             "selection test",
+		SchedulingWeight: 100,
+		Platform:         "openai",
+		State:            account.StateActive,
+		MaxConcurrency:   DefaultAccountMaxConcurrency,
+		Extra:            map[string]interface{}{},
 	}
 }

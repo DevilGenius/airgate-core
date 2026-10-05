@@ -13,7 +13,7 @@ const account: AccountResp = {
   state: 'active',
   priority: 0,
   max_concurrency: 4,
-  current_concurrency: 0,
+  scheduling_weight: 100, current_concurrency: 0,
   rate_multiplier: 1,
   upstream_is_pool: false,
   group_ids: [],

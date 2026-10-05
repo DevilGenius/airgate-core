@@ -1,3 +1,4 @@
+import { parseSchedulingWeightInput } from './accountDefaults';
 export const IMPORT_PRIORITY_MIN = -99999;
 export const IMPORT_PRIORITY_MAX = 99999;
 
@@ -23,6 +24,7 @@ export type ImportPriority =
 
 export interface ImportAssignment {
 	max_concurrency?: number;
+  scheduling_weight?: number;
 	priority?: ImportPriority;
 	group_ids?: number[];
 	proxy_id?: number;
@@ -47,6 +49,7 @@ export const EMPTY_IMPORT_CONFIG: ImportConfigDSL = { version: 1, rules: [] };
 
 const IMPORT_ASSIGNMENT_FIELDS = new Set([
   'max_concurrency',
+  'scheduling_weight',
   'priority',
   'group_ids',
   'proxy_id',
@@ -156,6 +159,12 @@ function parseRule(value: unknown, ruleIndex: number): ImportRule {
     }
   }
   const assignment = {} as ImportAssignment;
+  if (set.scheduling_weight != null) {
+    if (typeof set.scheduling_weight !== 'number' || parseSchedulingWeightInput(String(set.scheduling_weight)) == null) {
+      throw new Error(`rules[${ruleIndex}].set.scheduling_weight is invalid`);
+    }
+    assignment.scheduling_weight = set.scheduling_weight;
+  }
   if (set.max_concurrency != null) {
     if (!Number.isSafeInteger(set.max_concurrency) || Number(set.max_concurrency) < 0) {
       throw new Error(`rules[${ruleIndex}].set.max_concurrency is invalid`);

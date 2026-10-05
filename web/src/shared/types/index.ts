@@ -182,6 +182,7 @@ export interface AccountResp {
   rate_multiplier: number;
   /** 成功率低于该阈值时将对应模型候选放入降级池；0 表示关闭。 */
   model_downgrade_threshold?: number;
+  scheduling_weight: number;
   error_msg?: string;
   upstream_is_pool: boolean;
   extra?: Record<string, unknown>;
@@ -227,6 +228,7 @@ export interface CreateAccountReq {
   proxy_id?: number;
   rate_multiplier?: number | null;
   model_downgrade_threshold?: number | null;
+  scheduling_weight?: number;
   upstream_is_pool?: boolean;
   extra?: Record<string, unknown>;
   group_ids?: number[];
@@ -248,6 +250,7 @@ export interface UpdateAccountReq {
   proxy_slot?: number;
   rate_multiplier?: number | null;
   model_downgrade_threshold?: number | null;
+  scheduling_weight?: number;
   upstream_is_pool?: boolean;
   extra?: Record<string, unknown>;
   group_ids?: number[];
@@ -269,6 +272,7 @@ export interface BulkUpdateAccountsReq {
   max_concurrency?: number;
   rate_multiplier?: number | null;
   model_downgrade_threshold?: number | null;
+  scheduling_weight?: number;
   model_policy?: ModelPolicy | null;
   group_ids?: number[];
   proxy_id?: number | null;
@@ -305,6 +309,7 @@ export interface AccountExportItem {
   max_concurrency: number;
   rate_multiplier?: number | null;
   model_downgrade_threshold?: number;
+  scheduling_weight?: number;
 }
 
 // 导出文件结构

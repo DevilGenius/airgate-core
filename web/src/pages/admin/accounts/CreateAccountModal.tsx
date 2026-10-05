@@ -39,6 +39,9 @@ import {
 } from '../../../shared/utils/rateMultiplier';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
 import {
+  DEFAULT_SCHEDULING_WEIGHT,
+  MAX_SCHEDULING_WEIGHT,
+  parseSchedulingWeightInput,
   ACCOUNT_PRIORITY_MAX,
   ACCOUNT_PRIORITY_MIN,
   commitAccountPriorityInput,
@@ -87,6 +90,9 @@ export function CreateAccountModal({
   const [batchMode, setBatchMode] = useState(false);
   const [priorityInput, setPriorityInput] = useState(String(DEFAULT_ACCOUNT_PRIORITY));
   const [rateMultiplierInput, setRateMultiplierInput] = useState('1');
+  const [schedulingWeightInput, setSchedulingWeightInput] = useState(String(DEFAULT_SCHEDULING_WEIGHT));
+  const schedulingWeightValue = parseSchedulingWeightInput(schedulingWeightInput);
+  const schedulingWeightValid = schedulingWeightValue != null;
   const [modelDowngradeThresholdInput, setModelDowngradeThresholdInput] = useState(String(DEFAULT_MODEL_DOWNGRADE_THRESHOLD));
 
   // 根据平台获取凭证字段定义
@@ -128,6 +134,7 @@ export function CreateAccountModal({
     setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
     setRateMultiplierInput('1');
     setModelDowngradeThresholdInput(String(DEFAULT_MODEL_DOWNGRADE_THRESHOLD));
+    setSchedulingWeightInput(String(DEFAULT_SCHEDULING_WEIGHT));
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -158,7 +165,7 @@ export function CreateAccountModal({
     accounts: PluginBatchAccountInput[],
   ): Promise<PluginBatchImportResult> => {
     if (!onBatchImport) return { imported: 0, failed: accounts.length };
-    if (!modelDowngradeThresholdValid) return { imported: 0, failed: accounts.length };
+    if (!modelDowngradeThresholdValid || !schedulingWeightValid) return { imported: 0, failed: accounts.length };
     const prefix = form.name.trim();
     const priority = commitAccountPriorityInput(priorityInput, form.priority ?? DEFAULT_ACCOUNT_PRIORITY);
     const rateMultiplier = isEmptyRateMultiplierInput(rateMultiplierInput)
@@ -176,6 +183,7 @@ export function CreateAccountModal({
         max_concurrency: form.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
         rate_multiplier: rateMultiplier,
         model_downgrade_threshold: modelDowngradeThresholdValue ?? undefined,
+        scheduling_weight: schedulingWeightValue!,
       };
     });
     return onBatchImport(toImport);
@@ -193,7 +201,7 @@ export function CreateAccountModal({
     const rateMultiplierValue = parseRateMultiplier(rateMultiplierInput);
     const rateMultiplierEmpty = isEmptyRateMultiplierInput(rateMultiplierInput);
     if (!rateMultiplierEmpty && !isValidRateMultiplierValue(rateMultiplierValue)) return;
-    if (!modelDowngradeThresholdValid) return;
+    if (!modelDowngradeThresholdValid || !schedulingWeightValid) return;
     const rateMultiplier = rateMultiplierEmpty ? null : rateMultiplierValue;
     const identity = syncAccountIdentity(credentials, form.email);
     onSubmit({
@@ -202,6 +210,7 @@ export function CreateAccountModal({
       priority,
       rate_multiplier: rateMultiplier,
       model_downgrade_threshold: modelDowngradeThresholdValue,
+      scheduling_weight: schedulingWeightValue!,
       platform,
       type: accountType || undefined,
       credentials: identity.credentials,
@@ -217,6 +226,7 @@ export function CreateAccountModal({
     setPriorityInput(String(DEFAULT_ACCOUNT_PRIORITY));
     setRateMultiplierInput('1');
     setModelDowngradeThresholdInput(String(DEFAULT_MODEL_DOWNGRADE_THRESHOLD));
+    setSchedulingWeightInput(String(DEFAULT_SCHEDULING_WEIGHT));
     setCredentials({});
     setGroupIds([]);
     setBatchMode(false);
@@ -281,7 +291,7 @@ export function CreateAccountModal({
             <Button
               aria-busy={loading}
               form={CREATE_ACCOUNT_FORM_ID}
-              isDisabled={loading || !platform || !form.name || !rateMultiplierValid || !modelDowngradeThresholdValid}
+              isDisabled={loading || !platform || !form.name || !rateMultiplierValid || !modelDowngradeThresholdValid || !schedulingWeightValid}
               type="submit"
               variant="primary"
             >
@@ -409,6 +419,14 @@ export function CreateAccountModal({
                         value={rateMultiplierInput}
                         onChange={(e) => setRateMultiplierInput(e.target.value)}
                       />
+                    </HeroTextField>
+
+                    <HeroTextField fullWidth isInvalid={!schedulingWeightValid}>
+                      <Label>{t('accounts.scheduling_weight')}</Label>
+                      <Input aria-label={t('accounts.scheduling_weight')} type="number" min={0} max={MAX_SCHEDULING_WEIGHT} step={1}
+                        value={schedulingWeightInput} onChange={(event) => setSchedulingWeightInput(event.target.value)} />
+                      <p className="mt-1 text-[11px] leading-4 text-text-tertiary">{t('accounts.scheduling_weight_hint')}</p>
+                      {!schedulingWeightValid && <p className="mt-1 text-[11px] leading-4 text-danger">{t('accounts.scheduling_weight_invalid')}</p>}
                     </HeroTextField>
 
                     <HeroTextField fullWidth isInvalid={!modelDowngradeThresholdValid}>
