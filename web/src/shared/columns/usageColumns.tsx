@@ -933,7 +933,7 @@ export function createUsageClientColumn(t: TFunction): UsageColumnConfig<UsageRo
   return {
     key: 'client',
     title: t('usage.client'),
-    width: '152px',
+    width: '168px',
     hideOnMobile: true,
     render: (row) => {
       const ipAddress = compactClientText(row.ip_address);
@@ -998,13 +998,13 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
     {
       key: 'created_at',
       title: t('usage.time'),
-      width: '92px',
+      width: '84px',
       render: (row) => <TimeCell value={row.created_at} />,
     },
     {
       key: 'model',
       title: t('usage.model'),
-      width: '220px',
+      width: '204px',
       render: (row) => {
         const PluginUsageModelMeta = getPluginUsageModelMeta(row.platform);
         const metaContext = buildUsageRecordContext(row, customerScope);

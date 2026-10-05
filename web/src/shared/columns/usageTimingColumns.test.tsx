@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { TFunction } from 'i18next';
-import { formatTimingMs, usageLatencyTone, type UsageColumnConfig } from '../../../shared/columns/usageColumns';
-import type { UsageLogResp } from '../../../shared/types';
+import { formatTimingMs, usageLatencyTone, type UsageColumnConfig } from './usageColumns';
+import type { UsageLogResp } from '../types';
 import { combineUsageTimingColumns, createUsageTpsColumn, readUsageColumnSelection, usageTokensPerSecond } from './usageTimingColumns';
 
-describe('admin usage timing columns', () => {
+describe('usage timing columns', () => {
   it.each([
     [4999, 5000, 15000, 'normal'],
     [5000, 5000, 15000, 'slow'],
@@ -165,4 +165,3 @@ describe('column preferences', () => {
     expect([...readUsageColumnSelection([], defaults)]).toEqual(defaults);
   });
 });
-

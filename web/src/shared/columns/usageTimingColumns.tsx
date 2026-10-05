@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
-import { usageLatencyTone, type UsageColumnConfig, type UsageLatencyTone, type UsageRow } from '../../../shared/columns/usageColumns';
-import type { UsageLogResp } from '../../../shared/types';
+import { usageLatencyTone, type UsageColumnConfig, type UsageLatencyTone, type UsageRow } from './usageColumns';
+import type { UsageLogResp } from '../types';
 
 type TimingRow = Pick<UsageLogResp, 'output_tokens' | 'duration_ms' | 'first_token_ms' | 'stream' | 'account_type'>;
 
@@ -145,4 +145,3 @@ export function readUsageColumnSelection(value: unknown, defaults: readonly stri
   if (legacy && !keys.includes('tps')) keys.push('tps');
   return new Set(keys);
 }
-

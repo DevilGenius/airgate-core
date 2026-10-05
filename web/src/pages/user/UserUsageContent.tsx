@@ -13,7 +13,7 @@ import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
 import { Activity, DollarSign, Clock, Gauge, Percent, Sigma, Upload } from 'lucide-react';
 import type { UsageQuery } from '../../shared/types';
-import { UsageRichTooltipProvider, createUsageClientColumn, useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
+import { UsageRichTooltipProvider, fmtNum, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey, getTokenAPIKeyID } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
 import { RecordsTable } from '../../shared/components/RecordsTable';
@@ -32,7 +32,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { createPagedRowsStructuralSharing } from '../../shared/utils/structuralSharing';
 import { formatRateMultiplier } from '../../shared/utils/rateMultiplier';
 import { type MetricTone, METRIC_TONE_CLASSES, METRIC_TONE_STYLES } from '../../shared/ui/metricTones';
-import { combineUsageTimingColumns, createUsageTpsColumn } from '../admin/usage/usageTimingColumns';
+import { useUsageTableColumns } from '../../shared/columns/usageTableColumns';
 
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = STORAGE_KEYS.ui.userUsageAutoRefresh;
 const USER_USAGE_FILTER_STORAGE_KEY = STORAGE_KEYS.ui.userUsageFilters;
@@ -393,75 +393,7 @@ export default function UserUsageContent() {
     [filters, page, pageSize],
   );
 
-  const sharedColumns = useUsageColumns({ customerScope, adminView: false });
-  const columns = useMemo(() => {
-    const modelColumnIndex = sharedColumns.findIndex((column) => column.key === 'model');
-    const timeColumnIndex = sharedColumns.findIndex((column) => column.key === 'created_at');
-    const streamColumn = sharedColumns.find((column) => column.key === 'stream');
-    const timingKeys = new Set(['first_event_ms', 'first_token_ms', 'duration_ms']);
-    const timingColumns = combineUsageTimingColumns(
-      sharedColumns.filter((column) => timingKeys.has(column.key)),
-    );
-    const sharedColumnsAfterModel = sharedColumns
-      .slice(modelColumnIndex + 1)
-      .filter((column) => !timingKeys.has(column.key) && column.key !== 'stream');
-    const endpointColumn: UsageColumnConfig<UsageRow> = {
-      key: 'endpoint',
-      title: t('usage.endpoint', '端点'),
-      width: '180px',
-      hideOnMobile: true,
-      render: (row) => {
-        const endpoint = 'endpoint' in row && row.endpoint ? row.endpoint : '-';
-
-        return (
-          <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={endpoint}>
-            {endpoint}
-          </span>
-        );
-      },
-    };
-    const apiKeyColumn: UsageColumnConfig<UsageRow> = {
-      key: 'api_key',
-      title: 'API Key',
-      width: '96px',
-      hideOnMobile: true,
-      render: (row) => {
-        if (row.api_key_id === 0) {
-          return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_plugin_call')}</span>;
-        }
-        if ('api_key_deleted' in row && row.api_key_deleted) {
-          return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
-        }
-
-        const name = 'api_key_name' in row && row.api_key_name ? row.api_key_name : '-';
-
-        return (
-          <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
-        );
-      },
-    };
-    const tpsColumn = createUsageTpsColumn<UsageRow>(t);
-    const clientColumn = createUsageClientColumn(t);
-    return modelColumnIndex >= 0
-      ? [
-          ...sharedColumns.slice(0, timeColumnIndex + 1),
-          ...(customerScope ? [] : [apiKeyColumn]),
-          ...sharedColumns.slice(timeColumnIndex + 1, modelColumnIndex + 1),
-          ...(streamColumn ? [streamColumn] : []),
-          ...timingColumns,
-          tpsColumn,
-          ...sharedColumnsAfterModel,
-          endpointColumn,
-          clientColumn,
-        ]
-      : [
-          ...sharedColumns,
-          tpsColumn,
-          endpointColumn,
-          ...(customerScope ? [] : [apiKeyColumn]),
-          clientColumn,
-        ];
-  }, [customerScope, sharedColumns, t]);
+  const { columns } = useUsageTableColumns(customerScope ? 'apiKey' : 'user');
 
   return (
     <div>
