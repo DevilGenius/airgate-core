@@ -458,7 +458,7 @@ export default function UserUsageContent() {
       <PageToolbarFrame>
         <div className="ag-page-toolbar-filters">
           <div className="ag-page-toolbar-filter-row">
-            <div className="ag-toolbar-calendar w-full sm:w-72">
+            <div className="ag-toolbar-calendar">
               <UsageDateRangeFilter
                 clearLabel={t('common.clear')}
                 endDate={filters.end_date}

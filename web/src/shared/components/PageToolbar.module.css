@@ -1,3 +1,14 @@
+.toolbar {
+  /* Two controls plus a 0.75rem gap match one of four summary cards.
+     Keep controls readable as the container narrows, then wrap naturally. */
+  --ag-toolbar-control-width: max(10rem, calc(12.5cqw - 0.65625rem));
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-start;
+  min-width: 0;
+  container-type: inline-size;
+}
+
 .toolbar.toolbar {
   position: relative;
   gap: 0.875rem;
@@ -11,3 +22,77 @@
 
 .toolbar[data-flow='stack'] { margin-bottom: 0; }
 
+.toolbar > :where(:global(.ag-page-toolbar-filters)) {
+  flex: 1 1 32rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.toolbar :where(:global(.ag-page-toolbar-filter-row)) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.toolbar :where(:global(.ag-page-toolbar-filter-row)) > * {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.toolbar :where(:global(.ag-page-toolbar-filter-row) > :global(.ag-toolbar-control)) {
+  flex: 0 0 var(--ag-toolbar-control-width);
+  width: var(--ag-toolbar-control-width);
+}
+
+.toolbar :where(:global(.ag-toolbar-calendar)) {
+  flex: 0 1 20rem;
+  min-width: 0;
+}
+
+.toolbar :where(:global(.ag-toolbar-calendar) > :global(.ag-usage-date-range)) {
+  width: 100%;
+  min-width: 0;
+}
+
+.toolbar > :where(:global(.ag-page-toolbar-actions)) {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+  margin-inline-start: auto;
+}
+
+.toolbar > :where(:global(.ag-page-toolbar-actions)) > * {
+  max-width: 100%;
+}
+
+/* Mobile filters stay in two columns; desktop controls wrap continuously. */
+@media (width < 640px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar > :where(:global(.ag-page-toolbar-filters)) {
+    flex: 0 1 auto;
+  }
+
+  .toolbar :where(:global(.ag-page-toolbar-filter-row) > :global(.ag-toolbar-control)) {
+    flex: 0 0 calc((100% - 0.75rem) / 2);
+    width: calc((100% - 0.75rem) / 2);
+  }
+
+  .toolbar :where(:global(.ag-toolbar-calendar)) {
+    flex: 0 0 100%;
+    width: 100%;
+  }
+
+  .toolbar > :where(:global(.ag-page-toolbar-actions)) {
+    margin-inline-start: 0;
+  }
+}

@@ -25,7 +25,7 @@ export const PageToolbar = memo(function PageToolbar({
 }) {
   return (
     <PageToolbarFrame className={className}>
-      {children ? <div className="ag-page-toolbar-filters">{children}</div> : <div />}
+      {children ? <div className="ag-page-toolbar-filters">{children}</div> : null}
       {actions ? <div className="ag-page-toolbar-actions">{actions}</div> : null}
     </PageToolbarFrame>
   );

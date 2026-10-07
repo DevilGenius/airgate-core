@@ -1095,7 +1095,7 @@ export default function MonitorPage() {
           <div className="ag-page-toolbar-actions">
             <RefreshControl
               beforeRefresh={!isRequestTable ? (
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <NativeSwitch
                     ariaLabel={t('monitor.text_hash')}
                     className="ag-page-toolbar-switch"

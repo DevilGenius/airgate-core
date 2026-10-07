@@ -2,13 +2,15 @@
   max-width: 100%;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
+  overflow-x: auto;
 }
 
 .group {
   display: flex;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.25rem;
 }
@@ -16,6 +18,18 @@
 .group + .group {
   padding-inline-start: 0.5rem;
   border-inline-start: 1px solid var(--border);
+}
+
+@media (width < 640px) {
+  .filters {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .group {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+  }
 }
 
 .toggle {

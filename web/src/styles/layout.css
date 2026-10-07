@@ -63,34 +63,6 @@
   --ag-shell-footer-height: 2.625rem;
 }
 
-.ag-page-toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-}
-
-.ag-page-toolbar-filters {
-  min-width: 0;
-}
-
-.ag-page-toolbar-filter-row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.75rem;
-}
-
-.ag-page-toolbar-filter-row > * {
-  min-width: 0;
-}
-
-.ag-toolbar-calendar,
-.ag-toolbar-calendar > .ag-usage-date-range {
-  width: 100%;
-  min-width: 0;
-}
-
 /* One geometry contract for action buttons; dropdowns and square icon buttons
    reserve their own content space without changing height or corner radius. */
 .ag-page-toolbar .ag-page-toolbar-actions :is(.button, .ag-toolbar-menu-trigger) {
@@ -128,22 +100,9 @@
   flex-shrink: 0;
 }
 
-.ag-page-toolbar-actions {
-  display: flex;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.5rem;
-}
-
 .ag-page-toolbar {
-  container-type: inline-size;
   --ag-toolbar-standard-font-size: 0.875rem;
   --ag-toolbar-standard-line-height: 1.25rem;
-}
-
-.ag-page-toolbar {
   font-size: var(--ag-toolbar-standard-font-size);
   line-height: var(--ag-toolbar-standard-line-height);
 }
@@ -389,19 +348,6 @@
   line-height: 1;
 }
 
-.ag-page-toolbar--actions-only {
-  align-items: flex-end;
-}
-
-.ag-page-toolbar--actions-only .ag-page-toolbar-actions {
-  margin-left: auto;
-}
-
-.ag-page-toolbar .ag-toolbar-control {
-  width: 100%;
-  min-width: 0;
-}
-
 .ag-monitor-multi-filter-group {
   margin-top: 0.25rem;
   padding-top: 0.25rem;
@@ -414,63 +360,6 @@
   font-size: 0.6875rem;
   font-weight: 600;
   line-height: 1;
-}
-
-.ag-page-toolbar-filter-row {
-  gap: 0.75rem;
-}
-
-@media (min-width: 640px) {
-  .ag-page-toolbar-filter-row {
-    flex-flow: row wrap;
-    align-items: center;
-  }
-
-  .ag-page-toolbar-filter-row > * {
-    flex-shrink: 0;
-  }
-
-  .ag-page-toolbar .ag-toolbar-control {
-    flex-basis: var(--ag-toolbar-control-width);
-    width: var(--ag-toolbar-control-width);
-  }
-}
-
-@media (min-width: 1280px) {
-  .ag-page-toolbar {
-    --ag-toolbar-control-width: calc(12.5cqw - 0.65625rem);
-  }
-
-  .ag-page-toolbar {
-    flex-direction: row;
-    align-items: flex-start;
-  }
-
-  .ag-page-toolbar-filters {
-    flex: 1 1 auto;
-  }
-
-  .ag-page-toolbar-actions {
-    margin-left: auto;
-    flex-wrap: nowrap;
-    justify-content: flex-end;
-  }
-
-
-
-
-}
-
-@media (min-width: 1536px) {
-  .ag-page-toolbar {
-    --ag-toolbar-control-width: calc(12.5cqw - 0.875rem);
-  }
-
-  .ag-page-toolbar-filter-row {
-    gap: 1rem;
-  }
-
-
 }
 
 .ag-page-body {
@@ -831,7 +720,7 @@
   min-width: 0;
 }
 
-/* 在窄屏把三个主要筛选控件保持在同一行。 */
+/* 移动端保留刷新与两个筛选控件同一行的布局。 */
 @container ag-dashboard-shell (max-width: 63.99rem) {
   .ag-dashboard-page .ag-dashboard-toolbar {
     display: grid;

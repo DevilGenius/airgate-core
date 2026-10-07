@@ -63,7 +63,6 @@ html[data-theme="dark"] {
   --ag-dropdown-icon-size: 1rem;
   --ag-dropdown-arrow-width: 2.25rem;
   --ag-dropdown-padding-inline: 0.75rem;
-  --ag-toolbar-control-width: 10rem;
   --ag-toolbar-button-min-width: 7.5rem;
   --cursor-interactive: pointer;
   --cursor-disabled: not-allowed;
