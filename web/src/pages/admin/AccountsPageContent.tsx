@@ -1439,7 +1439,7 @@ export default function AccountsPageContent() {
   const importControlRef = useRef<HTMLDivElement | null>(null);
   const actionsNode = useMemo(() => (
     <>
-      <div className="inline-grid gap-2 md:grid-cols-2">
+      <div className="inline-grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <RefreshControl
           value={autoRefresh}
           options={ACCOUNT_AUTO_REFRESH_OPTIONS}
@@ -1452,11 +1452,19 @@ export default function AccountsPageContent() {
           isRefreshing={isAccountsFetching}
           isAutoRefreshing={isAccountsFetching || isUsageFetching}
         />
+        <Button
+          className="ag-page-toolbar-button hidden md:inline-flex"
+          variant="secondary"
+          onPress={() => setShowImportConfigModal(true)}
+        >
+          <Settings2 className="h-4 w-4" />
+          {t('accounts.import_config')}
+        </Button>
         <div className="hidden min-w-0 md:grid">
           <div ref={importControlRef} className={refreshControlStyles.control} role="group" aria-label={`${t('accounts.import')} / ${t('accounts.export')}`}>
             <button
               type="button"
-              className={refreshControlStyles.refresh}
+              className={`${refreshControlStyles.refresh} ${refreshControlStyles.centered}`}
               onClick={() => openAICompatImportEnabled ? setShowCompatImportModal(true) : importInputRef.current?.click()}
               disabled={isAnyImportPending}
               aria-busy={openAICompatImportEnabled ? isCompatImportPending : isImportPending}
@@ -1499,14 +1507,6 @@ export default function AccountsPageContent() {
           </div>
         </div>
       </div>
-      <Button
-        className="ag-page-toolbar-button hidden md:inline-flex"
-        variant="secondary"
-        onPress={() => setShowImportConfigModal(true)}
-      >
-        <Settings2 className="h-4 w-4" />
-        {t('accounts.import_config')}
-      </Button>
       <Button className="ag-page-toolbar-button" variant="primary" onPress={handleCreateAccount}>
         <Plus className="h-4 w-4" />
         {t('accounts.create')}

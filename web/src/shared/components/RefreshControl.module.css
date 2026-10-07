@@ -27,6 +27,10 @@
   cursor: pointer;
 }
 
+.control .refresh.centered {
+  justify-content: center;
+}
+
 .control .menu {
   flex: 0 0 var(--ag-dropdown-arrow-width, 2.25rem);
   border-inline-start: 1px solid var(--border);
