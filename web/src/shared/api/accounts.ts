@@ -1,4 +1,4 @@
-import { get, post, put, del, patch } from './client';
+import { get, post, put, del, patch, upload } from './client';
 import type {
   AccountResp, CreateAccountReq, UpdateAccountReq,
   AccountExportFile, ImportAccountsResp, AccountExportItem,
@@ -25,6 +25,13 @@ export type AccountListFilter = {
   sort_dir?: 'asc' | 'desc';
 };
 
+export interface CompatibleImportResult {
+  imported: number;
+  failed: number;
+  parsed: number;
+  issues?: Array<{ stage: string; file?: string; index?: number; level: string; message: string }>;
+}
+
 export const accountsApi = {
   list: (params: PageReq & AccountListFilter) =>
     get<PagedData<AccountResp>>('/api/v1/admin/accounts', params),
@@ -39,6 +46,16 @@ export const accountsApi = {
   // 批量导入账号
   import: (accounts: AccountExportItem[]) =>
     post<ImportAccountsResp>('/api/v1/admin/accounts/import', { version: 2, accounts }),
+  // Compatible UI import shares the credential API's server naming pipeline.
+  importCompatible: (platform: string, format: string, files: Array<{ name: string; content: string }>) => {
+    const body = new FormData();
+    body.append('platform', platform);
+    body.append('format', format);
+    for (const file of files) {
+      body.append('files', new Blob([file.content], { type: 'application/json' }), file.name);
+    }
+    return upload<CompatibleImportResult>('/api/v1/admin/accounts/import/compat', body);
+  },
   getImportConfig: () =>
     get<AccountImportConfigResp>('/api/v1/admin/accounts/import-config'),
   updateImportConfig: (dsl: string) =>

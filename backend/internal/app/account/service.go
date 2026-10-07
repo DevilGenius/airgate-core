@@ -565,24 +565,15 @@ func (s *Service) importAccounts(ctx context.Context, items []CreateInput, prese
 }
 
 func prepareImportAccount(input CreateInput, preserveAssignments bool) (CreateInput, error) {
-	input.Name = strings.TrimSpace(input.Name)
-	input.Platform = strings.ToLower(strings.TrimSpace(input.Platform))
-	input.Type = strings.ToLower(strings.TrimSpace(input.Type))
-	if input.Name == "" {
-		return CreateInput{}, errors.New("账号名称不能为空")
-	}
+	input = NormalizeCreateNaming(input)
 	if input.Platform == "" {
 		return CreateInput{}, errors.New("账号平台不能为空")
 	}
+	if !input.AutoName && input.Name == "" {
+		return CreateInput{}, errors.New("账号名称不能为空")
+	}
 	if len(input.Credentials) == 0 {
 		return CreateInput{}, errors.New("账号凭证不能为空")
-	}
-	if input.Type == "" {
-		if strings.TrimSpace(input.Credentials["api_key"]) != "" {
-			input.Type = "apikey"
-		} else {
-			input.Type = "oauth"
-		}
 	}
 	if input.MaxConcurrency < 0 {
 		return CreateInput{}, errors.New("账号容量不能小于 0")

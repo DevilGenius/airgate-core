@@ -470,6 +470,9 @@ func lockProxyForSlot(ctx context.Context, tx *ent.Tx, proxyID int) (*ent.Proxy,
 
 // Create 创建账号；同邮箱软删除账号会复用原行并恢复，同平台 OAuth 账号会刷新凭证。
 func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput) (appaccount.Account, error) {
+	if input.AutoName {
+		input = appaccount.NormalizeCreateNaming(input)
+	}
 	resolvedEmail, resolvedCredentials, identityErr := accountidentity.Resolve(input.Email, input.Credentials)
 	if identityErr != nil {
 		return appaccount.Account{}, mapAccountIdentityError(identityErr)
@@ -522,6 +525,16 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 				accountID = item.ID
 				break
 			}
+			// Restoring an existing row reuses its name, regardless of the new
+			// plan or credential type. Only a genuinely new account consumes an index.
+			if input.AutoName {
+				input.Name = existing.Name
+				input.AutoName = false
+			}
+			input.Name, err = allocateAccountName(ctx, tx, input)
+			if err != nil {
+				return appaccount.Account{}, err
+			}
 			builder := tx.Account.UpdateOneID(existing.ID).
 				Where(entaccount.DeletedAtNotNil()).
 				SetName(input.Name).
@@ -571,6 +584,10 @@ func (s *AccountStore) Create(ctx context.Context, input appaccount.CreateInput)
 	}
 
 	if accountID == 0 {
+		input.Name, err = allocateAccountName(ctx, tx, input)
+		if err != nil {
+			return appaccount.Account{}, err
+		}
 		builder := tx.Account.Create().
 			SetName(input.Name).
 			SetNillableEmail(input.Email).

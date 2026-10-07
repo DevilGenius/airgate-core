@@ -100,6 +100,7 @@ func (h *CredentialImportHandler) ImportCompatibleAccounts(c *gin.Context) {
 	for _, account := range parsed.Accounts {
 		rateMultiplier := account.RateMultiplier
 		inputs = append(inputs, appaccount.CreateInput{
+			AutoName:       true,
 			Name:           account.Name,
 			Email:          account.Email,
 			Platform:       req.Platform,

@@ -32,7 +32,7 @@ func TestParseUsesCapabilityTargetWithoutPublicPluginName(t *testing.T) {
 		},
 		result: apppluginadmin.ProxyResult{
 			StatusCode: http.StatusOK,
-			Body:       []byte(`{"format":"codex","accounts":[{"name":"one","type":"oauth","credentials":{"access_token":"token"},"priority":50,"max_concurrency":10,"rate_multiplier":1}],"renamed":true}`),
+			Body:       []byte(`{"format":"codex","accounts":[{"name":"one","type":"oauth","credentials":{"access_token":"token"},"priority":50,"max_concurrency":10,"rate_multiplier":1}]}`),
 		},
 	}
 	service := NewService(proxy)

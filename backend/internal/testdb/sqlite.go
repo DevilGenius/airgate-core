@@ -39,6 +39,17 @@ func OpenEnt(t *testing.T, dsn string, migrateOpts ...entschema.MigrateOption) *
 		_ = client.Close()
 		t.Fatalf("migrate sqlite test db: %v", err)
 	}
+	// SQL-managed table: intentionally separate from the accounts Ent schema.
+	if _, err := db.ExecContext(context.Background(), `CREATE TABLE IF NOT EXISTS account_name_counters (
+		platform TEXT NOT NULL,
+		naming_date DATE NOT NULL,
+		plan_type TEXT NOT NULL,
+		last_index BIGINT NOT NULL DEFAULT 0 CHECK (last_index >= 0),
+		PRIMARY KEY (platform, naming_date, plan_type)
+	)`); err != nil {
+		_ = client.Close()
+		t.Fatalf("create account name counters: %v", err)
+	}
 	return client
 }
 

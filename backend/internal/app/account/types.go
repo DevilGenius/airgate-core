@@ -142,6 +142,8 @@ type ListResult struct {
 
 // CreateInput 创建账号输入。
 type CreateInput struct {
+	// AutoName is set only by the compatible/credential API import pipeline.
+	AutoName                bool
 	Name                    string
 	Email                   *string
 	Platform                string

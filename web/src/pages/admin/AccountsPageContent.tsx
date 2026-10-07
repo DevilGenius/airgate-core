@@ -73,10 +73,6 @@ import {
   type BulkEditSelection,
 } from './accounts/bulkEditSupport';
 import { getPlatformPluginMap, parseAccountImportItems } from './accounts/accountUtils';
-import {
-  DEFAULT_ACCOUNT_MAX_CONCURRENCY,
-  DEFAULT_ACCOUNT_PRIORITY,
-} from './accounts/accountDefaults';
 import type {
   AccountResp,
   CreateAccountReq,
@@ -138,28 +134,6 @@ async function mapWithConcurrency<T, R>(
   await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
   return results;
 }
-
-type CompatImportIssue = {
-  file: string;
-  index?: number;
-  level: string;
-  message: string;
-};
-
-type CompatImportResponse = {
-  format: string;
-  renamed: boolean;
-  accounts: Array<{
-    name: string;
-    email?: string | null;
-    type?: string;
-    credentials: Record<string, string>;
-    priority?: number;
-    max_concurrency?: number;
-    rate_multiplier?: number;
-  }>;
-  issues?: CompatImportIssue[];
-};
 
 type RefreshTokenExchangeResult = CompatImportRTResult & {
   accountType?: string;
@@ -896,7 +870,6 @@ export default function AccountsPageContent() {
           return [{
             name: `refresh-token-${String(index + 1).padStart(3, '0')}.json`,
             content: JSON.stringify({
-              name: item.accountName || item.credentials.email || `openai-rt-${String(index + 1).padStart(3, '0')}`,
               type: item.accountType || 'oauth',
               credentials: item.credentials,
             }),
@@ -913,15 +886,7 @@ export default function AccountsPageContent() {
         compatFormat = 'account_json';
       }
 
-      const result = await pluginsApi.rpc<CompatImportResponse>(
-        openAIPluginID,
-        'accounts/import/compat',
-        { format: compatFormat, files: compatInputs },
-      );
-      if (!result.accounts?.length) {
-        toast('error', t('accounts.import_invalid'));
-        return false;
-      }
+      const result = await accountsApi.importCompatible('openai', compatFormat, compatInputs);
 
       if (result.issues?.length) {
         toast('warning', t('accounts.import_compat_issues', {
@@ -929,22 +894,13 @@ export default function AccountsPageContent() {
         }));
       }
 
-      const accounts: AccountExportItem[] = result.accounts.map((account) => ({
-        name: account.name,
-        email: account.email ?? null,
-        platform: 'openai',
-        type: account.type || 'oauth',
-        credentials: account.credentials,
-        priority: account.priority ?? DEFAULT_ACCOUNT_PRIORITY,
-        max_concurrency: account.max_concurrency ?? DEFAULT_ACCOUNT_MAX_CONCURRENCY,
-        rate_multiplier: account.rate_multiplier ?? 1,
-      }));
-      try {
-        await importMutation.mutateAsync(accounts);
-        return format !== 'refresh_token';
-      } catch {
-        return false;
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      if (result.failed > 0) {
+        toast('warning', t('accounts.import_partial', { imported: result.imported, failed: result.failed }));
+      } else {
+        toast('success', t('accounts.import_success', { count: result.imported }));
       }
+      return result.imported > 0 && format !== 'refresh_token';
     } catch (error) {
       toast('error', error instanceof Error ? error.message : t('accounts.import_invalid'));
       return false;

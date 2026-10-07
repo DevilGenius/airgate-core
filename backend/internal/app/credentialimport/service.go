@@ -55,7 +55,6 @@ type ParseResult struct {
 	Format   string         `json:"format"`
 	Accounts []AccountDraft `json:"accounts"`
 	Issues   []Issue        `json:"issues,omitempty"`
-	Renamed  bool           `json:"renamed"`
 }
 
 type ParserError struct {

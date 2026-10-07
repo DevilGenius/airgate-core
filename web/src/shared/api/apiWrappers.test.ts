@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { accountsApi } from './accounts';
 import { apikeysApi } from './apikeys';
 import { authApi } from './auth';
-import { del, get, patch, post, put } from './client';
+import { del, get, patch, post, put, upload } from './client';
 
 vi.mock('./client', () => ({
   del: vi.fn(),
@@ -10,6 +10,7 @@ vi.mock('./client', () => ({
   patch: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
+  upload: vi.fn(),
 }));
 
 describe('authApi', () => {
@@ -64,6 +65,16 @@ describe('apikeysApi', () => {
 describe('accountsApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('keeps compatible automatic imports separate from ordinary file import', () => {
+    accountsApi.importCompatible('openai', 'refresh_token', [{ name: 'tokens.txt', content: 'rt-input' }]);
+    expect(upload).toHaveBeenCalledWith('/api/v1/admin/accounts/import/compat', expect.any(FormData));
+    const form = vi.mocked(upload).mock.calls[0]![1];
+    expect(form.get('platform')).toBe('openai');
+    expect(form.get('format')).toBe('refresh_token');
+    expect((form.get('files') as File).name).toBe('tokens.txt');
+    expect(post).not.toHaveBeenCalled();
   });
 
   it('maps account list, export, mutation and runtime endpoints', () => {

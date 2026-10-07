@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"mime/multipart"
 	"net/http"
@@ -15,10 +16,71 @@ import (
 
 	"github.com/DevilGenius/airgate-core/ent/account"
 	appaccount "github.com/DevilGenius/airgate-core/internal/app/account"
+	appcredentialimport "github.com/DevilGenius/airgate-core/internal/app/credentialimport"
+	apppluginadmin "github.com/DevilGenius/airgate-core/internal/app/pluginadmin"
 	"github.com/DevilGenius/airgate-core/internal/infra/store"
 	"github.com/DevilGenius/airgate-core/internal/scheduler"
 	"github.com/DevilGenius/airgate-core/internal/testdb"
 )
+
+type namingImportParser struct{}
+
+func (namingImportParser) ResolveGatewayCapability(string, string) (apppluginadmin.CapabilityTarget, error) {
+	return apppluginadmin.CapabilityTarget{PluginName: "openai", Metadata: `{"formats":["account_json"]}`}, nil
+}
+
+func (namingImportParser) Proxy(context.Context, apppluginadmin.ProxyInput) (apppluginadmin.ProxyResult, error) {
+	return apppluginadmin.ProxyResult{StatusCode: http.StatusOK, Body: []byte(`{"accounts":[{"name":"Original File Name","type":"oauth","credentials":{"access_token":"complete","plan_type":"plus"},"priority":50,"max_concurrency":10,"rate_multiplier":1}]}`)}, nil
+}
+
+func TestCompatibleAndCredentialAPIShareAutomaticNaming(t *testing.T) {
+	db := testdb.OpenMemoryEnt(t, "compatible_naming")
+	defer db.Close()
+	svc := appaccount.NewService(store.NewAccountStore(db), nil, scheduler.NewConcurrencyManager(nil), nil)
+	h := NewCredentialImportHandler(NewAccountHandler(svc, nil), appcredentialimport.NewService(namingImportParser{}))
+	for _, tc := range []struct {
+		path      string
+		dry       bool
+		wantCount int
+	}{
+		{"/api/v1/admin/accounts/import/compat", true, 0},
+		{"/api/v1/admin/accounts/import/compat", false, 1},
+		{"/api/v1/credentials/accounts/import/compat", false, 2},
+	} {
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		for key, value := range map[string]string{"platform": "openai", "format": "account_json", "dry_run": strconv.FormatBool(tc.dry)} {
+			if err := writer.WriteField(key, value); err != nil {
+				t.Fatal(err)
+			}
+		}
+		part, err := writer.CreateFormFile("files", "account.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := part.Write([]byte(`{"access_token":"complete"}`)); err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Request = httptest.NewRequest(http.MethodPost, tc.path, body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+		h.ImportCompatibleAccounts(c)
+		items, err := db.Account.Query().Order(account.ByID()).All(t.Context())
+		if recorder.Code != http.StatusOK || err != nil || len(items) != tc.wantCount {
+			t.Fatalf("path=%s dry=%v count=%d err=%v body=%s", tc.path, tc.dry, len(items), err, recorder.Body.String())
+		}
+		for index, item := range items {
+			want := time.Now().In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("0102") + "-Plus-" + strconv.Itoa(index+1)
+			if item.Name != want {
+				t.Fatalf("got %q, want %q", item.Name, want)
+			}
+		}
+	}
+}
 
 func TestReadCompatibleImportRequest(t *testing.T) {
 	body := &bytes.Buffer{}
