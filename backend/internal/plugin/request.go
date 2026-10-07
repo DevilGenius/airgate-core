@@ -163,7 +163,6 @@ func usesLargeGatewayBodyLimit(path string) bool {
 	}
 	switch forwardpath.Normalize(path) {
 	case "/v1/responses", "/responses",
-		"/v1/responses/compact", "/responses/compact",
 		"/v1/chat/completions", "/chat/completions",
 		"/v1/messages", "/messages",
 		"/v1/messages/count_tokens", "/messages/count_tokens":

@@ -74,7 +74,7 @@ func (f *Forwarder) checkAPIKeyRPM(c *gin.Context, state *forwardState) bool {
 
 func isResponsesAPIPath(path string) bool {
 	switch forwardpath.Normalize(path) {
-	case "/v1/responses", "/responses", "/v1/responses/compact", "/responses/compact":
+	case "/v1/responses", "/responses":
 		return true
 	default:
 		return false

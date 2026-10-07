@@ -13,7 +13,7 @@ type requestBodyFillReader struct{}
 func (requestBodyFillReader) Read(p []byte) (int, error) { return len(p), nil }
 
 func TestMultimodalRequestBodyBoundary(t *testing.T) {
-	for _, path := range []string{"/v1/responses", "/v1/responses/compact", "/v1/chat/completions", "/v1/messages", "/v1/images/edits"} {
+	for _, path := range []string{"/v1/responses", "/v1/chat/completions", "/v1/messages", "/v1/images/edits"} {
 		for _, size := range []int64{96 << 20, (96 << 20) + 1} {
 			// Exercise chunked bodies too: admission must not depend on Content-Length.
 			body := io.NopCloser(io.LimitReader(requestBodyFillReader{}, size))
@@ -42,8 +42,6 @@ func TestGatewayBodyLimit(t *testing.T) {
 	}{
 		{name: "responses", path: "/v1/responses", want: largeGatewayBodyLimit},
 		{name: "responses alias", path: "/responses", want: largeGatewayBodyLimit},
-		{name: "responses compact", path: "/v1/responses/compact", want: largeGatewayBodyLimit},
-		{name: "responses compact alias", path: "/responses/compact", want: largeGatewayBodyLimit},
 		{name: "chat completions", path: "/v1/chat/completions", want: largeGatewayBodyLimit},
 		{name: "chat completions alias", path: "/chat/completions", want: largeGatewayBodyLimit},
 		{name: "messages", path: "/v1/messages", want: largeGatewayBodyLimit},
