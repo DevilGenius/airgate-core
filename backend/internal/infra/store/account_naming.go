@@ -32,7 +32,7 @@ func allocateAccountNameAt(ctx context.Context, tx *ent.Tx, input appaccount.Cre
 	if err := tx.Driver().Query(ctx, query, []any{input.Platform, current.Format("2006-01-02"), plan}, &rows); err != nil {
 		return "", fmt.Errorf("allocate account name: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var index int64
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {

@@ -35,7 +35,7 @@ func (namingImportParser) Proxy(context.Context, apppluginadmin.ProxyInput) (app
 
 func TestCompatibleAndCredentialAPIShareAutomaticNaming(t *testing.T) {
 	db := testdb.OpenMemoryEnt(t, "compatible_naming")
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	svc := appaccount.NewService(store.NewAccountStore(db), nil, scheduler.NewConcurrencyManager(nil), nil)
 	h := NewCredentialImportHandler(NewAccountHandler(svc, nil), appcredentialimport.NewService(namingImportParser{}))
 	for _, tc := range []struct {

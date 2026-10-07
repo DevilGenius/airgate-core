@@ -13,7 +13,7 @@ import (
 
 func TestAccountNamingScopesRollbackAndManualNames(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewAccountStore(db)
 	ctx := t.Context()
 	create := func(input appaccount.CreateInput, want string) appaccount.Account {
@@ -46,7 +46,7 @@ func TestAccountNamingScopesRollbackAndManualNames(t *testing.T) {
 
 func TestAccountNamingReauthorizationAndRestore(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewAccountStore(db)
 	email := "naming@example.com"
 	input := appaccount.CreateInput{AutoName: true, Platform: "openai", Type: "oauth", Email: &email, Credentials: map[string]string{"access_token": "one"}}
@@ -83,7 +83,7 @@ func TestAccountNamingPersistsAcrossReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 	db = testdb.OpenEnt(t, dsn)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	got, err := NewAccountStore(db).Create(t.Context(), input)
 	if err != nil || got.Name != namingToday()+"-Unknown-2" {
 		t.Fatalf("counter lost after reopening: %q, %v", got.Name, err)
@@ -92,7 +92,7 @@ func TestAccountNamingPersistsAcrossReopen(t *testing.T) {
 
 func TestAccountNamingConcurrentCreation(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewAccountStore(db)
 	const count = 16
 	var wg sync.WaitGroup
@@ -131,12 +131,12 @@ func namingToday() string {
 
 func TestAccountNamingDatePlanAndTimezone(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	tx, err := db.Tx(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	boundary := time.Date(2026, 10, 7, 16, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
 		plan string
@@ -168,7 +168,7 @@ func TestAccountNamingDatePlanAndTimezone(t *testing.T) {
 
 func TestExistingAccountKeepsOriginalNameWithoutAllocatingNewPlanIndex(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewAccountStore(db)
 	email := "existing@example.com"
 	input := appaccount.CreateInput{Platform: "openai", Type: "oauth", Email: &email,
@@ -203,7 +203,7 @@ func TestExistingAccountKeepsOriginalNameWithoutAllocatingNewPlanIndex(t *testin
 
 func TestOrdinaryImportKeepsNamesAndDoesNotAllocate(t *testing.T) {
 	db := enttestOpen(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := appaccount.NewService(NewAccountStore(db), nil, nil, nil)
 	input := appaccount.CreateInput{Platform: "openai", Type: "oauth", Name: "Original Import Name", Credentials: map[string]string{"access_token": "token", "plan_type": "plus"}}
 	summary := s.ImportConfigured(t.Context(), []appaccount.CreateInput{input})
