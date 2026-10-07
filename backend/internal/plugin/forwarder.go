@@ -497,7 +497,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				}
 				attemptLogger.Warn("forward_model_reroute_rejected",
 					"attempt", totalAttempts,
-					"reroute_client_model", strings.TrimSpace(execution.outcome.RerouteClientModel),
+					"fallback_reason", execution.outcome.ModelFallbackReason,
 					sdk.LogFieldReason, judgmentReason(execution),
 				)
 			}
@@ -969,7 +969,7 @@ func (f *Forwarder) resolveModelReroute(
 	if c == nil || state == nil || state.keyInfo == nil || state.modelReroutes >= maxModelReroutes || execution.err != nil {
 		return "", nil, routing.Requirements{}, false
 	}
-	targetClientModel, ok := execution.outcome.ModelRerouteClientTarget()
+	targetClientModel, ok := dispatchresolver.FallbackTarget(state.requestedPlatform, state.keyInfo.GroupDispatchResolver, requestTransportMethod(c.Request), state.requestPath, state.dispatchPlan, execution.outcome)
 	if !ok || (state.stream && c.Writer.Written()) {
 		return "", nil, routing.Requirements{}, false
 	}

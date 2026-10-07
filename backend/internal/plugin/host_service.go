@@ -812,7 +812,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			}
 
 			if fwdErr == nil && modelReroutes < maxModelReroutes {
-				if targetClientModel, requested := outcome.ModelRerouteClientTarget(); requested {
+				if targetClientModel, requested := hostFallbackTarget(route, req, plan, outcome); requested {
 					if plans, ok := hostModelReroutePlans(route, req, plan.ClientModel, targetClientModel); ok {
 						chain = newDispatchChain(plans)
 						modelReroutes++
@@ -1037,7 +1037,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 				return cerr
 			}
 			if !fw.committed && fwdErr == nil && modelReroutes < maxModelReroutes {
-				if targetClientModel, requested := outcome.ModelRerouteClientTarget(); requested {
+				if targetClientModel, requested := hostFallbackTarget(route, req, plan, outcome); requested {
 					if plans, ok := hostModelReroutePlans(route, req, plan.ClientModel, targetClientModel); ok {
 						chain = newDispatchChain(plans)
 						modelReroutes++
@@ -2085,4 +2085,12 @@ func cloneDispatchPlansHost(input []sdk.DispatchPlan) []sdk.DispatchPlan {
 // 与 account.buildProxyURL 等价，但接收 ent.Proxy 而非 service.Proxy。
 func proxyURLFromAccount(a *ent.Account) string {
 	return buildProxyURLFromEnt(a)
+}
+
+func hostFallbackTarget(route routing.Candidate, req hostForwardRequest, plan sdk.DispatchPlan, outcome sdk.ForwardOutcome) (string, bool) {
+	group := routegraph.Group(route.GroupID)
+	if group == nil {
+		return "", false
+	}
+	return dispatchresolver.FallbackTarget(route.Platform, group.DispatchResolver, hostForwardMethod(req), req.Path, plan, outcome)
 }

@@ -14,13 +14,14 @@ type CompiledResolver struct {
 }
 
 type compiledRule struct {
-	id             string
-	when           compiledWhen
-	stripSuffix    string
-	operation      string
-	timeoutProfile string
-	gate           sdk.DispatchGate
-	candidates     []sdk.DispatchCandidate
+	id                    string
+	when                  compiledWhen
+	stripSuffix           string
+	operation             string
+	timeoutProfile        string
+	contextWindowFallback string
+	gate                  sdk.DispatchGate
+	candidates            []sdk.DispatchCandidate
 }
 
 type compiledWhen struct {
@@ -85,13 +86,14 @@ func Compile(dsl sdk.DispatchDSL) *CompiledResolver {
 			continue
 		}
 		rules = append(rules, compiledRule{
-			id:             strings.TrimSpace(rule.ID),
-			when:           compileWhen(rule.When),
-			stripSuffix:    strings.TrimSpace(rule.Model.StripSuffix),
-			operation:      strings.TrimSpace(rule.Operation),
-			timeoutProfile: strings.TrimSpace(rule.TimeoutProfile),
-			gate:           rule.Gate,
-			candidates:     append([]sdk.DispatchCandidate(nil), rule.Candidates...),
+			id:                    strings.TrimSpace(rule.ID),
+			when:                  compileWhen(rule.When),
+			stripSuffix:           strings.TrimSpace(rule.Model.StripSuffix),
+			operation:             strings.TrimSpace(rule.Operation),
+			timeoutProfile:        strings.TrimSpace(rule.TimeoutProfile),
+			gate:                  rule.Gate,
+			contextWindowFallback: strings.TrimSpace(rule.ContextWindowFallback),
+			candidates:            append([]sdk.DispatchCandidate(nil), rule.Candidates...),
 		})
 	}
 	if len(rules) == 0 {
@@ -134,20 +136,8 @@ func ResolveDispatchPlans(platform string, groupResolver *CompiledResolver, meth
 
 // ResolveDispatchPlans 用编译后的 resolver 解析一次请求。
 func (r *CompiledResolver) ResolveDispatchPlans(method, path, clientModel string) []sdk.DispatchPlan {
-	if r == nil || len(r.rules) == 0 {
-		return nil
-	}
-	normalizedMethod := strings.ToUpper(strings.TrimSpace(method))
-	normalizedPath := forwardpath.Normalize(path)
-	model := strings.TrimSpace(clientModel)
-
-	for _, rule := range r.rules {
-		if !rule.when.matches(normalizedMethod, normalizedPath, model) {
-			continue
-		}
-		if plans := rule.renderPlans(model); len(plans) > 0 {
-			return plans
-		}
+	if rule := r.matchRule(method, path, clientModel); rule != nil {
+		return rule.renderPlans(clientModel)
 	}
 	return nil
 }
@@ -265,14 +255,7 @@ func (w compiledWhen) matches(method, path, model string) bool {
 
 func (r compiledRule) renderPlans(clientModel string) []sdk.DispatchPlan {
 	clientModel = strings.TrimSpace(clientModel)
-	modelBase := clientModel
-	if suffix := strings.TrimSpace(r.stripSuffix); suffix != "" {
-		modelKey := strings.ToLower(clientModel)
-		suffixKey := strings.ToLower(suffix)
-		if strings.HasSuffix(modelKey, suffixKey) && len(clientModel) > len(suffix) {
-			modelBase = strings.TrimSpace(clientModel[:len(clientModel)-len(suffix)])
-		}
-	}
+	modelBase := r.baseModel(clientModel)
 	out := make([]sdk.DispatchPlan, 0, len(r.candidates))
 	seen := make(map[string]struct{}, len(r.candidates))
 	for _, candidate := range r.candidates {

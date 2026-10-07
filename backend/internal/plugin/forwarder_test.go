@@ -956,10 +956,17 @@ func TestApplyModelRerouteRebuildsDispatchPlan(t *testing.T) {
 	}
 
 	forwarder := &Forwarder{}
+	setFallback := func(target string) {
+		rules := append([]sdk.DispatchRule{{When: sdk.DispatchWhen{Models: []string{"gpt-short", "gpt-long"}}, ContextWindowFallback: target, Candidates: []sdk.DispatchCandidate{{Scheduling: "${model}"}}}}, longContextDSL.Rules...)
+		// Keep the long target's explicit pool mapping before the short fallback rule.
+		rules = append(append([]sdk.DispatchRule(nil), longContextDSL.Rules...), rules[0])
+		state.keyInfo.GroupDispatchResolver = dispatchresolver.Compile(sdk.DispatchDSL{Rules: rules})
+	}
+	setFallback("gpt-unavailable")
 	invalidExecution := forwardExecution{outcome: sdk.ForwardOutcome{
-		Kind:               sdk.OutcomeSuccess,
-		FailoverScope:      sdk.FailoverScopeModelReroute,
-		RerouteClientModel: "gpt-long",
+		Kind:                sdk.OutcomeSuccess,
+		FailoverScope:       sdk.FailoverScopeModelReroute,
+		ModelFallbackReason: sdk.ModelFallbackContextWindow,
 	}}
 	if _, _, _, ok := forwarder.resolveModelReroute(c, state, invalidExecution); ok {
 		t.Fatal("successful outcome must not request a model reroute")
@@ -970,24 +977,25 @@ func TestApplyModelRerouteRebuildsDispatchPlan(t *testing.T) {
 		SchedulingModel: "long-context-pool",
 		WireModel:       "internal-long-wire",
 	}
+	// Core rejects a fallback to the current client model.
 	alreadyLongExecution := forwardExecution{outcome: sdk.ForwardOutcome{
-		Kind:               sdk.OutcomeClientError,
-		FailoverScope:      sdk.FailoverScopeModelReroute,
-		RerouteClientModel: "gpt-long",
+		Kind:                sdk.OutcomeClientError,
+		FailoverScope:       sdk.FailoverScopeModelReroute,
+		ModelFallbackReason: sdk.ModelFallbackContextWindow,
 	}}
 	if _, _, _, ok := forwarder.resolveModelReroute(c, &alreadyLongState, alreadyLongExecution); ok {
 		t.Fatal("a request already resolved from the long-context client model must not reroute")
 	}
 
 	execution := forwardExecution{outcome: sdk.ForwardOutcome{
-		Kind:               sdk.OutcomeClientError,
-		FailoverScope:      sdk.FailoverScopeModelReroute,
-		RerouteClientModel: "gpt-unavailable",
+		Kind:                sdk.OutcomeClientError,
+		FailoverScope:       sdk.FailoverScopeModelReroute,
+		ModelFallbackReason: sdk.ModelFallbackContextWindow,
 	}}
 	if _, _, _, ok := forwarder.resolveModelReroute(c, state, execution); ok {
 		t.Fatal("model reroute must reject a target with no eligible account")
 	}
-	execution.outcome.RerouteClientModel = "gpt-long"
+	setFallback("gpt-long")
 	targetModel, plans, requirements, ok := forwarder.resolveModelReroute(c, state, execution)
 	if !ok {
 		t.Fatal("model reroute should be applied")
@@ -1013,7 +1021,7 @@ func TestApplyModelRerouteRebuildsDispatchPlan(t *testing.T) {
 	if state.modelReroutes != 1 {
 		t.Fatalf("model reroute count = %d, want 1", state.modelReroutes)
 	}
-	execution.outcome.RerouteClientModel = "gpt-other"
+	setFallback("gpt-other")
 	if _, _, _, ok := forwarder.resolveModelReroute(c, state, execution); ok {
 		t.Fatal("a second model reroute must be rejected")
 	}
