@@ -1,8 +1,9 @@
 package dispatchresolver
 
 import (
-	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 	"testing"
+
+	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
 func TestFallbackTargetIsResolvedOnlyInsideCore(t *testing.T) {

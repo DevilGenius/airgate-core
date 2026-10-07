@@ -1,9 +1,10 @@
 package dispatchresolver
 
 import (
+	"strings"
+
 	"github.com/DevilGenius/airgate-core/internal/forwardpath"
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
-	"strings"
 )
 
 // FallbackTarget keeps fallback policy in Core. Execution plans sent to plugins
