@@ -16,6 +16,10 @@ export interface AccountTestStreamHandlers {
   onRawError?: (message: string) => void;
 }
 
+export function isRateLimitWarning(error?: string): boolean {
+  return !!error && /\b429\b|rate[\s_-]*limit(?:ed|ing)?|too many requests|限流/i.test(error);
+}
+
 export function filterConnectivityTestModels(models: ModelInfo[] | null | undefined): ModelInfo[] {
   const filtered = (models ?? []).filter((model) => !model.id.toLowerCase().startsWith('gpt-image-'));
   const lunaIndex = filtered.findIndex((model) => model.id.toLowerCase() === 'gpt-5.6-luna');

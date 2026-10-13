@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Label, useOverlayState } from '@heroui/react';
-import { Play, RotateCcw, Copy, Check, X, Server } from 'lucide-react';
+import { AlertTriangle, Play, RotateCcw, Copy, Check, X, Server } from 'lucide-react';
 import { getPluginPlatformIcon, getPlatformIconVersion, onPlatformIconChange } from '../../app/plugin-frontend-registry';
 import { AccountPlatformTypeIcons } from './accounts/AccountPlatformTypeIcons';
 import { accountIdentityDisplay } from './accounts/AccountIdentityCell';
@@ -12,6 +12,7 @@ import { useBackgroundTestNotification } from './accounts/useBackgroundTestNotif
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import {
   filterConnectivityTestModels,
+  isRateLimitWarning,
   runAccountConnectivityTest,
 } from './accounts/accountTestRunner';
 import type { AccountResp, ModelInfo } from '../../shared/types';
@@ -62,7 +63,7 @@ export function AccountTestModal({
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [cognitionDegraded, setCognitionDegraded] = useState(false);
+  const [cognitionDegraded, setCognitionDegraded] = useState<boolean | null>(null);
   const [timing, setTiming] = useState<TestTiming | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -108,7 +109,7 @@ export function AccountTestModal({
     setOutputLines([]);
     setStreamingContent('');
     setErrorMessage('');
-    setCognitionDegraded(false);
+    setCognitionDegraded(null);
     setTiming(null);
     setSelectedModel('');
     setModels([]);
@@ -138,7 +139,7 @@ export function AccountTestModal({
     setStreamingContent('');
     streamingRef.current = '';
     setErrorMessage('');
-    setCognitionDegraded(false);
+    setCognitionDegraded(null);
     setTiming(null);
     setStatus('connecting');
 
@@ -146,6 +147,7 @@ export function AccountTestModal({
 
     const controller = new AbortController();
     abortRef.current = controller;
+    const startedAt = performance.now();
 
     try {
       const result = await runAccountConnectivityTest({
@@ -166,37 +168,35 @@ export function AccountTestModal({
             setStreamingContent(streamingRef.current);
             scrollToBottom();
           },
-          onRawError: (message) => addLine(message, 'text-red-400'),
+          onRawError: (message) => addLine(message, isRateLimitWarning(message) ? 'text-yellow-400' : 'text-red-400'),
         },
       });
 
       if (controller.signal.aborted) return;
-      setCognitionDegraded(result.cognitionDegraded === true);
+      setCognitionDegraded(result.cognitionDegraded ?? null);
+      setTiming({
+        firstEventMs: result.firstEventMs ?? null,
+        durationMs: result.durationMs ?? Math.round(performance.now() - startedAt),
+      });
       if (streamingRef.current) {
         addLine(streamingRef.current, 'text-green-300');
         streamingRef.current = '';
         setStreamingContent('');
       }
       if (result.success) {
-        if (result.cognitionDegraded === false) addLine('降智检测：正常，回复命中正则', 'text-green-300');
-        setTiming({
-          firstEventMs: result.firstEventMs ?? null,
-          durationMs: result.durationMs ?? 0,
-        });
         setStatus('success');
       } else {
-        setTiming(null);
         setStatus('error');
         setErrorMessage(result.error || t('accounts.test_error'));
       }
       onTestComplete?.(account.id, result.success);
     } catch (err) {
       if ((err as Error).name === 'AbortError' || controller.signal.aborted) return;
-      setTiming(null);
+      setTiming({ firstEventMs: null, durationMs: Math.round(performance.now() - startedAt) });
       setStatus('error');
       const msg = (err as Error).message;
       setErrorMessage(msg);
-      addLine(msg, 'text-red-400');
+      addLine(msg, isRateLimitWarning(msg) ? 'text-yellow-400' : 'text-red-400');
       onTestComplete?.(account.id, false);
     }
   }, [account, selectedModel, addLine, onTestComplete, scrollToBottom, t]);
@@ -208,7 +208,9 @@ export function AccountTestModal({
 
   const clipboardCopy = useClipboard();
   const handleCopy = async () => {
-    const text = outputLines.map((l) => l.text).join('\n') + (streamingContent ? '\n' + streamingContent : '');
+    const text = outputLines.map((l) => l.text).join('\n')
+      + (streamingContent ? '\n' + streamingContent : '')
+      + (status === 'success' && cognitionDegraded === false ? '\n\n降智检测：正常' : '');
     await clipboardCopy(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -222,12 +224,14 @@ export function AccountTestModal({
     },
   });
 
+  const rateLimited = status === 'error' && isRateLimitWarning(errorMessage);
+
   useBackgroundTestNotification({
     open,
     running: status === 'connecting' || status === 'streaming',
     finished: status === 'success' || status === 'error',
     title: `${t('accounts.test_modal_title')} · ${account?.name ?? ''}`,
-    type: cognitionDegraded ? 'cognition' : status === 'error' ? 'error' : 'success',
+    type: rateLimited ? 'warning' : cognitionDegraded ? 'cognition' : status === 'error' ? 'error' : 'success',
     onRestore,
   });
 
@@ -328,12 +332,22 @@ export function AccountTestModal({
                             <span className="animate-pulse">_</span>
                           </span>
                         )}
-                        {status === 'success' && (
-                          <div className="mt-1">
-                            <div className="text-green-400">
-                              <Check className="w-3.5 h-3.5 inline mr-1" />
-                              {t('accounts.test_done')}
-                            </div>
+                        {(status === 'success' || status === 'error') && (
+                          <div className="mt-3 border-t border-gray-700 pt-3">
+                            {status === 'success' && cognitionDegraded === false && (
+                              <div className="text-green-300">
+                                <Check className="w-3.5 h-3.5 inline mr-1" />
+                                降智检测：正常
+                              </div>
+                            )}
+                            {status === 'error' && (
+                              <div className={rateLimited ? 'text-yellow-400' : cognitionDegraded ? 'text-[#a855f7]' : 'text-red-400'}>
+                                {rateLimited || cognitionDegraded
+                                  ? <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />
+                                  : <X className="w-3.5 h-3.5 inline mr-1" />}
+                                {errorMessage || t('accounts.test_error')}
+                              </div>
+                            )}
                             {timing && (
                               <div className="mt-0.5 text-gray-400">
                                 {t('accounts.test_timing', {
@@ -342,12 +356,6 @@ export function AccountTestModal({
                                 })}
                               </div>
                             )}
-                          </div>
-                        )}
-                        {status === 'error' && (
-                          <div className={`mt-1 ${cognitionDegraded ? 'text-[#a855f7]' : 'text-red-400'}`}>
-                            <X className="w-3.5 h-3.5 inline mr-1" />
-                            {errorMessage || t('accounts.test_error')}
                           </div>
                         )}
                       </>

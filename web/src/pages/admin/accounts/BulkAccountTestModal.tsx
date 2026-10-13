@@ -11,6 +11,7 @@ import { useBackgroundTestNotification } from './useBackgroundTestNotification';
 import type { AccountResp, ModelInfo } from '../../../shared/types';
 import {
   filterConnectivityTestModels,
+  isRateLimitWarning,
   runAccountConnectivityTest,
   type AccountTestRunResult,
 } from './accountTestRunner';
@@ -508,7 +509,3 @@ function TestStatusIcon({ status }: { status: ItemStatus }) {
   return <span className="h-3 w-3 rounded-full border border-[var(--ag-glass-border)]" />;
 }
 
-function isRateLimitWarning(error?: string): boolean {
-  if (!error) return false;
-  return /\b429\b|rate[\s_-]*limit(?:ed|ing)?|too many requests/i.test(error);
-}
