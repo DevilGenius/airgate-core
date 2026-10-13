@@ -14,6 +14,7 @@ interface CommonModalProps {
   footer?: ReactNode;
   icon?: ReactNode;
   iconClassName?: string;
+  onCloseTrigger?: () => void;
   placement?: ModalContainerProps['placement'];
   scroll?: ModalContainerProps['scroll'];
   showCloseTrigger?: boolean;
@@ -35,6 +36,7 @@ export function CommonModal({
   description,
   dialogStyle,
   footer,
+  onCloseTrigger,
   placement = 'auto',
   scroll = 'inside',
   showCloseTrigger = true,
@@ -50,7 +52,12 @@ export function CommonModal({
       <Modal.Backdrop>
         <Modal.Container placement={placement} scroll={scroll} size={size}>
           <Modal.Dialog className={cx('ag-elevation-modal', className)} style={dialogStyle}>
-            {showCloseTrigger ? <Modal.CloseTrigger className="ag-modal-close-trigger" /> : null}
+            {showCloseTrigger ? (
+              onCloseTrigger ? (
+                // Opt out of the dialog's close slot to keep explicit close separate from dismissal.
+                <Modal.CloseTrigger className="ag-modal-close-trigger" slot={null} onPress={onCloseTrigger} />
+              ) : <Modal.CloseTrigger className="ag-modal-close-trigger" />
+            ) : null}
             <Modal.Header
               className={cx(
                 'ag-modal-header',

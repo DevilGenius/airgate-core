@@ -8,6 +8,7 @@ import { accountIdentityDisplay } from './accounts/AccountIdentityCell';
 import { accountsApi } from '../../shared/api/accounts';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { CommonModal } from '../../shared/components/CommonModal';
+import { useBackgroundTestNotification } from './accounts/useBackgroundTestNotification';
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import {
   filterConnectivityTestModels,
@@ -36,6 +37,8 @@ interface AccountTestModalProps {
   open: boolean;
   account: AccountResp | null;
   onClose: () => void;
+  onBackground: () => void;
+  onRestore: () => void;
   onTestComplete?: (accountId: number, success: boolean) => void;
 }
 
@@ -43,6 +46,8 @@ export function AccountTestModal({
   open,
   account,
   onClose,
+  onBackground,
+  onRestore,
   onTestComplete,
 }: AccountTestModalProps) {
   const { t } = useTranslation();
@@ -57,6 +62,7 @@ export function AccountTestModal({
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [cognitionDegraded, setCognitionDegraded] = useState(false);
   const [timing, setTiming] = useState<TestTiming | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -67,7 +73,7 @@ export function AccountTestModal({
 
   // 加载模型列表
   useEffect(() => {
-    if (!open || !accountId) return;
+    if (!accountId) return;
     let active = true;
     setModels([]);
     setSelectedModel('');
@@ -92,9 +98,9 @@ export function AccountTestModal({
     return () => {
       active = false;
     };
-  }, [open, accountId]);
+  }, [accountId]);
 
-  // 关闭弹窗或切换账号时，重置为完整的单账号测试初始态。
+  // Visibility changes must not reset a background test.
   useEffect(() => {
     abortRef.current?.abort();
     streamingRef.current = '';
@@ -102,12 +108,14 @@ export function AccountTestModal({
     setOutputLines([]);
     setStreamingContent('');
     setErrorMessage('');
+    setCognitionDegraded(false);
     setTiming(null);
     setSelectedModel('');
     setModels([]);
-    setLoadingModels(Boolean(open && accountId));
+    setLoadingModels(Boolean(accountId));
     setCopied(false);
-  }, [open, accountId]);
+    return () => abortRef.current?.abort();
+  }, [accountId]);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -130,6 +138,7 @@ export function AccountTestModal({
     setStreamingContent('');
     streamingRef.current = '';
     setErrorMessage('');
+    setCognitionDegraded(false);
     setTiming(null);
     setStatus('connecting');
 
@@ -161,6 +170,8 @@ export function AccountTestModal({
         },
       });
 
+      if (controller.signal.aborted) return;
+      setCognitionDegraded(result.cognitionDegraded === true);
       if (streamingRef.current) {
         addLine(streamingRef.current, 'text-green-300');
         streamingRef.current = '';
@@ -180,7 +191,7 @@ export function AccountTestModal({
       }
       onTestComplete?.(account.id, result.success);
     } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
+      if ((err as Error).name === 'AbortError' || controller.signal.aborted) return;
       setTiming(null);
       setStatus('error');
       const msg = (err as Error).message;
@@ -205,8 +216,17 @@ export function AccountTestModal({
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
-      if (!nextOpen) handleClose();
+      if (!nextOpen) onBackground();
     },
+  });
+
+  useBackgroundTestNotification({
+    open,
+    running: status === 'connecting' || status === 'streaming',
+    finished: status === 'success' || status === 'error',
+    title: `${t('accounts.test_modal_title')} · ${account?.name ?? ''}`,
+    type: cognitionDegraded ? 'cognition' : status === 'error' ? 'error' : 'success',
+    onRestore,
   });
 
   if (!account || !identity) return null;
@@ -221,10 +241,11 @@ export function AccountTestModal({
   return (
     <CommonModal
       className="ag-account-page-modal ag-account-test-modal"
+      onCloseTrigger={handleClose}
       footer={(
         <div className="flex w-full justify-end gap-2">
           <Button variant="secondary" onPress={handleClose}>
-            {t('common.close')}
+            {isRunning ? t('common.cancel') : t('common.close')}
           </Button>
           <Button
             variant={status === 'error' ? 'danger' : 'primary'}
@@ -322,7 +343,7 @@ export function AccountTestModal({
                           </div>
                         )}
                         {status === 'error' && (
-                          <div className="text-red-400 mt-1">
+                          <div className={`mt-1 ${cognitionDegraded ? 'text-[#a855f7]' : 'text-red-400'}`}>
                             <X className="w-3.5 h-3.5 inline mr-1" />
                             {errorMessage || t('accounts.test_error')}
                           </div>

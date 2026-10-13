@@ -269,8 +269,9 @@ export default function AccountsPageContent() {
   const [showCompatImportModal, setShowCompatImportModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountResp | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<AccountResp | null>(null);
-  const [testingAccount, setTestingAccount] = useState<AccountResp | null>(null);
-  const [bulkTestAccounts, setBulkTestAccounts] = useState<AccountResp[] | null>(null);
+  const [testSessions, setTestSessions] = useState<Array<{ id: number; bulk: boolean; accounts: AccountResp[] }>>([]);
+  const [visibleTestSession, setVisibleTestSession] = useState<number | null>(null);
+  const nextTestSessionId = useRef(0);
   const [statsAccountId, setStatsAccountId] = useState<number | null>(null);
 
   // 批量选择状态
@@ -298,8 +299,7 @@ export default function AccountsPageContent() {
     || bulkEditSelection !== null
     || bulkDeleteIds !== null
     || bulkRefreshTargets !== null
-    || bulkTestAccounts !== null
-    || testingAccount !== null
+    || visibleTestSession !== null
     || statsAccountId !== null;
   useAccountModalRootIsolation(isAnyAccountModalOpen);
   const markModalOpenStart = useAccountModalPerfMonitor(isAnyAccountModalOpen);
@@ -1031,8 +1031,9 @@ export default function AccountsPageContent() {
   }, [markModalOpenStart, rows.length]);
   const handleTestAccount = useCallback((row: AccountResp) => {
     markModalOpenStart('test', rows.length);
-    setBulkTestAccounts(null);
-    setTestingAccount(row);
+    const id = ++nextTestSessionId.current;
+    setTestSessions((sessions) => [...sessions, { id, bulk: false, accounts: [row] }]);
+    setVisibleTestSession(id);
   }, [markModalOpenStart, rows.length]);
   const handleStatsAccount = useCallback((id: number) => {
     markModalOpenStart('stats', rows.length);
@@ -1147,17 +1148,15 @@ export default function AccountsPageContent() {
       .filter((account): account is AccountResp => account != null);
     if (selectedAccounts.length === 0) return;
     markModalOpenStart('bulk-test', rows.length);
-    setTestingAccount(null);
-    setBulkTestAccounts(selectedAccounts);
+    const id = ++nextTestSessionId.current;
+    setTestSessions((sessions) => [...sessions, { id, bulk: true, accounts: selectedAccounts }]);
+    setVisibleTestSession(id);
   }, [markModalOpenStart, rows.length, selectionStore]);
 
-  const handleCloseAccountTest = useCallback(() => {
-    setTestingAccount(null);
-  }, []);
-
-  const handleCloseBulkTest = useCallback(() => {
-    setBulkTestAccounts(null);
-    clearSelection();
+  const handleCloseTestSession = useCallback((id: number, bulk: boolean) => {
+    setTestSessions((sessions) => sessions.filter((session) => session.id !== id));
+    setVisibleTestSession((visible) => visible === id ? null : visible);
+    if (bulk) clearSelection();
     void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
   }, [clearSelection, queryClient]);
 
@@ -1725,24 +1724,27 @@ export default function AccountsPageContent() {
         />
       )}
 
-      {/* 批量测试：按平台和账号类型分组选择模型，同类账号并发复用单账号测试接口。 */}
-      {bulkTestAccounts ? (
+      {/* Keep background sessions mounted so streams and results survive dismissal. */}
+      {testSessions.map((session) => session.bulk ? (
         <BulkAccountTestModal
-          open
-          accounts={bulkTestAccounts}
-          onClose={handleCloseBulkTest}
+          key={session.id}
+          open={visibleTestSession === session.id}
+          accounts={session.accounts}
+          onBackground={() => setVisibleTestSession(null)}
+          onRestore={() => setVisibleTestSession(session.id)}
+          onClose={() => handleCloseTestSession(session.id, true)}
         />
-      ) : null}
-
-      {/* 单账号测试连接 */}
-      {testingAccount ? (
+      ) : (
         <AccountTestModal
-          open
-          account={testingAccount}
-          onClose={handleCloseAccountTest}
+          key={session.id}
+          open={visibleTestSession === session.id}
+          account={session.accounts[0] ?? null}
+          onBackground={() => setVisibleTestSession(null)}
+          onRestore={() => setVisibleTestSession(session.id)}
+          onClose={() => handleCloseTestSession(session.id, false)}
           onTestComplete={handleAccountTestComplete}
         />
-      ) : null}
+      ))}
 
       {/* 账号统计 */}
       {statsAccountId !== null && (

@@ -1,7 +1,8 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { Toast, ToastQueue, type ToastContentValue } from '@heroui/react';
+import { AlertTriangle } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'danger' | 'warning' | 'info';
+export type ToastType = 'success' | 'error' | 'danger' | 'warning' | 'info' | 'cognition';
 
 export interface ToastOptions {
   timeout?: number;
@@ -60,6 +61,14 @@ function toastVariant(type: ToastType): ToastContentValue['variant'] {
 
 function toastContent(type: ToastType, store: ToastMessageStore, title?: ReactNode): ToastContentValue {
   const message = <MutableToastMessage store={store} />;
+  if (type === 'cognition') {
+    return {
+      title: title ?? message,
+      description: title ? <span className="text-[#a855f7]">{message}</span> : undefined,
+      indicator: <AlertTriangle className="size-5 text-[#a855f7]" />,
+      variant: 'default',
+    };
+  }
   return {
     description: title ? message : undefined,
     title: title ?? message,

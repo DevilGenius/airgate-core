@@ -7,6 +7,7 @@ import { AccountPlatformTypeIcons } from './AccountPlatformTypeIcons';
 import { accountsApi } from '../../../shared/api/accounts';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { SimpleSelect } from '../../../shared/components/SimpleSelect';
+import { useBackgroundTestNotification } from './useBackgroundTestNotification';
 import type { AccountResp, ModelInfo } from '../../../shared/types';
 import {
   filterConnectivityTestModels,
@@ -48,10 +49,14 @@ interface PlatformModelState {
 export function BulkAccountTestModal({
   accounts,
   onClose,
+  onBackground,
+  onRestore,
   open,
 }: {
   accounts: AccountResp[];
   onClose: () => void;
+  onBackground: () => void;
+  onRestore: () => void;
   open: boolean;
 }) {
   const { t } = useTranslation();
@@ -77,7 +82,6 @@ export function BulkAccountTestModal({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
     abortRef.current?.abort();
     textRef.current.clear();
     setItems(accounts.map((account) => ({
@@ -135,7 +139,7 @@ export function BulkAccountTestModal({
     return () => {
       active = false;
     };
-  }, [accounts, groups, open, t]);
+  }, [accounts, groups, t]);
 
   useEffect(() => () => {
     abortRef.current?.abort();
@@ -232,8 +236,16 @@ export function BulkAccountTestModal({
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
-      if (!nextOpen) handleClose();
+      if (!nextOpen) onBackground();
     },
+  });
+  useBackgroundTestNotification({
+    open,
+    running,
+    finished,
+    title: `${t('accounts.bulk_test_title')} · ${t('accounts.bulk_test_group_count', { count: accounts.length })}`,
+    type: !finished ? 'info' : failed > 0 ? 'error' : cognition > 0 ? 'cognition' : warning > 0 ? 'warning' : 'success',
+    onRestore,
   });
   const progress = accounts.length > 0 ? Math.round((done / accounts.length) * 100) : 0;
   const successPercent = accounts.length > 0 ? (success / accounts.length) * 100 : 0;
@@ -253,6 +265,7 @@ export function BulkAccountTestModal({
   return (
     <CommonModal
       className="ag-account-page-modal"
+      onCloseTrigger={handleClose}
       description={t('accounts.bulk_test_desc')}
       footer={(
         <div className="flex w-full justify-end gap-2">
@@ -385,7 +398,7 @@ export function BulkAccountTestModal({
                   ) : null}
                 </div>
                 {items.filter((item) => item.groupKey === group.key).map((item) => {
-                  const message = item.status === 'error' || item.status === 'warning' ? item.error ?? item.text : item.text;
+                  const message = item.status === 'error' || item.status === 'warning' || item.status === 'cognition' ? item.error ?? item.text : item.text;
                   return (
                     <div
                       key={item.id}
