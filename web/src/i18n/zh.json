@@ -527,6 +527,7 @@
     "test_background_running": "测试正在后台运行，点击查看进度",
     "test_background_finished": "测试已完成，点击查看结果",
     "test_background_restore": "点击返回测试窗口",
+    "test_cancelled_on_close": "测试窗口已关闭，已取消未完成的测试请求。已产生的用量仍可能计费。",
     "select_model": "选择测试模型",
     "start_test": "开始测试",
     "retry": "重试",

@@ -16,6 +16,26 @@ export function useBackgroundTestNotification({
   const { toast } = useToast();
   const restoreRef = useRef(onRestore);
   restoreRef.current = onRestore;
+  const latestRef = useRef({ running, title, t, toast });
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    latestRef.current = { running, title, t, toast };
+  }, [running, title, t, toast]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const latest = latestRef.current;
+      // Ignore StrictMode's cleanup/re-setup; notify only after a real unmount.
+      queueMicrotask(() => {
+        if (!mountedRef.current && latest.running) {
+          latest.toast('info', latest.t('accounts.test_cancelled_on_close'), latest.title, { timeout: 4000 });
+        }
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (open) return;

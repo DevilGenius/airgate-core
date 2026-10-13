@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { StrictMode, type ReactNode } from 'react';
+import { cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useBackgroundTestNotification } from './useBackgroundTestNotification';
 
@@ -41,4 +41,30 @@ it.each(['error', 'cognition'] as const)('cleans up background notices on unmoun
   expect(mocks.toast).toHaveBeenCalledWith(type, expect.anything(), 'Account B', { timeout: 0 });
   unmount();
   expect(mocks.close).toHaveBeenCalledWith('failed');
+});
+
+it.each([true, false])('notifies on unmount of a running test (open=%s) with an auto-dismiss timeout', async (open) => {
+  mocks.toast.mockReturnValue('progress');
+  const { unmount } = renderHook(() => useBackgroundTestNotification({
+    open, running: true, finished: false, title: 'Running test', type: 'info', onRestore: vi.fn(),
+  }));
+  unmount();
+  await waitFor(() => expect(mocks.toast).toHaveBeenLastCalledWith(
+    'info', 'accounts.test_cancelled_on_close', 'Running test', { timeout: 4000 },
+  ));
+  if (!open) expect(mocks.close).toHaveBeenCalledWith('progress');
+});
+
+it('does not report cancellation after completion or on StrictMode effect replay', async () => {
+  const initialProps = { open: true, running: true, finished: false, title: 'Test', type: 'success' as const, onRestore: vi.fn() };
+  const { rerender, unmount } = renderHook(useBackgroundTestNotification, {
+    initialProps,
+    wrapper: ({ children }) => <StrictMode>{children}</StrictMode>,
+  });
+  await Promise.resolve();
+  expect(mocks.toast).not.toHaveBeenCalled();
+  rerender({ ...initialProps, running: false, finished: true });
+  unmount();
+  await Promise.resolve();
+  expect(mocks.toast).not.toHaveBeenCalled();
 });

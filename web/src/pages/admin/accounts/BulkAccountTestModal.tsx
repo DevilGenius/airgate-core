@@ -236,7 +236,9 @@ export function BulkAccountTestModal({
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
-      if (!nextOpen) onBackground();
+      if (nextOpen) return;
+      if (finished) handleClose();
+      else onBackground();
     },
   });
   useBackgroundTestNotification({

@@ -216,7 +216,9 @@ export function AccountTestModal({
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
-      if (!nextOpen) onBackground();
+      if (nextOpen) return;
+      if (status === 'success' || status === 'error') handleClose();
+      else onBackground();
     },
   });
 
