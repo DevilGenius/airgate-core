@@ -22,6 +22,7 @@ import (
 	"github.com/DevilGenius/airgate-core/internal/accountpriority"
 	"github.com/DevilGenius/airgate-core/internal/accountweight"
 	appproxy "github.com/DevilGenius/airgate-core/internal/app/proxy"
+	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/infra/accountcache"
 	"github.com/DevilGenius/airgate-core/internal/modelpolicy"
 	"github.com/DevilGenius/airgate-core/internal/monitoring"
@@ -81,6 +82,11 @@ type AccountDeletionObserver interface {
 	OnAccountsDeleted(accountIDs []int)
 }
 
+type ConnectivityTestBilling interface {
+	Begin(userID int) (string, func(), error)
+	Record(context.Context, billing.UsageRecord, *sdk.Usage, plugin.ForwardUsageRates) (int, error)
+}
+
 // Service 提供账号域用例编排；账号用量探测与缓存由内部 accountUsageService 负责。
 type Service struct {
 	repo             Repository
@@ -92,6 +98,11 @@ type Service struct {
 	monitor          monitoring.Recorder
 	now              func() time.Time
 	usage            *accountUsageService
+	testBilling      ConnectivityTestBilling
+}
+
+func (s *Service) SetConnectivityTestBilling(billing ConnectivityTestBilling) {
+	s.testBilling = billing
 }
 
 // NewService 创建账号服务。
@@ -1201,7 +1212,7 @@ func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, e
 }
 
 // PrepareConnectivityTest 准备账号连通性测试。
-func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID string) (*ConnectivityTest, error) {
+func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID string, userID int) (*ConnectivityTest, error) {
 	logger := sdk.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
@@ -1270,14 +1281,38 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 		AccountType: item.Type,
 		ModelID:     modelID,
 		run: func(runCtx context.Context, writer http.ResponseWriter) (ConnectivityTestTiming, error) {
+			var userEmail string
+			if s.testBilling != nil {
+				var release func()
+				var err error
+				userEmail, release, err = s.testBilling.Begin(userID)
+				if err != nil {
+					return ConnectivityTestTiming{}, err
+				}
+				defer release()
+			}
 			req := *forwardReq
 			req.Writer = writer
 			capture := &cognitionResponseWriter{ResponseWriter: writer}
 			if policy.Enabled {
 				req.Writer = capture
 			}
+			started := time.Now()
 			outcome, forwardErr := inst.Forward(runCtx, &req)
 			timing := connectivityTestTiming(outcome)
+			// Settle confirmed consumption before cognition checks or downstream cancellation.
+			if s.testBilling != nil && outcome.Usage != nil && (outcome.Kind == sdk.OutcomeSuccess || outcome.Kind == sdk.OutcomeClientError || outcome.Kind == sdk.OutcomeStreamAborted) {
+				recordCtx, cancel := context.WithTimeout(context.WithoutCancel(runCtx), 10*time.Second)
+				_, recordErr := s.testBilling.Record(recordCtx, billing.UsageRecord{
+					UserID: userID, UserEmail: userEmail, AccountID: item.ID,
+					Platform: item.Platform, Model: modelID, Endpoint: "/v1/chat/completions",
+					Stream: true, DurationMs: time.Since(started).Milliseconds(),
+				}, outcome.Usage, plugin.ForwardUsageRates{Billing: 1, Sell: 1, Account: item.RateMultiplier})
+				cancel()
+				if recordErr != nil {
+					logger.Error("account_test_record_usage_failed", sdk.LogFieldUserID, userID, sdk.LogFieldAccountID, item.ID, sdk.LogFieldError, recordErr)
+				}
+			}
 			if policy.Enabled {
 				degraded := forwardErr != nil || outcome.Kind != sdk.OutcomeSuccess || capture.overflow || !policy.matcher.MatchString(capture.text())
 				if _, persistErr := s.updateAccount(runCtx, item.ID, UpdateInput{CognitionDegraded: &degraded}); persistErr != nil {

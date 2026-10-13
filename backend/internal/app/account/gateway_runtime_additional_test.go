@@ -413,7 +413,7 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 	}, nil, stateWriter)
 	service.SetMonitorRecorder(recorder)
 
-	ct, err := service.PrepareConnectivityTest(t.Context(), 11, "")
+	ct, err := service.PrepareConnectivityTest(t.Context(), 11, "", 7)
 	if err != nil {
 		t.Fatalf("PrepareConnectivityTest() error = %v", err)
 	}
@@ -460,7 +460,7 @@ func TestPrepareConnectivityTestRunsGatewayOutcomes(t *testing.T) {
 	}, nil, stateWriter)
 	service.SetMonitorRecorder(recorder)
 
-	ct, err = service.PrepareConnectivityTest(t.Context(), 12, "")
+	ct, err = service.PrepareConnectivityTest(t.Context(), 12, "", 7)
 	if err != nil {
 		t.Fatalf("PrepareConnectivityTest failure case error = %v", err)
 	}

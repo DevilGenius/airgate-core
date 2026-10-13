@@ -508,12 +508,18 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 		return
 	}
 
+	userID, ok := currentUserID(c)
+	if !ok || userID <= 0 {
+		response.Unauthorized(c, "用户未认证")
+		return
+	}
+
 	var req struct {
 		ModelID string `json:"model_id"`
 	}
 	_ = c.ShouldBindJSON(&req)
 
-	testPlan, err := h.service.PrepareConnectivityTest(c.Request.Context(), id, req.ModelID)
+	testPlan, err := h.service.PrepareConnectivityTest(c.Request.Context(), id, req.ModelID, userID)
 	if err != nil {
 		httpCode, message := h.handleError("测试账号失败", "测试失败", err)
 		response.Error(c, httpCode, httpCode, message)

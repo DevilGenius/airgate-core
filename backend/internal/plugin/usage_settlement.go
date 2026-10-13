@@ -8,7 +8,8 @@ import (
 	sdk "github.com/DevilGenius/airgate-sdk/sdkgo"
 )
 
-type usageSettlementRates struct{ Billing, Sell, Account float64 }
+type ForwardUsageRates struct{ Billing, Sell, Account float64 }
+type usageSettlementRates = ForwardUsageRates
 type usageSettlement struct {
 	Usage    usageSnapshot
 	Costs    billing.CalculateResult

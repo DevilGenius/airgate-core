@@ -1291,61 +1291,12 @@ func (h *HostService) recordHostForwardUsage(
 	if err != nil {
 		return 0, err
 	}
-
-	settled := settleUsage(h.calculator, usage, usageSettlementRates{
-		Billing: route.EffectiveRate, Sell: sellRate, Account: accFull.RateMultiplier,
-	})
-	usageValues, calc, usageMetadata := settled.Usage, settled.Costs, settled.Metadata
-
-	h.scheduler.AddWindowCost(ctx, accountID, calc.AccountCost)
-
-	actualModel := usage.Model
-	if actualModel == "" {
-		actualModel = model
-	}
-
-	record := billing.UsageRecord{
-		UserID:                int(req.UserID),
-		UserEmail:             userEmail,
-		APIKeyID:              int(req.APIKeyID),
-		AccountID:             accountID,
-		GroupID:               route.GroupID,
-		Platform:              platform,
-		Model:                 actualModel,
-		InputTokens:           usageValues.InputTokens,
-		OutputTokens:          usageValues.OutputTokens,
-		CachedInputTokens:     usageValues.CachedInputTokens,
-		CacheCreationTokens:   usageValues.CacheCreationTokens,
-		ReasoningOutputTokens: usageValues.ReasoningOutputTokens,
-		InputPrice:            usageValues.InputPrice,
-		OutputPrice:           usageValues.OutputPrice,
-		CachedInputPrice:      usageValues.CachedInputPrice,
-		CacheCreationPrice:    usageValues.CacheCreationPrice,
-		InputCost:             calc.InputCost,
-		OutputCost:            calc.OutputCost,
-		CachedInputCost:       calc.CachedInputCost,
-		CacheCreationCost:     calc.CacheCreationCost,
-		TotalCost:             calc.TotalCost,
-		ActualCost:            calc.ActualCost,
-		BilledCost:            calc.BilledCost,
-		AccountCost:           calc.AccountCost,
-		RateMultiplier:        calc.RateMultiplier,
-		SellRate:              calc.SellRate,
-		AccountRateMultiplier: calc.AccountRateMultiplier,
-		ServiceTier:           usageValues.ServiceTier,
-		Endpoint:              req.Path,
-		ReasoningEffort:       hostForwardReasoningEffort(req),
-		Stream:                req.Stream,
-		DurationMs:            duration.Milliseconds(),
-		FirstEventMs:          usageValues.FirstEventMs,
-		FirstTokenMs:          usageValues.FirstTokenMs,
-		WSDialMs:              usageValues.WSDialMs,
-		UsageMetadata:         usageMetadata,
-	}
-	if h.recorder == nil {
-		return 0, nil
-	}
-	return h.recorder.RecordSync(ctx, record)
+	return NewForwardUsageBilling(h.calculator, h.recorder, h.scheduler).Record(ctx, billing.UsageRecord{
+		UserID: int(req.UserID), UserEmail: userEmail, APIKeyID: int(req.APIKeyID),
+		AccountID: accountID, GroupID: route.GroupID, Platform: platform, Model: model,
+		Endpoint: req.Path, ReasoningEffort: hostForwardReasoningEffort(req),
+		Stream: req.Stream, DurationMs: duration.Milliseconds(),
+	}, usage, ForwardUsageRates{Billing: route.EffectiveRate, Sell: sellRate, Account: accFull.RateMultiplier})
 }
 
 func (h *HostService) hostForwardSellRate(_ context.Context, req hostForwardRequest) (float64, error) {
@@ -1859,19 +1810,9 @@ func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFu
 }
 
 func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64) error {
-	u := routegraph.User(int(userID))
-	if u == nil {
-		return status.Error(codes.NotFound, "用户不存在")
-	}
-	if !u.Active() {
-		return status.Error(codes.PermissionDenied, "用户已禁用")
-	}
-	if u.Balance <= 0 {
-		return hostForwardInsufficientQuotaError()
-	}
-	return nil
+	_, err := forwardUsageUser(int(userID))
+	return err
 }
-
 func (h *HostService) checkHostForwardAPIKey(req hostForwardRequest) error {
 	if req.APIKeyID <= 0 {
 		return nil

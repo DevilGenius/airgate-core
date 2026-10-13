@@ -748,7 +748,7 @@ func usageLogInsertValues(rec UsageRecord, createdAt time.Time) ([]any, error) {
 		rec.UserID,
 		nullablePositiveID(rec.APIKeyID),
 		rec.AccountID,
-		rec.GroupID,
+		nullablePositiveID(rec.GroupID),
 	}, nil
 }
 

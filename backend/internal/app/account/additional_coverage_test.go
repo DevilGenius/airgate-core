@@ -271,7 +271,7 @@ func TestPrepareConnectivityTestValidationBranches(t *testing.T) {
 			return Account{}, repoErr
 		},
 	}, stubPluginCatalog{}, nil, nil)
-	if _, err := service.PrepareConnectivityTest(t.Context(), 1, ""); !errors.Is(err, repoErr) {
+	if _, err := service.PrepareConnectivityTest(t.Context(), 1, "", 7); !errors.Is(err, repoErr) {
 		t.Fatalf("PrepareConnectivityTest lookup error = %v, want %v", err, repoErr)
 	}
 
@@ -280,7 +280,7 @@ func TestPrepareConnectivityTestValidationBranches(t *testing.T) {
 			return Account{ID: 1, Platform: "openai", Type: "oauth"}, nil
 		},
 	}, stubPluginCatalog{}, nil, nil)
-	if _, err := service.PrepareConnectivityTest(t.Context(), 1, ""); !errors.Is(err, ErrPluginNotFound) {
+	if _, err := service.PrepareConnectivityTest(t.Context(), 1, "", 7); !errors.Is(err, ErrPluginNotFound) {
 		t.Fatalf("PrepareConnectivityTest plugin error = %v, want ErrPluginNotFound", err)
 	}
 

@@ -313,7 +313,7 @@ func TestAccountAuxiliaryRoutesSuccessWithSQLite(t *testing.T) {
 		t.Fatalf("refresh token status = %d, body=%s", w.Code, w.Body.String())
 	}
 
-	w = invokeHandlerForValidation(http.MethodPost, "/accounts/"+accountIDString+"/test", `{"model_id":"model-test"}`, accountParams, nil, accountHandler.TestAccount)
+	w = invokeHandlerForValidation(http.MethodPost, "/accounts/"+accountIDString+"/test", `{"model_id":"model-test"}`, accountParams, func(c *gin.Context) { c.Set("user_id", 7) }, accountHandler.TestAccount)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("test account status = %d, body=%s", w.Code, w.Body.String())
 	}

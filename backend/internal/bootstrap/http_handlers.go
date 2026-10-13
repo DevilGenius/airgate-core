@@ -87,6 +87,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	verifyCodeStore := mailer.NewVerifyCodeStore()
 	accountStore := store.NewAccountStore(dep.DB)
 	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency, dep.Scheduler)
+	accountService.SetConnectivityTestBilling(plugin.NewForwardUsageBilling(billing.NewCalculator(), dep.Recorder, dep.Scheduler))
 	accountService.SetAccountChangePublisher(dep.Events)
 	accountService.SetUsageCacheRedis(dep.Redis)
 	accountService.SetAccountDeletionObserver(dep.Scheduler)

@@ -67,7 +67,7 @@ func TestCognitionTestPolicy(t *testing.T) {
 					return Account{ID: 1}, nil
 				},
 			}, accountGatewayCatalog{instances: map[string]*plugin.PluginInstance{"openai": runtime.instance}}, nil, nil)
-			plan, err := service.PrepareConnectivityTest(t.Context(), 1, "gpt-test")
+			plan, err := service.PrepareConnectivityTest(t.Context(), 1, "gpt-test", 7)
 			if err != nil {
 				t.Fatal(err)
 			}
