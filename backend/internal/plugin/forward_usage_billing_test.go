@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"entgo.io/ent/dialect/sql/schema"
+
 	"github.com/DevilGenius/airgate-core/internal/billing"
 	"github.com/DevilGenius/airgate-core/internal/routegraph"
 	"github.com/DevilGenius/airgate-core/internal/testdb"

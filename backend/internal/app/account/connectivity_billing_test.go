@@ -13,12 +13,13 @@ import (
 )
 
 type testConnectivityBilling struct {
-	userID     int
-	released   bool
-	beginErr   error
-	records    []billing.UsageRecord
-	rates      []plugin.ForwardUsageRates
-	contextErr error
+	userID       int
+	released     bool
+	beginErr     error
+	records      []billing.UsageRecord
+	rates        []plugin.ForwardUsageRates
+	contextErr   error
+	beforeRecord func()
 }
 
 func (b *testConnectivityBilling) Begin(userID int) (string, func(), error) {
@@ -27,6 +28,9 @@ func (b *testConnectivityBilling) Begin(userID int) (string, func(), error) {
 }
 
 func (b *testConnectivityBilling) Record(ctx context.Context, record billing.UsageRecord, _ *sdk.Usage, rates plugin.ForwardUsageRates) (int, error) {
+	if b.beforeRecord != nil {
+		b.beforeRecord()
+	}
 	b.contextErr = ctx.Err()
 	b.records = append(b.records, record)
 	b.rates = append(b.rates, rates)
@@ -34,12 +38,16 @@ func (b *testConnectivityBilling) Record(ctx context.Context, record billing.Usa
 }
 
 func TestConnectivityUsageSettlement(t *testing.T) {
-	for _, name := range []string{"success", "degraded", "cancelled", "no-usage", "admission-denied"} {
+	for _, name := range []string{"success", "degraded", "cancelled-during-settlement", "cancelled-before-usage", "no-usage", "admission-denied"} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			calls := 0
 			biller := &testConnectivityBilling{}
+			if name == "cancelled-during-settlement" {
+				// Cancel only after Usage has crossed the RPC boundary.
+				biller.beforeRecord = cancel
+			}
 			if name == "admission-denied" {
 				biller.beginErr = billing.ErrBillingBusy
 			}
@@ -47,15 +55,18 @@ func TestConnectivityUsageSettlement(t *testing.T) {
 				platform: "openai",
 				handle: func(context.Context, string, string, string, http.Header, []byte) (int, http.Header, []byte, error) {
 					if name == "degraded" {
-						return 200, nil, []byte(`{"enabled":true,"prompt":"compute","pattern":"^42$"}`), nil
+						return 200, nil, []byte(`{"enabled":true,"prompt":"compute","regexp":"^42$"}`), nil
 					}
 					return 200, nil, []byte(`{"enabled":false}`), nil
 				},
 				forward: func(context.Context, *sdk.ForwardRequest) (sdk.ForwardOutcome, error) {
 					calls++
 					outcome := sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess, Usage: &sdk.Usage{InputCost: 1}}
-					if name == "cancelled" {
+					if name == "cancelled-before-usage" {
 						cancel()
+						return sdk.ForwardOutcome{Kind: sdk.OutcomeStreamAborted}, context.Canceled
+					}
+					if name == "cancelled-during-settlement" {
 						outcome.Kind = sdk.OutcomeStreamAborted
 					}
 					if name == "no-usage" {
@@ -76,7 +87,7 @@ func TestConnectivityUsageSettlement(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = plan.RunWithTiming(ctx, httptest.NewRecorder())
+			timing, err := plan.RunWithTiming(ctx, httptest.NewRecorder())
 			if name == "admission-denied" {
 				if !errors.Is(err, billing.ErrBillingBusy) || calls != 0 {
 					t.Fatalf("err=%v calls=%d", err, calls)
@@ -86,10 +97,15 @@ func TestConnectivityUsageSettlement(t *testing.T) {
 			if biller.userID != 7 || !biller.released {
 				t.Fatalf("billing lifecycle: %+v", biller)
 			}
-			if name == "degraded" && err == nil {
-				t.Fatal("expected cognition failure")
+			if name == "degraded" && (err == nil || timing.CognitionDegraded == nil || !*timing.CognitionDegraded) {
+				t.Fatalf("expected cognition failure, timing=%+v err=%v", timing, err)
 			}
-			if name == "no-usage" {
+			if name == "cancelled-during-settlement" || name == "cancelled-before-usage" {
+				if ctx.Err() != context.Canceled {
+					t.Fatal("request context was not cancelled")
+				}
+			}
+			if name == "no-usage" || name == "cancelled-before-usage" {
 				if len(biller.records) != 0 {
 					t.Fatal("invented usage")
 				}
