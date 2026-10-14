@@ -12,8 +12,9 @@ import { useBackgroundTestNotification } from './accounts/useBackgroundTestNotif
 import { SimpleSelect } from '../../shared/components/SimpleSelect';
 import {
   filterConnectivityTestModels,
-  isRateLimitWarning,
+  accountTestResultStatus,
   runAccountConnectivityTest,
+  type AccountTestRunResult,
 } from './accounts/accountTestRunner';
 import type { AccountResp, ModelInfo } from '../../shared/types';
 
@@ -24,13 +25,15 @@ interface OutputLine {
   color: string; // tailwind text color class
 }
 
-interface TestTiming {
-  firstEventMs: number | null;
-  durationMs: number;
-}
+const resultAppearance = {
+  success: { color: 'text-green-300', Icon: Check },
+  warning: { color: 'text-yellow-400', Icon: AlertTriangle },
+  cognition: { color: 'text-[#a855f7]', Icon: AlertTriangle },
+  error: { color: 'text-red-400', Icon: X },
+};
 
-function formatTimingMs(value: number | null): string {
-  if (value === null || !Number.isFinite(value) || value <= 0) return '-';
+function formatTimingMs(value?: number): string {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) return '-';
   return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
 }
 
@@ -62,9 +65,7 @@ export function AccountTestModal({
   const [status, setStatus] = useState<TestStatus>('idle');
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [cognitionDegraded, setCognitionDegraded] = useState<boolean | null>(null);
-  const [timing, setTiming] = useState<TestTiming | null>(null);
+  const [result, setResult] = useState<AccountTestRunResult | null>(null);
   const [copied, setCopied] = useState(false);
 
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -108,9 +109,7 @@ export function AccountTestModal({
     setStatus('idle');
     setOutputLines([]);
     setStreamingContent('');
-    setErrorMessage('');
-    setCognitionDegraded(null);
-    setTiming(null);
+    setResult(null);
     setSelectedModel('');
     setModels([]);
     setLoadingModels(Boolean(accountId));
@@ -138,9 +137,7 @@ export function AccountTestModal({
     setOutputLines([]);
     setStreamingContent('');
     streamingRef.current = '';
-    setErrorMessage('');
-    setCognitionDegraded(null);
-    setTiming(null);
+    setResult(null);
     setStatus('connecting');
 
     addLine(t('accounts.test_connecting'), 'text-yellow-400');
@@ -148,9 +145,10 @@ export function AccountTestModal({
     const controller = new AbortController();
     abortRef.current = controller;
     const startedAt = performance.now();
+    let outcome: AccountTestRunResult;
 
     try {
-      const result = await runAccountConnectivityTest({
+      outcome = await runAccountConnectivityTest({
         accountId: account.id,
         fallbackError: t('accounts.test_error'),
         modelId: selectedModel,
@@ -168,37 +166,22 @@ export function AccountTestModal({
             setStreamingContent(streamingRef.current);
             scrollToBottom();
           },
-          onRawError: (message) => addLine(message, isRateLimitWarning(message) ? 'text-yellow-400' : 'text-red-400'),
         },
       });
-
-      if (controller.signal.aborted) return;
-      setCognitionDegraded(result.cognitionDegraded ?? null);
-      setTiming({
-        firstEventMs: result.firstEventMs ?? null,
-        durationMs: result.durationMs ?? Math.round(performance.now() - startedAt),
-      });
-      if (streamingRef.current) {
-        addLine(streamingRef.current, 'text-green-300');
-        streamingRef.current = '';
-        setStreamingContent('');
-      }
-      if (result.success) {
-        setStatus('success');
-      } else {
-        setStatus('error');
-        setErrorMessage(result.error || t('accounts.test_error'));
-      }
-      onTestComplete?.(account.id, result.success);
     } catch (err) {
-      if ((err as Error).name === 'AbortError' || controller.signal.aborted) return;
-      setTiming({ firstEventMs: null, durationMs: Math.round(performance.now() - startedAt) });
-      setStatus('error');
-      const msg = (err as Error).message;
-      setErrorMessage(msg);
-      addLine(msg, isRateLimitWarning(msg) ? 'text-yellow-400' : 'text-red-400');
-      onTestComplete?.(account.id, false);
+      if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) return;
+      outcome = { success: false, error: err instanceof Error ? err.message : String(err) };
     }
+    if (controller.signal.aborted) return;
+    if (streamingRef.current) {
+      addLine(streamingRef.current, 'text-green-300');
+      streamingRef.current = '';
+      setStreamingContent('');
+    }
+    setResult({ ...outcome, durationMs: outcome.durationMs ?? Math.round(performance.now() - startedAt) });
+    setStatus(outcome.success ? 'success' : 'error');
+    scrollToBottom();
+    onTestComplete?.(account.id, outcome.success);
   }, [account, selectedModel, addLine, onTestComplete, scrollToBottom, t]);
 
   const handleClose = () => {
@@ -207,10 +190,23 @@ export function AccountTestModal({
   };
 
   const clipboardCopy = useClipboard();
+  const isRunning = status === 'connecting' || status === 'streaming';
+  const resultStatus = result ? accountTestResultStatus(result) : 'success';
+  const { color: resultColor, Icon: ResultIcon } = resultAppearance[resultStatus];
+  const resultMessage = result
+    ? result.success
+      ? result.cognitionDegraded === false ? '降智检测：正常' : ''
+      : result.error || t('accounts.test_error')
+    : '';
+  const timingMessage = result ? t('accounts.test_timing', {
+    firstEvent: formatTimingMs(result.firstEventMs),
+    duration: formatTimingMs(result.durationMs),
+  }) : '';
   const handleCopy = async () => {
-    const text = outputLines.map((l) => l.text).join('\n')
-      + (streamingContent ? '\n' + streamingContent : '')
-      + (status === 'success' && cognitionDegraded === false ? '\n\n降智检测：正常' : '');
+    const text = [
+      [...outputLines.map((line) => line.text), streamingContent].filter(Boolean).join('\n'),
+      [resultMessage, timingMessage].filter(Boolean).join('\n'),
+    ].filter(Boolean).join('\n\n');
     await clipboardCopy(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -224,25 +220,22 @@ export function AccountTestModal({
     },
   });
 
-  const rateLimited = status === 'error' && isRateLimitWarning(errorMessage);
-
   useBackgroundTestNotification({
     open,
-    running: status === 'connecting' || status === 'streaming',
-    finished: status === 'success' || status === 'error',
+    running: isRunning,
+    finished: result !== null,
     title: `${t('accounts.test_modal_title')} · ${account?.name ?? ''}`,
-    type: rateLimited ? 'warning' : cognitionDegraded ? 'cognition' : status === 'error' ? 'error' : 'success',
+    type: resultStatus,
     onRestore,
   });
 
   if (!account || !identity) return null;
 
-  const canStart = status !== 'connecting' && status !== 'streaming' && !!selectedModel;
+  const canStart = !isRunning && !!selectedModel;
   const modelOptions = loadingModels
     ? [{ id: '', label: t('common.loading') }]
     : models.map((m) => ({ id: m.id, label: m.name || m.id }));
   const selectedModelLabel = modelOptions.find((item) => item.id === selectedModel)?.label ?? '';
-  const isRunning = status === 'connecting' || status === 'streaming';
 
   return (
     <CommonModal
@@ -332,30 +325,15 @@ export function AccountTestModal({
                             <span className="animate-pulse">_</span>
                           </span>
                         )}
-                        {(status === 'success' || status === 'error') && (
+                        {result && (
                           <div className="mt-3 border-t border-gray-700 pt-3">
-                            {status === 'success' && cognitionDegraded === false && (
-                              <div className="text-green-300">
-                                <Check className="w-3.5 h-3.5 inline mr-1" />
-                                降智检测：正常
+                            {resultMessage && (
+                              <div className={resultColor}>
+                                <ResultIcon className="w-3.5 h-3.5 inline mr-1" />
+                                {resultMessage}
                               </div>
                             )}
-                            {status === 'error' && (
-                              <div className={rateLimited ? 'text-yellow-400' : cognitionDegraded ? 'text-[#a855f7]' : 'text-red-400'}>
-                                {rateLimited || cognitionDegraded
-                                  ? <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />
-                                  : <X className="w-3.5 h-3.5 inline mr-1" />}
-                                {errorMessage || t('accounts.test_error')}
-                              </div>
-                            )}
-                            {timing && (
-                              <div className="mt-0.5 text-gray-400">
-                                {t('accounts.test_timing', {
-                                  firstEvent: formatTimingMs(timing.firstEventMs),
-                                  duration: formatTimingMs(timing.durationMs),
-                                })}
-                              </div>
-                            )}
+                            <div className="mt-0.5 text-gray-400">{timingMessage}</div>
                           </div>
                         )}
                       </>

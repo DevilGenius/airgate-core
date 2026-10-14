@@ -20,6 +20,16 @@ export function isRateLimitWarning(error?: string): boolean {
   return !!error && /\b429\b|rate[\s_-]*limit(?:ed|ing)?|too many requests|限流/i.test(error);
 }
 
+export type AccountTestResultStatus = 'success' | 'warning' | 'cognition' | 'error';
+
+export function accountTestResultStatus(result: AccountTestRunResult): AccountTestResultStatus {
+  if (result.success) return 'success';
+  if (isRateLimitWarning(result.error)) return 'warning';
+  // Upstream failures also set the persisted degradation flag; only a mismatch is a cognition result.
+  if (result.cognitionDegraded === true && result.error === '降智检测未命中正常回复正则，已标记降智') return 'cognition';
+  return 'error';
+}
+
 export function filterConnectivityTestModels(models: ModelInfo[] | null | undefined): ModelInfo[] {
   const filtered = (models ?? []).filter((model) => !model.id.toLowerCase().startsWith('gpt-image-'));
   const lunaIndex = filtered.findIndex((model) => model.id.toLowerCase() === 'gpt-5.6-luna');

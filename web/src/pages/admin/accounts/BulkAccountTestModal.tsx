@@ -11,18 +11,13 @@ import { useBackgroundTestNotification } from './useBackgroundTestNotification';
 import type { AccountResp, ModelInfo } from '../../../shared/types';
 import {
   filterConnectivityTestModels,
-  isRateLimitWarning,
+  accountTestResultStatus,
+  type AccountTestResultStatus,
   runAccountConnectivityTest,
   type AccountTestRunResult,
 } from './accountTestRunner';
 
-type ItemStatus = 'pending' | 'running' | 'success' | 'warning' | 'cognition' | 'error';
-
-export function bulkAccountTestStatus(result: AccountTestRunResult): ItemStatus {
-  if (isRateLimitWarning(result.error)) return 'warning';
-  if (result.cognitionDegraded === true) return 'cognition';
-  return result.success ? 'success' : 'error';
-}
+type ItemStatus = 'pending' | 'running' | AccountTestResultStatus;
 
 interface ItemState {
   groupKey: string;
@@ -158,7 +153,7 @@ export function BulkAccountTestModal({
   }, []);
 
   const recordResult = useCallback((accountId: number, result: AccountTestRunResult) => {
-    const status = bulkAccountTestStatus(result);
+    const status = accountTestResultStatus(result);
     setItems((previous) => previous.map((item) => (
       item.id === accountId
         ? { ...item, status, error: result.error }
