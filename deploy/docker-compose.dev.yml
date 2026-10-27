@@ -44,12 +44,12 @@ services:
       - >-
         set -e;
         corepack enable;
-        corepack prepare pnpm@11.22.0 --activate;
+        corepack prepare pnpm@12.15.0 --activate;
         cd /workspace/airgate-core/web && pnpm install --frozen-lockfile && pnpm build
     restart: "no"
 
   core:
-    image: golang:1.26.5-bookworm
+    image: golang:1.27.3-bookworm
     working_dir: /workspace/airgate-core/backend
     restart: unless-stopped
     depends_on:

@@ -26,7 +26,7 @@ STUDIO_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-studio/assets
 BINARY := $(BACKEND_DIR)/server
 WEBDIST := $(BACKEND_DIR)/internal/web/webdist
 GO := GOTOOLCHAIN=local go
-GOLANGCI_LINT_VERSION := v2.12.2
+GOLANGCI_LINT_VERSION := v2.15.0
 TOOLS_DIR := $(CURDIR)/.tools
 TOOLS_BIN := $(TOOLS_DIR)/bin
 # Keep lint subprocesses away from shared caches/locks that may be inaccessible

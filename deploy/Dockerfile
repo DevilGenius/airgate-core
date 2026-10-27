@@ -7,7 +7,7 @@
 # ---- 阶段 1: 构建前端 ----
 FROM node:22-alpine AS frontend
 WORKDIR /build
-RUN corepack enable && corepack prepare pnpm@11.22.0 --activate
+RUN corepack enable && corepack prepare pnpm@12.15.0 --activate
 
 # 构建 Core 前端
 COPY airgate-core/web/package.json airgate-core/web/pnpm-lock.yaml airgate-core/web/pnpm-workspace.yaml ./airgate-core/web/
@@ -16,7 +16,7 @@ COPY airgate-core/web ./airgate-core/web
 RUN cd airgate-core/web && pnpm build
 
 # ---- 阶段 2: 构建后端 ----
-FROM golang:1.26.5-alpine AS backend
+FROM golang:1.27.3-alpine AS backend
 RUN apk add --no-cache git
 WORKDIR /build
 ENV GOPRIVATE=github.com/DevilGenius/airgate-sdk \

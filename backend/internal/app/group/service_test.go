@@ -264,12 +264,12 @@ func TestStatsForGroupsMergesConcurrencyCounts(t *testing.T) {
 				t.Fatalf("groupIDs = %#v", groupIDs)
 			}
 			return map[int]GroupStats{
-					1: {CapacityTotal: 10},
-					2: {CapacityTotal: 20},
-				}, map[int][]AccountCapacity{
-					1: {{AccountID: 101}, {AccountID: 102}},
-					2: {{AccountID: 201}},
-				}, nil
+				1: {CapacityTotal: 10},
+				2: {CapacityTotal: 20},
+			}, map[int][]AccountCapacity{
+				1: {{AccountID: 101}, {AccountID: 102}},
+				2: {{AccountID: 201}},
+			}, nil
 		},
 	}, reader)
 

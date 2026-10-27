@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-const golangciLintVersion = "v2.12.2"
+const golangciLintVersion = "v2.15.0"
 
 func main() {
 	unusedOnly := flag.Bool("unused", false, "only run unused and staticcheck linters")
